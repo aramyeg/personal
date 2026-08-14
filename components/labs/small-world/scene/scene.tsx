@@ -1,10 +1,11 @@
 'use client'
-import { Suspense, useCallback, useRef, useState } from 'react'
+import { Suspense, useCallback, useMemo, useRef, useState } from 'react'
 import type { MutableRefObject } from 'react'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { hasArt } from '../art-manifest'
 import { BiomeAtmosphere } from './biome-atmosphere'
-import { endingDprFor } from './ending-dpr'
+import { ENDING_DPR_FLOOR, endingDprFor } from './ending-dpr'
+import { LOOK } from './look-table'
 import {
   CAMERA_FOV,
   CAMERA_POSITION,
@@ -177,23 +178,31 @@ function CameraRig({ journeyRef }: { journeyRef: JourneyRef }) {
 }
 
 /**
- * Raises the render's pixel ratio for the ENDING and nothing else (Task 81).
+ * Raises the render's pixel ratio — for the ending since Task 81, for the journey too since Task 130.
  *
  * `ending-dpr.ts` carries the whole argument — why a ceiling with no floor left a 1080p monitor
- * rendering the ending at 1440x900, why the journey deliberately does not get this, and why the
- * decision latches rather than being taken per frame. All this does is read the zoom and write when
- * the answer changes, at the same priority as the rig so the buffer is never resized between the
- * camera being placed and the frame being drawn.
+ * rendering the ending at 1440x900, and why the decision latches rather than being taken per frame.
+ * T130 gave the JOURNEY a floor of its own (`LOOK.journeyDpr`, default 2, Aram's ask), which this
+ * component passes in: at 1 the behaviour is T81's exactly, at 2 the whole lab renders at the
+ * ending's density. All this does is read the zoom and write when the answer changes, at the same
+ * priority as the rig so the buffer is never resized between the camera being placed and the frame
+ * being drawn.
  */
 function EndingDpr({ journeyRef }: { journeyRef: JourneyRef }) {
   const setDpr = useThree((s) => s.setDpr)
-  const viewport = useThree((s) => s.viewport)
-  const current = useRef(viewport.dpr)
-  useFrame(() => {
+  useFrame((state) => {
     const device = typeof window === 'undefined' ? 1 : window.devicePixelRatio
-    const next = endingDprFor(journeyRef.current.ending.zoom, device, current.current)
+    // The renderer's LIVE ratio, never a copy of what this component last asked for — see
+    // `ending-dpr.ts`'s "WHAT IT COMPARES AGAINST IS LOAD-BEARING" for the failure that costs, and
+    // for the trace. Reading the truth is free here (this is already a pure function of the frame)
+    // and it deletes the only piece of state in this component that could be wrong.
+    const next = endingDprFor(
+      journeyRef.current.ending.zoom,
+      device,
+      state.viewport.dpr,
+      LOOK.journeyDpr.value
+    )
     if (next === null) return
-    current.current = next
     setDpr(next)
   }, CAMERA_RIG_PRIORITY)
   return null
@@ -292,6 +301,11 @@ export function SmallWorldScene({
   // empty planet. One-time false→true flip.
   const [bakeReady, setBakeReady] = useState(false)
   const onBakeReady = useCallback(() => setBakeReady(true), [])
+  // Read ONCE, at mount. A new array on every render would make r3f reconfigure the renderer on
+  // every render; a live change to the row is picked up by `<EndingDpr>` on the next frame instead,
+  // which is the path that exists for exactly that.
+  const dprRange = useMemo<[number, number]>(() => [LOOK.journeyDpr.value, ENDING_DPR_FLOOR], [])
+
   return (
     <div aria-hidden="true" style={{ position: 'absolute', inset: 0 }}>
       {/* TAP-TO-ADVANCE, as the FALLBACK it should always have been (Task 61). r3f calls this only
@@ -303,10 +317,12 @@ export function SmallWorldScene({
         gl={{ antialias: true }}
         /* A RANGE, not a setting: r3f clamps window.devicePixelRatio into it. The 2 is a CEILING
            (above it this lab renders no extra pixels — T79 proved a dsf6 capture was the browser
-           upscaling a 2× render), and the 1 is a floor only for the journey. The ENDING raises its
-           own floor to 2 — see `ending-dpr.ts`, and `<EndingDpr>` above, for why a 1080p monitor
-           was rendering the closing frame at 1440×900 and why the journey deliberately keeps 1. */
-        dpr={[1, 2]}
+           upscaling a 2× render); the floor is the look table's journey row, so the buffer is
+           ALLOCATED at the density the lab is going to run at instead of being reallocated on the
+           first frame. It also settles a fight: r3f re-applies this range on every reconfigure,
+           so a range that disagreed with `<EndingDpr>` above would keep undoing it. See
+           `ending-dpr.ts`. */
+        dpr={dprRange}
         onPointerMissed={firePanelAdvance}
       >
         <ToonRampProvider>

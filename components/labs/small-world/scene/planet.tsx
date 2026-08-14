@@ -17,7 +17,13 @@ import {
 } from './biomes'
 import { canonicalTheta } from './renewal'
 import { buildBuckets, makeRenewalMorph, type Buckets } from './bucketed-morph'
-import { makeBoilMaterial, boilAmplitude, loadPlanetAtlas } from './boil-material'
+import {
+  makeBoilMaterial,
+  boilAmplitude,
+  loadPlanetAtlas,
+  loadOcclusionAtlases,
+} from './boil-material'
+import { LOOK } from './look-table'
 import { studioLightsFor } from './desk-studio'
 import { DIALS, subscribe, bakeVersion, readLandDials } from './tunables'
 import { PLANET_RADIUS, terrainBump, terrainBumpB, type LandBakeUV } from './land-bake'
@@ -579,13 +585,21 @@ export function Planet({
   const atlasReady = useRef(false)
   const atlas = useMemo(() => loadPlanetAtlas(() => { atlasReady.current = true }), [])
   useEffect(() => () => atlas.dispose(), [atlas])
+  // T130 — the JOURNEY's two occlusion atlases. Gated on BOTH decoding (see loadOcclusionAtlases):
+  // this term multiplies, so one missing sampler would black out the half of the planet standing
+  // on that variant rather than merely leaving an effect off.
+  const occReady = useRef(false)
+  const occ = useMemo(() => loadOcclusionAtlases(() => { occReady.current = true }), [])
+  useEffect(() => () => { occ.a.dispose(); occ.b.dispose() }, [occ])
   const boil = useMemo(() => {
     const b = makeBoilMaterial(ramp)
     // Bound at construction, not in an effect, so the very first compile already has its sampler
     // — and so a ramp change (which builds a new material) can never leave the new one blind.
     b.uniforms.uBakeAtlas.value = atlas
+    b.uniforms.uOccA.value = occ.a
+    b.uniforms.uOccB.value = occ.b
     return b
-  }, [ramp, atlas])
+  }, [ramp, atlas, occ])
   useEffect(() => () => boil.material.dispose(), [boil])
   const boilStep = useRef(-1)
 
@@ -628,6 +642,21 @@ export function Planet({
     // disagree with the room about how lit the ending is. It is exactly 0 through the whole
     // journey and the still beat, and exactly 1 at the money shot.
     boil.uniforms.uBakeMix.value = atlasReady.current ? studioLightsFor(j.ending) : 0
+    // T130 — the journey's occlusion modulation. Two things are load-bearing here:
+    //
+    //  * It is scaled by `1 − studioLightsFor(ending)`, the SAME pure function the desk's
+    //    crossfade above rides, so at the money shot it is exactly 0 and the fragment block
+    //    branches out entirely. The approved desk frame therefore renders through code that runs
+    //    not one arithmetic operation more than it did before this feature — structural, not
+    //    numerical, and it holds at every setting of the look table's strength row.
+    //  * The rotation goes to the shader so the vertex stage can recompute the renewal front and
+    //    blend variant A's occlusion into variant B's exactly where the geometry morph blends the
+    //    terrains. It is the same `j.rotation` the morph above was just handed, read from the same
+    //    journey frame, so the two cannot disagree about where the world has changed.
+    boil.uniforms.uOccRot.value = j.rotation
+    boil.uniforms.uOccMix.value = occReady.current
+      ? LOOK.occStrength.value * (1 - studioLightsFor(j.ending))
+      : 0
   })
 
   return (

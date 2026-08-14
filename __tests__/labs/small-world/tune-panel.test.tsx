@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, fireEvent, render, screen } from '@testing-library/react'
 import { TunePanel } from '@/components/labs/small-world/overlay/tune-panel'
 import { DIALS, DIAL_KEYS, resetDials } from '@/components/labs/small-world/scene/tunables'
+import { LOOK_KEYS } from '@/components/labs/small-world/scene/look-table'
 
 beforeEach(() => resetDials())
 afterEach(() => {
@@ -10,10 +11,10 @@ afterEach(() => {
 })
 
 describe('TunePanel', () => {
-  it('renders one range input per declared dial (renders whatever tunables declares)', () => {
+  it('renders one range input per declared dial (renders whatever tunables and look-table declare)', () => {
     render(<TunePanel />)
     const sliders = screen.getAllByRole('slider')
-    expect(sliders).toHaveLength(DIAL_KEYS.length)
+    expect(sliders).toHaveLength(DIAL_KEYS.length + LOOK_KEYS.length)
   })
 
   it('shows the group headers', () => {

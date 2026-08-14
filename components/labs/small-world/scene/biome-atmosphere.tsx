@@ -4,6 +4,7 @@ import * as THREE from 'three'
 import { BIOME_MOODS, GRADE_BASE, moodBlendAt } from '../overlay/grade-mood'
 import type { MoodBlend } from '../overlay/grade-mood'
 import { gradeHoldFor, studioLightsFor } from './desk-studio'
+import { LOOK } from './look-table'
 import { Sky } from './sky'
 import type { JourneyRef } from './use-journey'
 
@@ -138,7 +139,18 @@ export const releasedLightMix = (lightMix: number, hold: number): number => ligh
  * which is exactly the scoping the revised law asks for.
  */
 
-/** The journey's rig: a raking key and a fill low enough that the 4-step ramp bands. */
+/**
+ * The journey's rig: a raking key and, as it shipped before T130, a fill low enough that the
+ * 4-step ramp bands.
+ *
+ * `AMBIENT_INTENSITY` IS NO LONGER WHAT THE FRAME WRITES. Aram asked for the desk's fill on the
+ * planet ("I like this ambient lighting of the desk so much more"), T127 measured that copying it
+ * whole muddies three biomes, and T130 made the choice a live row instead of a constant: the frame
+ * loop reads `LOOK.ambient.value` (default 1.00) and this number is the BOTTOM of that row's
+ * range — the rig as it was, still one slider-drag away. `look-table.test.ts` pins the two
+ * together, and the row's top to `STUDIO_AMBIENT_INTENSITY` below, so neither end of the dial can
+ * drift away from a real lighting constant.
+ */
 export const KEY_INTENSITY = 1.55
 export const AMBIENT_INTENSITY = 0.42
 
@@ -172,8 +184,11 @@ export function BiomeAtmosphere({ journeyRef }: { journeyRef: JourneyRef }) {
     }
     if (ambient.current) {
       ambient.current.color.copy(BASE_AMBIENT).lerp(target(b), mix * AMBIENT_FOLLOW)
+      // The look table feeds only the JOURNEY end of the lerp. At `lights = 1` — the money shot —
+      // the desk renders its approved 1.62 whatever the dial says, which is what makes the desk's
+      // pixel hash hold at every setting rather than only at the default.
       ambient.current.intensity = studioLitIntensity(
-        AMBIENT_INTENSITY,
+        LOOK.ambient.value,
         STUDIO_AMBIENT_INTENSITY,
         lights
       )
@@ -185,7 +200,7 @@ export function BiomeAtmosphere({ journeyRef }: { journeyRef: JourneyRef }) {
       <Sky journeyRef={journeyRef} />
       {/* Lower ambient so the 4-step ramp actually bands across the form — high
           fill washed the clay creases into a soft haze. */}
-      <ambientLight ref={ambient} intensity={AMBIENT_INTENSITY} />
+      <ambientLight ref={ambient} intensity={LOOK.ambient.value} />
       {/* Warm key raking from the upper-left, low enough that the terminator
           crosses the visible face — shadow pools in the clay dents and reads the
           toon bands as pinched facets. Both intensities are re-written every frame

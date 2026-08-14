@@ -26,7 +26,15 @@ import { STUDIO_LIGHTS_FULL } from './desk-studio'
  * scroll-driven motion with the whole dressing set live. The ENDING is the opposite on both counts:
  * it is dense printed line-art and hard contact edges, and the camera has stopped.
  *
- * So the floor engages at `STUDIO_LIGHTS_FULL` — the same beat `camera-parallax.ts` opens its
+ * T130 REOPENED THE FIRST HALF OF THAT AND KEPT THE SECOND. Aram asked for the density across the
+ * whole journey, and T127 re-measured the picture argument: the journey the lab ships now carries a
+ * great deal of small high-frequency dressing — conifer needles, striped umbrellas, the corner
+ * peekers, the girl's silhouette — which is not the flat-facet subject the paragraph above was
+ * written about, and which visibly recovers at dpr 2. The PERF half still stands, so the journey's
+ * floor is a look-table row (`LOOK.journeyDpr`) rather than a second constant: default 2, and 1
+ * restores this file's original behaviour exactly. See `endingDprFor` below.
+ *
+ * So the ending's floor engages at `STUDIO_LIGHTS_FULL` — the same beat `camera-parallax.ts` opens its
  * envelope on, and for the same reason. It is where the ending stops CHANGING: the studio has
  * reached full and the closing fifth of the pull-back is deliberately settled on the approved
  * picture. Taken as a relation rather than restated as a number, so retuning the studio's ramp
@@ -38,8 +46,18 @@ import { STUDIO_LIGHTS_FULL } from './desk-studio'
  * Raising the device pixel ratio REALLOCATES THE DRAWING BUFFER — at 1440×900 that is a 2880×1800
  * colour buffer plus its 4× multisample attachments, which is not something to do on a frame where
  * the answer has not changed. `endingDprFor` is therefore a pure function of zoom returning one of
- * two values, and its caller compares against what it last set and writes only on a change. Two
- * writes per visit: one on the way in, one on the way back out if the visitor scrubs upward.
+ * two values, and its caller writes only on a change. At the default (both floors 2) that is ONE
+ * write, at the mount; with the journey at 1 it is two, one on the way in and one on the way back
+ * out if the visitor scrubs upward.
+ *
+ * WHAT IT COMPARES AGAINST IS LOAD-BEARING, and T130 paid for learning it. The caller passes the
+ * renderer's LIVE ratio as `current`, never a copy of what it last asked for. r3f re-applies the
+ * Canvas's own `dpr` range whenever it reconfigures, which discards a `setDpr` written just before
+ * — and a caller holding its own copy then latches on a value the renderer no longer has and never
+ * writes again for the rest of the visit, taking THIS floor down with it. Measured on an
+ * instrumented build: applied at t = 1.72 s, reverted at t = 1.98 s, silent for the remaining
+ * 7.6 s. T81 never met it because its only write happened at the money shot, long after the mount
+ * had settled; a floor that engages on the first frame meets it immediately.
  *
  * The HYSTERESIS is what makes "two" true rather than "usually two". A visitor resting the scroll
  * exactly on the threshold, or a damped scroll settling onto it, would otherwise flip the buffer
@@ -47,7 +65,7 @@ import { STUDIO_LIGHTS_FULL } from './desk-studio'
  * picture. The band is deliberately wide enough that no damped approach can sit inside it.
  */
 
-/** Below this zoom the ending renders at whatever the device asks for; at or above it, at least 2. */
+/** Below this zoom the render takes the JOURNEY's floor; at or above it, the ending's. */
 export const ENDING_DPR_AT = STUDIO_LIGHTS_FULL
 
 /** How far back down the zoom must come before the floor is released. See the header. */
@@ -58,21 +76,35 @@ export const ENDING_DPR_HYSTERESIS = 0.06
 export const ENDING_DPR_FLOOR = 2
 
 /**
- * The dpr this frame wants, given the ending's zoom and what is currently set.
+ * THE JOURNEY GETS A FLOOR TOO, AND IT IS A ROW RATHER THAN A CONSTANT (Task 130).
  *
- * `current` is passed in rather than held in a module variable because this must be a PURE function
- * of its inputs — the lab's standing rule is that scroll determines the frame, and a hidden
- * accumulator would make two visitors at the same scroll position see different buffers.
+ * Aram: *"can we double the pixels during the whole journey?"*. T127 §3 L5 is the measurement
+ * behind the ask — the ending is the only part of the lab rendered at full density, and on a 1×
+ * display that difference is a large part of "the desk looks great". The argument in the header
+ * above is not wrong, it is a TRADE, and the two halves of it now sit on either side of a dial:
+ * `LOOK.journeyDpr` at 1 is this file exactly as T81 shipped it, and at 2 — the default — the
+ * whole lab renders at the ending's density.
  *
- * Returns `null` when nothing should change, so the caller's fast path is a null check rather than
- * a float compare against a value it has to remember how to compute.
+ * The floor is passed IN rather than read here for the same reason `current` is: this stays a pure
+ * function of its inputs, so the tests can hold both settings to the same laws and neither is a
+ * special case.
+ *
+ * THE HYSTERESIS SURVIVES THE GENERALISATION AND MOSTLY STOPS MATTERING. With both floors at 2 the
+ * two branches want the same number, so the threshold has nothing to flip between and the buffer
+ * is allocated once for the visit; with the journey at 1 the band does exactly what T81 built it
+ * for. Both are gated.
  */
-export function endingDprFor(zoom: number, device: number, current: number): number | null {
+export function endingDprFor(
+  zoom: number,
+  device: number,
+  current: number,
+  journeyFloor: number
+): number | null {
   const want =
     zoom >= ENDING_DPR_AT
       ? Math.max(device, ENDING_DPR_FLOOR)
       : zoom <= ENDING_DPR_AT - ENDING_DPR_HYSTERESIS
-        ? device
+        ? Math.max(device, journeyFloor)
         : current
   return want === current ? null : want
 }

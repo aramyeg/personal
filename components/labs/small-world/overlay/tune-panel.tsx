@@ -12,6 +12,16 @@ import {
   nonDefaultSettings,
 } from '../scene/tunables'
 import { PACE_ROWS, totalSecondsFor, authoredTotalSeconds } from '../pace-table'
+import {
+  LOOK,
+  LOOK_KEYS,
+  type LookKey,
+  subscribeLook,
+  lookRevision,
+  setLook,
+  resetLook,
+  nonDefaultLook,
+} from '../scene/look-table'
 
 /**
  * Round 9 (Task 30) — the ?tune=1 roughness panel. A hand-rolled dev overlay (no new
@@ -95,6 +105,60 @@ function DialRow({ dialKey }: { dialKey: DialKey }) {
 }
 
 /**
+ * T130 stitch — the look group (ambient fill / terrain occlusion / journey pixel
+ * ratio) rendered from `look-table.ts`'s own rows. Same Dial shape, separate
+ * store: look rows are read per frame by uniform writes and light intensities,
+ * so they live in the leaf module the scene imports, not in tunables' bake
+ * machinery. The panel just binds sliders to them.
+ */
+function LookDialRow({ lookKey }: { lookKey: LookKey }) {
+  const r = LOOK[lookKey]
+  const changed = r.value !== r.default
+  const places = decimalsFor(r.step)
+  return (
+    <label style={{ display: 'block', margin: '6px 0' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+        <span style={{ opacity: 0.85 }}>{r.label}</span>
+        <span style={{ color: changed ? '#ffcf6b' : '#aab' }}>{r.value.toFixed(places)}</span>
+      </div>
+      <input
+        type="range"
+        min={r.min}
+        max={r.max}
+        step={r.step}
+        value={r.value}
+        onChange={(e) => setLook(lookKey, Number(e.target.value))}
+        style={{ width: '100%', accentColor: '#6bcfff' }}
+      />
+    </label>
+  )
+}
+
+function LookGroup() {
+  return (
+    <div>
+      <div
+        style={{
+          marginTop: 10,
+          marginBottom: 2,
+          textTransform: 'uppercase',
+          letterSpacing: '0.08em',
+          fontSize: 10,
+          opacity: 0.55,
+          borderBottom: '1px solid rgba(255,255,255,0.1)',
+          paddingBottom: 2,
+        }}
+      >
+        look
+      </div>
+      {LOOK_KEYS.map((k) => (
+        <LookDialRow key={k} lookKey={k} />
+      ))}
+    </div>
+  )
+}
+
+/**
  * Task 129 — the pace group's own live readout: each row's authored crossing time
  * plus the whole story's authored total, both in seconds. Purely a display of
  * `pace-table.ts`'s OWN computation (`totalSecondsFor` / `authoredTotalSeconds`) —
@@ -167,6 +231,8 @@ async function copyText(text: string): Promise<boolean> {
 export function TunePanel() {
   // Re-render on any dial change or rebake toggle (values live on the shared store).
   useSyncExternalStore(subscribe, revisionSnapshot, revisionSnapshot)
+  // …and on any look-row change (T130's separate leaf store).
+  useSyncExternalStore(subscribeLook, lookRevision, lookRevision)
   const [open, setOpen] = useState(true)
   const [copied, setCopied] = useState<'ok' | 'fail' | null>(null)
   const rebaking = isRebaking()
@@ -175,7 +241,7 @@ export function TunePanel() {
     // Pretty-printed (2-space indent) so the pasted blob reads cleanly in chat —
     // still every non-default dial, pace included, via the same DIAL_KEYS-driven
     // `nonDefaultSettings()` the store already exposes.
-    const ok = await copyText(JSON.stringify(nonDefaultSettings(), null, 2))
+    const ok = await copyText(JSON.stringify({ ...nonDefaultSettings(), ...nonDefaultLook() }, null, 2))
     setCopied(ok ? 'ok' : 'fail')
     setTimeout(() => setCopied(null), 1200)
   }
@@ -226,10 +292,19 @@ export function TunePanel() {
             )
           })}
 
+          <LookGroup />
+
           <PaceReadout />
 
           <div style={{ display: 'flex', gap: 6, marginTop: 12 }}>
-            <button type="button" onClick={resetDials} style={{ ...BTN, flex: 1 }}>
+            <button
+              type="button"
+              onClick={() => {
+                resetDials()
+                resetLook()
+              }}
+              style={{ ...BTN, flex: 1 }}
+            >
               reset
             </button>
             <button type="button" onClick={onCopy} style={{ ...BTN, flex: 1 }}>
