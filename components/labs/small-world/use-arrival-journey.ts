@@ -6,7 +6,6 @@ import {
   initialArrival,
   isGoverned,
   leashTargetFor,
-  paceCapAt,
   stepArrival,
   type ArrivalState,
 } from './arrival'
@@ -246,29 +245,6 @@ export function useArrivalJourney(
       const lead = rawProgressRef.current - arrivalRef.current.progress
       const pushing = provenance.episode === 'travel' && readerMoved >= -eps
       ff = stepFastForward(ff, arrivalRef.current.progress, lead, pushing, dt, reduced.matches)
-
-      // ── T129 DIAGNOSTIC TELEMETRY (throwaway; reverted before any shipped run) ──
-      const __w = window as unknown as { __swPace?: unknown[] }
-      if (!__w.__swPace) __w.__swPace = []
-      const __prev = arrivalRef.current
-      const __cap = paceCapAt(__prev.progress, reduced.matches)
-      if (__w.__swPace.length < 60000) {
-        __w.__swPace.push({
-          t: Math.round(performance.now()),
-          dt: Number(dt.toFixed(5)),
-          p: __prev.progress,
-          raw: rawProgressRef.current,
-          lead: Number(lead.toFixed(6)),
-          cap: __cap === Infinity ? -1 : Number(__cap.toFixed(6)),
-          mode: __prev.mode,
-          motion,
-          push: pushing ? 1 : 0,
-          ffA: ff.active ? 1 : 0,
-          ffH: Number(ff.held.toFixed(3)),
-          ep: provenance.episode ?? 'none',
-        })
-      }
-      // ── end T129 diagnostic ──
 
       const next = stepArrival(
         arrivalRef.current,
