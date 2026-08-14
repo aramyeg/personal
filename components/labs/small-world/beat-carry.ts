@@ -1,5 +1,6 @@
 import { STEP_MAX_SECONDS } from './arrival'
 import { beatPaceOf, beatWindowAt } from './beat-windows'
+import { DIALS } from './scene/tunables'
 
 /**
  * ============================================================================
@@ -89,8 +90,18 @@ import { beatPaceOf, beatWindowAt } from './beat-windows'
  * ~0.1 s cannot fire inside a gesture. The upper bound is the reader's patience —
  * the freeze this exists to remove is visible almost immediately, so the grace has
  * to be short enough that the beat resumes before the picture reads as stuck.
+ *
+ * IT IS A DIAL SINCE TASK 129 (`paceCarryGrace`), and this const is its DEFAULT — the
+ * value the measurements above were taken against, kept exported because the proofs
+ * are written in it. `stepCarry` reads `carryGraceNow()` so a panel drag takes effect
+ * on the next frame rather than at the next page load.
  */
-export const CARRY_IDLE_SECONDS = 0.14
+export const CARRY_IDLE_SECONDS = DIALS.paceCarryGrace.default
+
+/** The grace the shipped path actually uses — live, so the ?tune panel can move it. */
+export function carryGraceNow(): number {
+  return DIALS.paceCarryGrace.value
+}
 
 /**
  * How far the document may move without it counting as the reader, in CSS pixels.
@@ -188,7 +199,7 @@ export function stepCarry(
 
   const step = Math.min(Math.max(dt, 0), STEP_MAX_SECONDS)
   const idle = (sameBeat ? prev.idle : 0) + step
-  if (idle < CARRY_IDLE_SECONDS) return { beat: beat.id, armed: true, idle, target: null }
+  if (idle < carryGraceNow()) return { beat: beat.id, armed: true, idle, target: null }
 
   // Reduced motion: the boundary in one frame, no ride. See the header.
   if (reducedMotion) return { beat: beat.id, armed: false, idle, target: beat.end }

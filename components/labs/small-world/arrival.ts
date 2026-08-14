@@ -1,6 +1,8 @@
 import { CHAPTER_COUNT } from './chapters'
+import { fastForwardFactor } from './fast-forward'
 import { PANEL_END, TRAVEL_END, type RevealState } from './journey-timeline'
 import { PAGE_SPAN_END } from './overlay/info-beats'
+import { CEILING_ENTRIES, ceilingAt, paceRow, secondsFor, spanEndAt } from './pace-table'
 
 /**
  * CHECKPOINT ARRIVAL: the reveal clock + the scroll absorption that protects it.
@@ -221,6 +223,57 @@ export const STEP_MAX_SECONDS = 0.05
  *     the story is written at, which is the only speed this task is about;
  *   - backward is untouched and 1:1 from the first frame, and the way out forward is
  *     the skip-to-desk affordance, which is instant by provenance (see below).
+ *
+ * ============================================================================
+ * THE CAP IS NO LONGER THIS FILE'S TO CHOOSE (Task 129) — read `pace-table.ts`
+ * ============================================================================
+ * Aram: "the girl should move through the planet at a fixed speed […] the animals
+ * moving after the presentation section should also have a concrete pace […] when the
+ * story is over and Alwi turns around to jump off the planet, this should also have a
+ * certain pace regardless of scrolling speed."
+ *
+ * Two tasks had each grown their own constant against their own beat, and neither
+ * could see the other: `PACE_SECONDS` here was the ceiling over a checkpoint's page
+ * draw, `EXIT_JUMP_SECONDS` in beat-windows was the floor under the leap, and the
+ * spans BETWEEN them — open travel, and the mascots' beat after the page — had no
+ * authored speed at all. `pace-table.ts` is now the one place a section's speed is
+ * written down; this file reads ceilings out of it and stops owning any of them.
+ *
+ * WHAT ACTUALLY CHANGES ON SCREEN, stated plainly because it is the largest change
+ * the governor has had since it shipped: TRAVEL AND THE MASCOTS' BEAT ARE GOVERNED
+ * FOR THE FIRST TIME. `paceCapAt` used to answer `Infinity` everywhere outside a
+ * page's draw span, which is most of the story; it now answers the table, and the
+ * table covers the whole of `[0, 1]`. The consequences are worth being explicit
+ * about, since "the cap now binds nearly everywhere" is exactly the sort of change
+ * that reads as harmless in a diff:
+ *
+ *   - THE TRAVEL CEILING IS HER LEGS, not a taste. It is authored as a SURFACE
+ *     SPEED — 2.2 world units of planet per second, which Task 110 measured as the
+ *     fastest she is unambiguously walking rather than reaching for the run — and
+ *     divided by `JOURNEY_SURFACE_RATE` to become a scroll ceiling. It lands at
+ *     0.0477 progress/s, within 3% of the `GOVERNED_MAX_SPEED` this file has
+ *     promised to serve in full since Task 109. So it costs an ordinary reader
+ *     nothing and binds only the fling it was added for.
+ *   - NO FLOOR CAME WITH IT. Travel and the mascots' beat are capped from above and
+ *     free from below: a reader may stand in the jungle and look at it for as long
+ *     as they like. That asymmetry is deliberate and is argued at the rows.
+ *   - `isGoverned` IS NOW TRUE ALMOST EVERYWHERE IN THE JOURNEY, and the callers
+ *     that shortcut the driver on it (`use-arrival-journey`'s scroll handler,
+ *     `story-stop-snap`) therefore take their governed branch almost everywhere.
+ *     That is the correct reading of what they ask — "is the world's motion being
+ *     shaped here" — and not a regression: the shortcut they skip is a copy of the
+ *     'pass' branch, which stopped meaning "progress is raw" the moment a cap could
+ *     bind, and the driver's own frame is one rAF behind at worst.
+ *
+ * AND ONE SCOPED AMENDMENT TO TASK 126'S LAW. `stepArrival` takes a `fastForward`
+ * flag, and when it is set the cap for this frame is the row's rate times
+ * `fastForwardFactor()`. It is not a hole in "no input pattern outruns the authored
+ * story", because the fast rate may never carry the reader out of the span it was
+ * armed in — the clamp to `spanEndAt(prev.progress)` below is what makes that a
+ * property of this function rather than a promise the caller has to keep. What a
+ * reader may decline is the note in front of them; what they still may not do is
+ * blast past one they have not been shown. See `fast-forward.ts` for how the flag
+ * is armed, and why it is measured as a lead over the world rather than as input.
  */
 
 /**
@@ -243,8 +296,16 @@ export const STEP_MAX_SECONDS = 0.05
  * page no longer draws in would fail silently. `info-beats` is a pure table of
  * constants with no DOM and no React, and there is no cycle: it imports the
  * timeline, and so do we.
+ *
+ * SINCE TASK 129 THAT SPAN IS A ROW IN THE PACE TABLE, and these three names are the
+ * NOTES ROW projected out for the callers and the proofs written against them. The
+ * names are kept because the reasoning above is exactly what they still mean; what
+ * changed is that they are one row of six rather than the whole of the governor.
  */
-export const PACE_SPAN = (PAGE_SPAN_END - TRAVEL_END) / CHAPTER_COUNT
+const NOTES_ROW = paceRow('notes')
+const NOTES_SPAN = NOTES_ROW.spans[0]
+
+export const PACE_SPAN = NOTES_SPAN[1] - NOTES_SPAN[0]
 /**
  * Seconds that span takes at the cap — the authored pace, and the one number here
  * tuned by eye rather than derived. It was bracketed by the content on both sides:
@@ -257,12 +318,29 @@ export const PACE_SPAN = (PAGE_SPAN_END - TRAVEL_END) / CHAPTER_COUNT
  * page's staging — and the manga page does not reveal any more; it prints
  * complete. What the cap paces is unchanged, because the governed span was always
  * the INFO leaf's draw span (`PAGE_SPAN_END`, above) and never the manga clock,
- * and 2.2 s still sits inside the surviving bracket. Re-measured on the shipped
+ * and 2.2 s still sat inside the surviving bracket. Re-measured on the shipped
  * build after the removal: see task-111-report.md.
+ *
+ * AND NOW THE OTHER BRACKET HOLDS IT (Task 129). Aram's complaint was that this beat
+ * is slow, so the dial behind it moved 2.2 -> 1.5: down onto the LOWER bracket
+ * exactly, which is as fast as the info page's own staging allows before its count-up
+ * and its burst stop reading as two events. The notes are now as quick as they can be
+ * made without breaking the thing they pace.
+ *
+ * IT IS A CONST, AND IT IS THE DEFAULT-TIME VALUE. The dial behind it is live and the
+ * ?tune panel writes it, but this is read once at module init - before any panel
+ * exists - so `GOVERNED_MAX_SPEED` below stays a stable number that the fling proofs
+ * and beat-windows' own gate can be stated against. THE LIVE PATH IS `paceCapAt`,
+ * which asks the table every frame; anything that needs the live rate rather than the
+ * shipped one asks `paceRateNow()`.
  */
-export const PACE_SECONDS = 2.2
-/** Progress per second inside the governed span. Outside it the cap is lifted. */
+export const PACE_SECONDS = secondsFor(NOTES_ROW, NOTES_SPAN)
+/** Progress per second inside the notes span, at the DEFAULT dial. See `paceRateNow`. */
 export const PACE_RATE = PACE_SPAN / PACE_SECONDS
+/** The notes row's LIVE rate — what `PACE_RATE` is once the panel has had a say. */
+export function paceRateNow(): number {
+  return NOTES_ROW.rate()
+}
 /**
  * How far the governed world may fall behind the document before the band bottoms
  * out. DERIVED, and from the one thing that bounds what the reader can see: the
@@ -306,16 +384,6 @@ export const GOVERNOR_MAX_LAG = CATCHUP_MAX_SPEED * RETRACT_SECONDS
 export const GOVERNED_MAX_SPEED = PACE_RATE + GOVERNOR_MAX_LAG / PACE_SECONDS
 
 /**
- * Global progress at which each chapter's page-draw span begins — the gates the
- * boundary stop below honours. Derived from the same span `pacedChapterAt` reads,
- * so a retune of the page's staging moves both together.
- */
-const GOVERNED_ENTRIES: readonly number[] = Array.from(
-  { length: CHAPTER_COUNT },
-  (_, chapter) => (chapter + TRAVEL_END) / CHAPTER_COUNT
-)
-
-/**
  * THE BOUNDARY STOP (Task 126, hole 2). The first governed span a forward step from
  * `from` to `to` would cross INTO, or null when it crosses none.
  *
@@ -330,6 +398,13 @@ const GOVERNED_ENTRIES: readonly number[] = Array.from(
  * the exit is where the cap stops applying, and stopping a step on the way out
  * would be pacing the reading tail, which Task 109 already established is the exact
  * definition of trapped.
+ *
+ * IT NOW GUARDS EVERY CEILINGED ROW'S ENTRY (Task 129), not the six page-draw spans
+ * it was written for. The gate list is `CEILING_ENTRIES` — the pace table's own — so
+ * travel, the mascots' beat and the three ending rows all get the same protection
+ * against a frame that steps clean over them. That is hole 2 of Task 126 generalised
+ * rather than a new mechanism: the argument for it was never about which beat was
+ * being jumped, only that a beat WAS.
  */
 export function governedEntryBetween(
   from: number,
@@ -337,7 +412,7 @@ export function governedEntryBetween(
   reducedMotion = false
 ): number | null {
   if (reducedMotion || to <= from) return null
-  for (const entry of GOVERNED_ENTRIES) {
+  for (const entry of CEILING_ENTRIES) {
     if (entry > from && entry < to) return entry
   }
   return null
@@ -370,7 +445,15 @@ export function leashTargetFor(
   return raw > ceiling ? ceiling : null
 }
 
-/** The chapter whose page is drawing itself at this progress, or null. */
+/**
+ * The chapter whose page is drawing itself at this progress, or null.
+ *
+ * SINCE TASK 129 THIS ANSWERS ABOUT THE NOTES ROW ONLY, and is no longer the same
+ * question as "is the governor shaping this frame" — travel and the mascots' beat are
+ * capped too now and this returns null in both. It is kept because "which page is
+ * drawing" is a real question with real callers and proofs; ask `paceCapAt` or
+ * `isGoverned` for the governor's own answer.
+ */
 export function pacedChapterAt(progress: number): number | null {
   const p = Math.min(1, Math.max(0, progress))
   const chapter = Math.min(CHAPTER_COUNT - 1, Math.floor(p / SEGMENT))
@@ -381,10 +464,14 @@ export function pacedChapterAt(progress: number): number | null {
 /**
  * The forward speed limit at a progress position, in progress per second.
  * `Infinity` means direct — scroll is 1:1 and nothing is shaped.
+ *
+ * THE TABLE ANSWERS THIS NOW (Task 129), not a constant in this file, and it answers
+ * LIVE: the ?tune panel writes the rate behind each row, so this must be asked per
+ * frame rather than cached. Reduced motion still lifts every ceiling, which is the
+ * degradation Task 109 wrote and `ceilingAt` preserves verbatim.
  */
 export function paceCapAt(progress: number, reducedMotion = false): number {
-  if (reducedMotion) return Infinity
-  return pacedChapterAt(progress) === null ? Infinity : PACE_RATE
+  return ceilingAt(progress, reducedMotion)
 }
 
 /**
@@ -533,12 +620,21 @@ function unwind(progress: number, prevRaw: number, raw: number, dt: number): num
  */
 export type MotionKind = 'travel' | 'lab' | 'unknown'
 
+/**
+ * `fastForward` is Task 129's scoped amendment, and it is a FLAG rather than a rate
+ * for the same reason `motion` is a kind rather than a distance: the decision belongs
+ * to the state machine that watches the reader (`fast-forward.ts`), and the arithmetic
+ * belongs here. Set, it multiplies THIS ROW'S cap by `fastForwardFactor()` and clamps
+ * the frame to the row's own span end — the second half is what makes "a declined note
+ * cannot become a skipped story" true of this function rather than of its caller.
+ */
 export function stepArrival(
   prev: ArrivalState,
   raw: number,
   dt: number,
   reducedMotion = false,
-  motion: MotionKind = 'unknown'
+  motion: MotionKind = 'unknown',
+  fastForward = false
 ): ArrivalState {
   const step = Math.min(Math.max(dt, 0), STEP_MAX_SECONDS)
   const allowance = Math.min(JUMP_MAX, Math.max(JUMP_MIN, JUMP_SPEED * step))
@@ -605,7 +701,23 @@ export function stepArrival(
       // the cap's own value and the cap stopped binding entirely. The lag it was
       // bounding is bounded by `leashTargetFor` now, on the document, where it
       // costs the reader nothing they can see.
-      const paced = Math.min(progress, prev.progress + cap * step)
+      // THE FAST-FORWARD (Task 129, R2), and the clamp that keeps it honest.
+      //
+      // The rate is a MULTIPLE of the row's own — the page keeps drawing, quickly and
+      // in the same order, instead of snapping to its finished state — and it may
+      // never carry the reader past `spanEndAt(prev.progress)`. The clamp is applied
+      // to `progress` BEFORE `paced` is computed rather than after, or the cap's own
+      // arithmetic could hand back a value past the stop line it was meant to enforce.
+      //
+      // Once the frame lands on that end the reader is standing in the NEXT row, and
+      // `stepFastForward` disarms there — so the amendment is scoped by the same table
+      // that granted it, and a note the reader has not been shown cannot be declined.
+      const effectiveCap = fastForward ? cap * fastForwardFactor() : cap
+      if (fastForward) {
+        const spanEnd = spanEndAt(prev.progress)
+        if (spanEnd !== null) progress = Math.min(progress, spanEnd)
+      }
+      const paced = Math.min(progress, prev.progress + effectiveCap * step)
       if (paced < progress) {
         progress = paced
         // The debt now belongs to the unwind, which is the one piece that already

@@ -11,6 +11,7 @@ import {
   resetDials,
   nonDefaultSettings,
 } from '../scene/tunables'
+import { PACE_ROWS, totalSecondsFor, authoredTotalSeconds } from '../pace-table'
 
 /**
  * Round 9 (Task 30) — the ?tune=1 roughness panel. A hand-rolled dev overlay (no new
@@ -20,6 +21,13 @@ import {
  * meanwhile). "reset" restores defaults; "copy" exports the non-default values as JSON
  * for Aram to paste into chat. Not a shipped surface — only mounts behind the flag, so a
  * compact dark-translucent dev-tool look is the target, not polish.
+ *
+ * Task 129 — the pace group needed no new panel code to RENDER (the group-header loop
+ * below was already generic; see tunables.ts's own header for why). It gets one addition
+ * of its own: `PaceReadout` below, which turns the live rates into the seconds Aram
+ * actually asked to pick — each row's crossing time plus the story's authored total —
+ * read straight off `pace-table.ts`'s own `totalSecondsFor`/`authoredTotalSeconds` rather
+ * than re-derived here.
  */
 
 // Decimal places to display, derived from the dial's step (so 0.001 → 3 places, 1 → 0).
@@ -86,6 +94,50 @@ function DialRow({ dialKey }: { dialKey: DialKey }) {
   )
 }
 
+/**
+ * Task 129 — the pace group's own live readout: each row's authored crossing time
+ * plus the whole story's authored total, both in seconds. Purely a display of
+ * `pace-table.ts`'s OWN computation (`totalSecondsFor` / `authoredTotalSeconds`) —
+ * no re-derivation here — so it can never drift from what the scene actually
+ * paces. Re-renders whenever a dial changes because the parent `TunePanel`
+ * already subscribes to the store via `useSyncExternalStore`.
+ */
+function PaceReadout() {
+  return (
+    <div
+      style={{
+        marginTop: 8,
+        paddingTop: 6,
+        borderTop: '1px solid rgba(255,255,255,0.1)',
+      }}
+    >
+      <div
+        style={{
+          textTransform: 'uppercase',
+          letterSpacing: '0.08em',
+          fontSize: 10,
+          opacity: 0.55,
+          marginBottom: 2,
+        }}
+      >
+        pace readout — seconds
+      </div>
+      {PACE_ROWS.map((row) => (
+        <div key={row.id} style={{ display: 'flex', justifyContent: 'space-between', gap: 6 }}>
+          <span style={{ opacity: 0.7, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {row.label}
+          </span>
+          <span style={{ flex: '0 0 auto' }}>{totalSecondsFor(row).toFixed(2)}s</span>
+        </div>
+      ))}
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 4, fontWeight: 600 }}>
+        <span>story total</span>
+        <span>{authoredTotalSeconds().toFixed(2)}s</span>
+      </div>
+    </div>
+  )
+}
+
 /** Best-effort clipboard write with a legacy execCommand fallback for non-secure hosts. */
 async function copyText(text: string): Promise<boolean> {
   try {
@@ -120,7 +172,10 @@ export function TunePanel() {
   const rebaking = isRebaking()
 
   const onCopy = async () => {
-    const ok = await copyText(JSON.stringify(nonDefaultSettings()))
+    // Pretty-printed (2-space indent) so the pasted blob reads cleanly in chat —
+    // still every non-default dial, pace included, via the same DIAL_KEYS-driven
+    // `nonDefaultSettings()` the store already exposes.
+    const ok = await copyText(JSON.stringify(nonDefaultSettings(), null, 2))
     setCopied(ok ? 'ok' : 'fail')
     setTimeout(() => setCopied(null), 1200)
   }
@@ -170,6 +225,8 @@ export function TunePanel() {
               </div>
             )
           })}
+
+          <PaceReadout />
 
           <div style={{ display: 'flex', gap: 6, marginTop: 12 }}>
             <button type="button" onClick={resetDials} style={{ ...BTN, flex: 1 }}>

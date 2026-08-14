@@ -8,6 +8,7 @@ import {
   HOLD_UNTIL_T,
   JUMP_MAX,
   GOVERNED_MAX_SPEED,
+  paceCapAt,
   PACE_RATE,
   PACE_SECONDS,
   PACE_SPAN,
@@ -34,11 +35,41 @@ import {
   type RevealState,
 } from '@/components/labs/small-world/journey-timeline'
 import { CHAPTER_COUNT } from '@/components/labs/small-world/chapters'
+import {
+  paceRow,
+  secondsFor,
+  totalSecondsFor,
+  type PaceRowId,
+} from '@/components/labs/small-world/pace-table'
+import { GIRL_JUMP_START, GIRL_WALK_END } from '@/components/labs/small-world/scene/girl-exit'
+import { ENDING_SPAN } from '@/components/labs/small-world/ending-timeline'
 
 const FRAME = 1 / 60
 const SEG = 1 / CHAPTER_COUNT
 /** progress at a local position inside chapter i's segment */
 const at = (i: number, local: number) => (i + local) * SEG
+/** The ending's own t → journey progress, for the ungoverned gaps the table leaves. */
+const endingAt = (t: number) => 1 + t * ENDING_SPAN
+
+/** Seconds a pace row is authored to take across ALL its spans, at the live dials. */
+const rowSeconds = (id: PaceRowId) => totalSecondsFor(paceRow(id))
+/** Seconds ONE of a row's spans is authored to take (they are equal within a row here). */
+const spanSeconds = (id: PaceRowId) => secondsFor(paceRow(id), paceRow(id).spans[0])
+
+/**
+ * The furthest the PACE TABLE lets a reader travel from `from` in `seconds`, integrated
+ * frame by frame. Used where a bound used to be one row's constant and now has to
+ * respect whichever rows the run actually crosses — travel and the mascots' beat are
+ * governed since Task 129, and at different rates from the notes.
+ */
+function ceilingReach(from: number, seconds: number): number {
+  let p = from
+  for (let t = 0; t < seconds - 1e-9; t += FRAME) {
+    const cap = paceCapAt(p)
+    p += (cap === Infinity ? 1 : cap) * FRAME
+  }
+  return p
+}
 
 /** Runs frames while `keepGoing`, feeding raw scroll from `scroll`. Returns every state. */
 function drive(
@@ -64,13 +95,23 @@ function drive(
   return out
 }
 
-/** Parks the journey one frame inside chapter `ch`'s dwell, arriving forward. */
+/**
+ * Parks the journey on the frame the hold arms inside chapter `ch`'s dwell, arriving
+ * forward.
+ *
+ * IT TAKES SEVERAL FRAMES SINCE TASK 129 rather than one, and that is the pace table
+ * rather than this helper: the last 0.03 of the travel leg is now governed at her
+ * walking speed, so a reader crosses it in the seconds a walk takes instead of in a
+ * single step. The contract is unchanged — park on the arrival hold, having arrived
+ * forwards, with the reveal clock freshly started — so every test below reads the same
+ * state it always did.
+ */
 function arriveAt(ch: number): { state: ArrivalState; raw: number } {
   const before = at(ch, TRAVEL_END - 0.03)
   const inside = at(ch, TRAVEL_END + 0.01)
   let state = initialArrival(before)
   state = stepArrival(state, before, FRAME)
-  state = stepArrival(state, inside, FRAME)
+  for (let f = 0; f < 240 && state.mode !== 'hold'; f++) state = stepArrival(state, inside, FRAME)
   return { state, raw: inside }
 }
 
@@ -151,23 +192,44 @@ describe('the reveal clock', () => {
     expect(retracting.reveal!.chapter).toBe(1)
     const gone = out.findIndex((s) => s.reveal === null)
     expect(gone).toBeGreaterThanOrEqual(0)
-    // It leaves, and the wait before it starts leaving is the page's own span —
-    // never more, whatever the visitor does with the wheel.
+    // It leaves, and the wait before it starts leaving is the DWELL's own authored
+    // span — never more, whatever the visitor does with the wheel.
+    //
+    // THE WAIT GREW BY THE MASCOTS' BEAT (Task 129) and the bound says so rather than
+    // absorbing it into slack. The reveal retracts when progress leaves the dwell at
+    // `PANEL_END`, and the dwell's tail — `[PAGE_SPAN_END, PANEL_END]`, the animals row
+    // — used to be ungoverned and crossed at whatever speed the wheel asked for. It is
+    // now paced at her travel speed, deliberately, so the mascots' 0.42 s retraction
+    // cannot be preempted. So the wait is the page's span plus the mascots', and the
+    // old `GOVERNOR_MAX_LAG / CATCHUP_MAX_SPEED` debt allowance is kept alongside them.
     expect((gone + 1) * FRAME).toBeLessThanOrEqual(
-      PACE_SECONDS + GOVERNOR_MAX_LAG / CATCHUP_MAX_SPEED + RETRACT_SECONDS + FRAME * 4
+      spanSeconds('notes') +
+        spanSeconds('animals') +
+        GOVERNOR_MAX_LAG / CATCHUP_MAX_SPEED +
+        RETRACT_SECONDS +
+        FRAME * 4
     )
   })
 
   it('resumes rather than replays when scrubbing across the window edge', () => {
     const { state, raw } = arriveAt(1)
     const parked = drive(state, { frames: 120, scroll: () => raw }).pop()!
-    const outside = at(1, TRAVEL_END - 0.02)
+    // THE THRASH IS TIGHTER TO THE EDGE NOW, and the reason is the pace table rather
+    // than the clock. Leaving is 1:1 and instant, as it always was; RETURNING is
+    // governed since Task 129, so the world walks the last stretch back in at her
+    // travel speed instead of arriving on the frame the finger does. Every frame spent
+    // walking back is a frame the reveal is still retracting at 2.5x the speed it
+    // rises, so the old 0.02-deep, 10-crossing thrash now spends more than one full
+    // retraction outside the dwell and the reveal genuinely ends — which is the
+    // sibling test below, not this one. This one is about the window EDGE: cross it,
+    // come back, and the clock must RESUME rather than replay.
+    const outside = at(1, TRAVEL_END - 0.004)
     let s = parked
     let prevT = 1
-    // Thrash the boundary: 10 crossings, 4 frames each.
-    for (let cross = 0; cross < 10; cross++) {
+    // Thrash the boundary: 6 crossings, 3 frames each.
+    for (let cross = 0; cross < 6; cross++) {
       const target = cross % 2 === 1 ? outside : raw
-      for (const step of drive(s, { frames: 4, scroll: () => target })) {
+      for (const step of drive(s, { frames: 3, scroll: () => target })) {
         // The clock is CONTINUOUS across every crossing — a replaying one would
         // snap back to 0 on entry, which is exactly the flicker this rules out.
         expect(step.reveal).not.toBeNull()
@@ -266,9 +328,15 @@ describe('scroll absorption', () => {
     }
     expect(worstStall * FRAME).toBeLessThanOrEqual(ABSORB_MAX_SECONDS)
     // …and it moved at the pace, not at the fling: two seconds of the hardest input
-    // buys two seconds of the beat, which is the whole of what was asked for.
+    // buys two seconds of the story, which is the whole of what was asked for.
+    //
+    // BOUNDED BY THE TABLE, NOT BY ONE ROW (Task 129). Two seconds is longer than the
+    // notes span now — it was 2.2 s, it is 1.5 s — so this run leaves the page and
+    // enters the mascots' beat, which is governed at a DIFFERENT (faster) rate. A
+    // bound written as `PACE_RATE * 2` would be measuring one row against another;
+    // `ceilingReach` integrates whichever rows the run actually crosses.
     const last = run[run.length - 1]
-    expect(last.progress - state.progress).toBeLessThanOrEqual(PACE_RATE * 2 * 1.05)
+    expect(last.progress).toBeLessThanOrEqual(ceilingReach(state.progress, 2) * (1 + 1e-9))
     // …and it never ran ahead of the finger while doing it.
     expect(last.progress).toBeLessThan(raw + 119 * 0.005)
   })
@@ -362,8 +430,13 @@ describe('scroll absorption', () => {
     let drainedAt: number | null = null
     for (let cross = 0; cross < 60 && drainedAt === null; cross++) {
       const target = cross % 2 === 1 ? outside : raw
+      // COUNTED WHERE THE WORLD IS, not where the finger is pointing (Task 129). The
+      // return leg into the checkpoint is governed now — travel is capped at her
+      // walking speed — so scrolling AT the stop is no longer the same thing as being
+      // inside its dwell, and a counter keyed on the target would credit the reveal
+      // with time it spent retracting. The guarantee is about time spent outside.
       for (const step of drive(s, { frames: 3, scroll: () => target })) {
-        if (target === outside) netOutside += FRAME
+        if (dwellChapterAt(step.progress) === null) netOutside += FRAME
         if (step.reveal === null && drainedAt === null) drainedAt = netOutside
         s = step
       }
@@ -379,10 +452,13 @@ describe('scroll absorption', () => {
     const away = drive(parked, { frames: 90, scroll: () => at(1, TRAVEL_END / 2) }).pop()!
     expect(away.reveal).toBeNull()
     expect(away.held).toBe(false)
-    const again = drive(away, {
-      frames: 2,
-      scroll: (f) => (f === 0 ? at(1, TRAVEL_END - 0.01) : at(1, TRAVEL_END + 0.01)),
-    }).pop()!
+    // Walking back in — several frames now rather than two, because the travel leg
+    // between here and the stop is governed (Task 129). What is being proved is the
+    // latch, not the frame count: the second visit gets its own hold and its own
+    // reveal from zero.
+    const back = at(1, TRAVEL_END + 0.01)
+    let again = away
+    for (let f = 0; f < 240 && again.mode !== 'hold'; f++) again = stepArrival(again, back, FRAME)
     expect(again.mode).toBe('hold')
     expect(again.reveal!.t).toBeLessThan(0.1)
   })
@@ -404,8 +480,24 @@ describe('scroll absorption', () => {
     let s = initialArrival(before - notch)
     s = stepArrival(s, before, FRAME)
     s = stepArrival(s, before + notch, FRAME)
-    expect(s.mode).toBe('hold')
+    // THE DISCRIMINATOR IS INVERTED SINCE TASK 129, and it is a stronger one. A
+    // teleport is honoured VERBATIM — `progress = raw`, mode 'pass' — so the proof
+    // that this notch was read as a scroll is that it was NOT honoured verbatim: the
+    // travel it crosses is governed now, and a governed frame is by definition not a
+    // teleported one.
+    expect(s.mode).not.toBe('pass')
+    expect(s.progress).toBeLessThan(before + notch)
+    // …and the checkpoint is not blown past, which is the bug the visitor reported.
+    // The world walks the rest of the way in and the reveal is chapter 3's.
+    for (let f = 0; f < 240 && s.reveal === null; f++) s = stepArrival(s, before + notch, FRAME)
     expect(s.reveal!.chapter).toBe(3)
+    // NO ARRIVAL HOLD HERE ANY MORE, and it is the governor taking the band's job
+    // rather than a beat lost. A hold arms only when the finger is within
+    // ARM_FROM_RELEASE_LAG of the world; one 320 px notch parks the document a good
+    // deal further ahead than that, so what this reader gets is the authored pace for
+    // the whole span instead of the band's stick followed by it. See the sibling
+    // arrivals above, which are within the lag and do hold.
+    expect(dwellChapterAt(s.progress)).toBe(3)
   })
 
   it('reveals instantly and absorbs nothing under reduced motion', () => {
@@ -529,6 +621,18 @@ describe('the pace governor', () => {
   /** Raw scroll that leaves the checkpoint's stop behind at `speed` progress/second. */
   const push = (from: number, speed: number) => (f: number) => from + (f * speed) / 60
 
+  /**
+   * THE UPPER BOUND ON CROSSING A PAGE'S SPAN, stated rather than multiplied.
+   *
+   * It used to be `PACE_SECONDS * 1.35`, where the 35% was quietly the arrival band's
+   * own stick — a FIXED ~0.68 s of hold sitting on top of the span's authored time.
+   * Task 129 moved the notes dial from 2.2 s to 1.5 s and the stick did not move with
+   * it, so the same slack became 45% and the multiplier stopped being true. Naming the
+   * two terms is what the multiplier was standing in for all along, and it now
+   * survives a retune of either.
+   */
+  const spanCeiling = spanSeconds('notes') + HOLD_UNTIL_T * REVEAL_SECONDS + FRAME * 4
+
   it('gives every reader up to GOVERNED_MAX_SPEED the same authored pace', () => {
     const from = at(2, TRAVEL_END + 0.001)
     // Every input from just over the cap to the fastest the guarantee covers — a
@@ -540,7 +644,7 @@ describe('the pace governor', () => {
       const done = run.findIndex((s) => pacedChapterAt(s.progress) === null)
       expect(done).toBeGreaterThanOrEqual(0)
       expect(done * FRAME).toBeGreaterThanOrEqual(PACE_SECONDS * 0.9)
-      expect(done * FRAME).toBeLessThanOrEqual(PACE_SECONDS * 1.35)
+      expect(done * FRAME).toBeLessThanOrEqual(spanCeiling)
     }
   })
 
@@ -562,7 +666,7 @@ describe('the pace governor', () => {
       // The same window the sibling test above holds slow readers to — the upper
       // edge is the arrival band's hold, which adds its own beat on top of the cap.
       expect(done * FRAME).toBeGreaterThanOrEqual(PACE_SECONDS * 0.9)
-      expect(done * FRAME).toBeLessThanOrEqual(PACE_SECONDS * 1.35)
+      expect(done * FRAME).toBeLessThanOrEqual(spanCeiling)
     }
   })
 
@@ -646,10 +750,20 @@ describe('the pace governor', () => {
     expect(pacedChapterAt(at(3, PAGE_SPAN_END - 0.001))).toBe(3)
     expect(pacedChapterAt(at(3, PAGE_SPAN_END + 0.001))).toBeNull()
     expect(pacedChapterAt(at(3, PAGE_SPAN_START - 0.001))).toBeNull()
-    // ...and the reading tail of the dwell is deliberately NOT governed: nothing is
-    // unfolding there, so slowing it would only stop a reader leaving.
-    expect(dwellChapterAt(at(3, PANEL_END - 0.001))).toBe(3)
-    expect(isGoverned(at(3, PANEL_END - 0.001))).toBe(false)
+    // ...and the reading tail of the dwell is not the PAGE's span: nothing is drawing
+    // there, so the notes cap does not reach it.
+    const tail = at(3, PANEL_END - 0.001)
+    expect(dwellChapterAt(tail)).toBe(3)
+    expect(pacedChapterAt(tail)).toBeNull()
+    // IT IS GOVERNED ALL THE SAME SINCE TASK 129, and by a different row: the tail is
+    // the mascots' beat, capped at her travel speed so their 0.42 s retraction cannot
+    // be preempted by a reader crossing the span in one frame. Task 109's "the tail is
+    // where a finished page is READ, and pacing it is the definition of trapped" is
+    // untouched by that — the notes rate is not applied here, the travel rate is, and
+    // it is more than twice as fast.
+    expect(isGoverned(tail)).toBe(true)
+    expect(paceCapAt(tail)).toBeCloseTo(paceRow('animals').rate(), 12)
+    expect(paceCapAt(tail)).toBeGreaterThan(paceCapAt(at(3, PAGE_SPAN_END - 0.001)))
   })
 
   it('can never build a debt big enough to read as a teleport', () => {
@@ -717,9 +831,14 @@ describe('the fling ceiling', () => {
     const { states } = driveLeashed(initialArrival(0), spam, 3600)
     const arrived = states.findIndex((s) => s.progress >= 1)
     expect(arrived).toBeGreaterThanOrEqual(0)
-    // Six beats at their authored pace is the floor the whole task is about. The
-    // travel between them stays free, so the total is that floor plus a little.
-    const authoredTotal = CHAPTER_COUNT * PACE_SECONDS
+    // THE AUTHORED TOTAL IS THE WHOLE TABLE NOW, not six page draws (Task 129).
+    // Task 126 could write `CHAPTER_COUNT * PACE_SECONDS` because the beats were the
+    // only governed spans and the travel between them was free — the floor under a
+    // whole-story traversal was six page draws and nothing else. Every span of the
+    // journey is ceilinged now, so the floor is the sum over the rows that tile it:
+    // travel at her walking speed, the pages at their authored seconds, the mascots'
+    // beat at the travel speed. 13.2 s becomes 25.97 s, and it is the same claim.
+    const authoredTotal = rowSeconds('travel') + rowSeconds('notes') + rowSeconds('animals')
     expect(arrived * FRAME).toBeGreaterThanOrEqual(authoredTotal * 0.95)
     // …and it is not a trap either: an infinite fling still finishes, promptly.
     expect(arrived * FRAME).toBeLessThanOrEqual(authoredTotal * 1.3)
@@ -769,12 +888,29 @@ describe('the fling ceiling', () => {
     })
 
     it('stops a single giant frame on the doorstep instead of over the beat', () => {
-      // The measured shape of the defect: a 932 px frame over a 361 px span. Here the
-      // step is a whole chapter, which is larger still.
+      // THE GATE ONLY FIRES FROM UNGOVERNED GROUND, and since Task 129 the journey has
+      // none: the pace table tiles `[0, 1]`, so a giant frame starting anywhere in a
+      // chapter is capped long before it reaches the next beat's doorstep. The gate is
+      // the second line of defence and this is the first one, measured on the same
+      // scenario Task 126 opened on — a whole-chapter step over a 361 px span:
       const from = at(3, TRAVEL_END - 0.05)
       const stepped = stepArrival(initialArrival(from), from + SEG, FRAME, false, 'travel')
-      expect(stepped.progress).toBeCloseTo(at(3, TRAVEL_END), 12)
-      expect(pacedChapterAt(stepped.progress)).toBe(3)
+      expect(stepped.progress).toBeLessThanOrEqual(at(3, TRAVEL_END))
+      expect(stepped.progress).toBeCloseTo(from + paceCapAt(from) * FRAME, 12)
+      // …and the beat is still not skipped: the next frames walk into it.
+      let walked = stepped
+      for (let f = 0; f < 240 && pacedChapterAt(walked.progress) === null; f++) {
+        walked = stepArrival(walked, from + SEG, FRAME, false, 'travel')
+      }
+      expect(pacedChapterAt(walked.progress)).toBe(3)
+
+      // THE GATE ITSELF, exercised where it can still fire: the brink, which the table
+      // deliberately leaves uncovered (a girl standing on the edge of her world is a
+      // picture, not a beat). A giant frame from there must stop on the leap's entry.
+      const brink = endingAt((GIRL_WALK_END + GIRL_JUMP_START) / 2)
+      expect(paceCapAt(brink)).toBe(Infinity)
+      const leapt = stepArrival(initialArrival(brink), brink + SEG, FRAME, false, 'travel')
+      expect(leapt.progress).toBeCloseTo(endingAt(GIRL_JUMP_START), 12)
     })
 
     it('leaving a beat is never gated — only entering one is', () => {
@@ -795,9 +931,13 @@ describe('the fling ceiling', () => {
       expect(placed.mode).toBe('pass')
 
       const flung = stepArrival(initialArrival(from), far, FRAME, false, 'travel')
-      // Not honoured, and stopped on the first beat it would have crossed.
+      // Not honoured. It used to stop on the first beat it would have crossed; since
+      // Task 129 it does not get that far, because the travel it starts in is itself
+      // capped — one frame buys one frame of a walk, and the beat is two thirds of a
+      // chapter away. Stronger than the gate, and the same guarantee.
       expect(flung.progress).toBeLessThan(far)
-      expect(flung.progress).toBeCloseTo(at(1, TRAVEL_END), 12)
+      expect(flung.progress).toBeLessThan(at(1, TRAVEL_END))
+      expect(flung.progress).toBeCloseTo(from + paceCapAt(from) * FRAME, 12)
     })
 
     it('defaults to the pre-Task-126 rule, so every caller that does not know keeps it', () => {
@@ -807,9 +947,14 @@ describe('the fling ceiling', () => {
         stepArrival(initialArrival(from), far, FRAME, false, 'unknown').progress
       )
       // …and 'unknown' is still DISTANCE, not a free pass: an ordinary-sized step
-      // with no provenance is scrolled through, exactly as it always was.
+      // with no provenance is SCROLLED THROUGH rather than teleported — which since
+      // Task 129 shows up the other way round. A teleport is honoured verbatim, so
+      // `progress === raw` is now the signature of the jump and not of the scroll;
+      // being governed instead is the proof it was read as a scroll.
       const near = from + 0.002
-      expect(stepArrival(initialArrival(from), near, FRAME).progress).toBe(near)
+      const scrolled = stepArrival(initialArrival(from), near, FRAME)
+      expect(scrolled.progress).toBeLessThan(near)
+      expect(scrolled.progress).toBeCloseTo(from + paceCapAt(from) * FRAME, 12)
     })
 
     it('honours a lab glide frame by frame, however small its steps are', () => {
@@ -892,11 +1037,17 @@ describe('renewal safety — the journey never outruns the finger', () => {
 
   it('reaches the same rotation as an unabsorbed scrub of the same scroll', () => {
     const scroll = (f: number) => Math.min(1, f * 0.0012)
-    const run = drive(initialArrival(0), { frames: 1200, scroll })
+    // 0.072 progress/s is half again her walking speed, so the world spends the whole
+    // scrub in debt and pays it back after the finger stops. The run is long enough to
+    // let it — the journey's authored total is ~26 s since Task 129, where it was the
+    // six page draws alone. What is being proved is that the debt is given back
+    // EXACTLY, not how long it takes.
+    const frames = 2400
+    const run = drive(initialArrival(0), { frames, scroll })
     const settled = run[run.length - 1]
     expect(settled.mode).toBe('pass')
     expect(journeyStateAt(settled.progress).rotation).toBeCloseTo(
-      journeyStateAt(scroll(1199)).rotation,
+      journeyStateAt(scroll(frames - 1)).rotation,
       10
     )
   })

@@ -3,6 +3,7 @@ import {
   DIALS,
   DIAL_KEYS,
   bakeVersion,
+  initPersistence,
   isRebaking,
   isTuneEnabled,
   nonDefaultSettings,
@@ -20,6 +21,10 @@ beforeEach(() => resetDials())
 afterEach(() => {
   vi.useRealTimers()
   resetDials()
+  // Persistence is also module-global (Task 129) — leave it disarmed for every
+  // other test in the file, whether or not the test that just ran armed it.
+  initPersistence('')
+  window.localStorage.clear()
 })
 
 describe('DIALS defaults pin the legacy shipped constants EXACTLY', () => {
@@ -120,7 +125,7 @@ describe('DIALS defaults pin the legacy shipped constants EXACTLY', () => {
     expect(DIALS.waterIceAmount.cls).toBe('rebake')
   })
 
-  it('declares exactly the Round-9 dial set, grouped boil/fields/dents/water', () => {
+  it('declares exactly the Round-9 + Task-129 dial set, grouped boil/fields/dents/water/canyon/pace', () => {
     expect(DIAL_KEYS).toEqual([
       'boilAmp',
       'boilFps',
@@ -151,12 +156,53 @@ describe('DIALS defaults pin the legacy shipped constants EXACTLY', () => {
       'waterIceAmount',
       'geyserAmp',
       'geyserPeriod',
+      'paceTravelSpeed',
+      'paceNotesSeconds',
+      'paceAnimalsSpeed',
+      'paceTurnSeconds',
+      'paceWalkSpeed',
+      'paceJumpSeconds',
+      'paceFastForward',
+      'paceCarryGrace',
     ])
     expect(DIALS.boilAmp.group).toBe('boil')
     expect(DIALS.mottleMacro.group).toBe('fields')
     expect(DIALS.dentDepth.group).toBe('dents')
     expect(DIALS.waterPathWarp.group).toBe('water')
     expect(DIALS.geyserAmp.group).toBe('canyon')
+    expect(DIALS.paceTravelSpeed.group).toBe('pace')
+  })
+
+  it('Task 129 — the pace dials are all LIVE and pin the pace-table defaults exactly', () => {
+    // Every pace dial is read per-frame by pace-table.ts's `rate()` closures, so a
+    // drag retimes the story on the next frame with no rebuild — none of these are
+    // rebake-class.
+    for (const k of [
+      'paceTravelSpeed',
+      'paceNotesSeconds',
+      'paceAnimalsSpeed',
+      'paceTurnSeconds',
+      'paceWalkSpeed',
+      'paceJumpSeconds',
+      'paceFastForward',
+      'paceCarryGrace',
+    ] as const) {
+      expect(DIALS[k].cls).toBe('live')
+      expect(DIALS[k].group).toBe('pace')
+    }
+    // Defaults pinned against the literals named in tunables.ts's own Task-129
+    // comment: TRAVEL_SURFACE_SPEED (2.2), Task 109's notes bracket (1.5), the
+    // ending-turn eye bracket (0.7), the shared walk speed (2.2 again),
+    // EXIT_JUMP_SECONDS preserved (0.9), the fast-forward multiple (3.5), and
+    // CARRY_IDLE_SECONDS preserved (0.14).
+    expect(DIALS.paceTravelSpeed.default).toBe(2.2)
+    expect(DIALS.paceNotesSeconds.default).toBe(1.5)
+    expect(DIALS.paceAnimalsSpeed.default).toBe(2.2)
+    expect(DIALS.paceTurnSeconds.default).toBe(0.7)
+    expect(DIALS.paceWalkSpeed.default).toBe(2.2)
+    expect(DIALS.paceJumpSeconds.default).toBe(0.9)
+    expect(DIALS.paceFastForward.default).toBe(3.5)
+    expect(DIALS.paceCarryGrace.default).toBe(0.14)
   })
 
   it('Task 49 — the canyon geyser dials are LIVE (per-frame plume render, not baked)', () => {
@@ -268,5 +314,82 @@ describe('isTuneEnabled', () => {
     expect(isTuneEnabled('?tune=0')).toBe(false)
     expect(isTuneEnabled('?foo=1')).toBe(false)
     expect(isTuneEnabled('?a=b&tune=1&c=d')).toBe(true)
+  })
+})
+
+describe('initPersistence (Task 129 — ?tune-gated localStorage)', () => {
+  const KEY = 'small-world:tune-dials:v1'
+  // Mirrors tunables.ts's own (unexported) STORAGE_DEBOUNCE_MS — same idiom as the
+  // rebake debounce it is patterned on.
+  const STORAGE_DEBOUNCE_MS = 400
+
+  beforeEach(() => {
+    window.localStorage.clear()
+  })
+
+  it('round-trips a non-default value: debounced write while armed, restored on the next init', () => {
+    vi.useFakeTimers()
+    initPersistence('?tune=1')
+    setDial('boilAmp', 0.05)
+    // not yet written — the write is debounced same as a rebake
+    expect(window.localStorage.getItem(KEY)).toBeNull()
+    vi.advanceTimersByTime(STORAGE_DEBOUNCE_MS)
+    expect(JSON.parse(window.localStorage.getItem(KEY)!)).toEqual({ boilAmp: 0.05 })
+
+    // simulate a reload: the in-memory dial falls back to default, storage persists
+    DIALS.boilAmp.value = DIALS.boilAmp.default
+    initPersistence('?tune=1')
+    expect(DIALS.boilAmp.value).toBe(0.05)
+  })
+
+  it('falls back to defaults on a corrupt/unparseable blob without throwing', () => {
+    window.localStorage.setItem(KEY, '{not valid json')
+    expect(() => initPersistence('?tune=1')).not.toThrow()
+    for (const k of DIAL_KEYS) expect(DIALS[k].value).toBe(DIALS[k].default)
+  })
+
+  it('clamps out-of-range restored values and ignores unknown keys / non-finite values', () => {
+    // 1e999 is valid JSON number syntax that overflows to Infinity once parsed —
+    // the non-finite case a hand-typed blob (or a bit-rotted one) could produce.
+    window.localStorage.setItem(
+      KEY,
+      '{"boilAmp": 999, "dentAO": -3, "unknownDial": 5, "boilFps": 1e999}'
+    )
+    initPersistence('?tune=1')
+    expect(DIALS.boilAmp.value).toBe(DIALS.boilAmp.max)
+    expect(DIALS.dentAO.value).toBe(DIALS.dentAO.min)
+    expect(DIALS.boilFps.value).toBe(DIALS.boilFps.default) // non-finite ignored
+    // an unknown key must not throw and must not create a stray dial
+    expect(Object.prototype.hasOwnProperty.call(DIALS, 'unknownDial')).toBe(false)
+  })
+
+  it('?tune absent: no localStorage read on init, no write on a later dial change', () => {
+    window.localStorage.setItem(KEY, JSON.stringify({ boilAmp: 0.05 }))
+    const getSpy = vi.spyOn(Storage.prototype, 'getItem')
+    const setSpy = vi.spyOn(Storage.prototype, 'setItem')
+    getSpy.mockClear()
+    setSpy.mockClear()
+
+    initPersistence('') // ?tune absent
+    expect(getSpy).not.toHaveBeenCalled()
+    expect(DIALS.boilAmp.value).toBe(DIALS.boilAmp.default) // not restored
+
+    vi.useFakeTimers()
+    setDial('boilAmp', 0.2)
+    vi.advanceTimersByTime(1000)
+    expect(setSpy).not.toHaveBeenCalled()
+
+    getSpy.mockRestore()
+    setSpy.mockRestore()
+  })
+
+  it('resetDials clears the stored blob too', () => {
+    vi.useFakeTimers()
+    initPersistence('?tune=1')
+    setDial('boilAmp', 0.05)
+    vi.advanceTimersByTime(STORAGE_DEBOUNCE_MS)
+    expect(window.localStorage.getItem(KEY)).not.toBeNull()
+    resetDials()
+    expect(window.localStorage.getItem(KEY)).toBeNull()
   })
 })

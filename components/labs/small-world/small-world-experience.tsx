@@ -9,7 +9,22 @@ import { SmallWorldScene } from './scene/scene'
 import { beginManualScrollRestoration, pinScrollTo, pinScrollToTop } from './scroll-reset'
 import { StoryStopSnap } from './story-stop-snap'
 import { useArrivalJourney } from './use-arrival-journey'
-import { isTuneEnabled } from './scene/tunables'
+import { initPersistence, isTuneEnabled } from './scene/tunables'
+
+/**
+ * ?tune-gated dial persistence is armed HERE rather than inside `tunables.ts` itself,
+ * and the reason is a production failure rather than a preference: `tunables.ts` is
+ * also in the land-bake Web Worker's module graph, a self-invoking `typeof window`
+ * guard there is constant-folded away by the bundler, and the resulting
+ * `ReferenceError` silently killed the worker offload while leaving the scene looking
+ * correct. This module is a client component the worker cannot reach, so being the
+ * caller IS the environment check. See `initPersistence` for the full account.
+ *
+ * At module scope, so a stored dial set is restored before this component ever
+ * renders and therefore before the scene reads a value off `DIALS`. The store no-ops
+ * unless `?tune` is present, so a normal visitor touches no storage at all.
+ */
+initPersistence(window.location.search)
 
 /** The ?tune=1 roughness panel is code-split behind the flag: absent → this chunk is
  *  never requested, so normal visitors (and LinkedIn unfurls) pay zero bundle/runtime. */

@@ -1,5 +1,4 @@
-import { ENDING_SPAN } from './ending-timeline'
-import { GIRL_JUMP_START, GIRL_TRANSFER } from './scene/girl-exit'
+import { PACE_ROWS, paceRow, secondsFor, type PaceRow, type PaceSpan } from './pace-table'
 
 /**
  * ============================================================================
@@ -27,30 +26,59 @@ import { GIRL_JUMP_START, GIRL_TRANSFER } from './scene/girl-exit'
  * function of the same number the scene is a pure function of.
  *
  * ---------------------------------------------------------------------------
+ * THIS TABLE IS A PROJECTION NOW (Task 129) — the rows live in `pace-table.ts`
+ * ---------------------------------------------------------------------------
+ * A window is a pace row with `floor` set, and its seconds are that row's own rate
+ * read live. Nothing about the mechanism changed: the carry still reads windows in
+ * progress units, still latches on `id`, still lands on `end`. What changed is where
+ * the decision is written — one row per section, so a section's floor and its ceiling
+ * can no longer be retuned apart from each other, and the ?tune panel moves both with
+ * one dial.
+ *
+ * BECAUSE THE SECONDS ARE LIVE, `beatWindows()` IS A FUNCTION. A frozen array built
+ * at module init would be the dial's value at page load, and a panel drag would move
+ * the ceiling while leaving the floor on the old number — the exact drift this task
+ * exists to end. `EXIT_JUMP_WINDOW` below is the one snapshot kept, and it is kept
+ * for the proofs written against it rather than for the shipped path.
+ *
+ * ---------------------------------------------------------------------------
  * THE CANDIDATES THAT ARE **NOT** WIRED — listed, not implemented, for Aram to pick
  * ---------------------------------------------------------------------------
- * The mechanism is general (add a row, get a floor). These were considered and
- * left out of the shipped table; one line each on whether a floor would help:
+ * The mechanism is general (add a row, get a floor). These were considered and left
+ * out; one line each on whether a floor would help. TWO OF THEM MOVED IN TASK 129 and
+ * are marked, because the reason they moved was Aram overruling the judgement below
+ * rather than new evidence:
  *
- *  - CHECKPOINT PAGE DRAW `[TRAVEL_END, PAGE_SPAN_END]` per chapter. WOULD HELP,
- *    and is the natural second row: it is the exact span the governor already
- *    paces from above, so a floor there would close the pair — a reader who stops
- *    mid-draw gets the finished page instead of half a sentence. Held back only
- *    because it fires six times per journey against the exit's once, so it is a
- *    feel change to the whole lab rather than a fix to a broken picture.
+ *  - THE ENDING TURN and THE WALK TO THE BRINK. **NOW WIRED.** Task 125 called the
+ *    walk "BORDERLINE, same argument as the desk descent: locomotion paused still
+ *    reads as a person", and left both out. Aram's Task 129 sentence — "when Alwi
+ *    turns around to jump off the planet, this should also have a certain pace
+ *    REGARDLESS OF SCROLLING SPEED" — overrules that, and it is worth naming the
+ *    disagreement rather than quietly resolving it: the walk's still frame IS
+ *    legible, and it is paced anyway because he asked for the whole exit to have one
+ *    pace, not for each of its frames to be defensible on its own. The brink between
+ *    them stays free; see the `ending-walk` row for why.
+ *  - CHECKPOINT PAGE DRAW `[TRAVEL_END, PAGE_SPAN_END]` per chapter. **NOW HAS THE
+ *    CEILING, STILL NO FLOOR.** Task 129 gave the notes row a `ceiling` and a
+ *    fast-forward, so half the pair this entry asked for is closed. The floor is
+ *    still held back for the reason given here originally: it fires six times per
+ *    journey against the exit's once, so it is a feel change to the whole lab rather
+ *    than a fix to a broken picture — and a reader stopped mid-draw is looking at a
+ *    half-drawn page, which is unfinished but not broken.
  *  - MANGA PAGE TURN. WOULD BUY NOTHING. T111 deleted the manga reveal clock; the
  *    page prints complete, so there is no mid-flight state to be stranded in.
  *  - DESK DESCENT `[GIRL_DESK_WALK_START, GIRL_DESK_SETTLED]`. WOULD HELP MILDLY:
  *    stopping there leaves her mid-stride crossing to her chair, which is an
  *    unlovely still but a legible one (a person walking, paused), not a body
  *    suspended in the air.
- *  - BIOME TRANSITIONS / OPEN TRAVEL. NO. Travel is continuous scenery with a
- *    readable frame everywhere; a floor would be a ride through ground the reader
- *    is entitled to stop on, which is the exact defect Task 106 named.
+ *  - BIOME TRANSITIONS / OPEN TRAVEL. NO, AND THE CEILING DID NOT CHANGE THAT.
+ *    Travel is continuous scenery with a readable frame everywhere; a floor would be
+ *    a ride through ground the reader is entitled to stop on, which is the exact
+ *    defect Task 106 named. Task 129 caps travel from ABOVE — she is never faster
+ *    than a walk — and deliberately refuses the floor, so a reader may still stand in
+ *    the jungle for as long as they like. Same for the mascots' beat.
  *  - THE ENDING PULL-BACK `[ZOOM_START, 1]`. NO. A camera move has a legible frame
  *    at every point — stopping mid-zoom is a framing choice, not a stranded beat.
- *  - THE WALK TO THE BRINK `[GIRL_TURN_START, GIRL_WALK_END]`. BORDERLINE, same
- *    argument as the desk descent: locomotion paused still reads as a person.
  */
 
 export type BeatWindow = {
@@ -64,12 +92,27 @@ export type BeatWindow = {
   seconds: number
 }
 
-/** The ending's own t → journey progress. The ending is (1, TRACK_END]; see ending-timeline. */
-const endingProgress = (t: number): number => 1 + t * ENDING_SPAN
+/** Every pace row that carries a floor, in the order the reader meets them. */
+const FLOOR_ROWS: readonly PaceRow[] = PACE_ROWS.filter((row) => row.floor)
+
+/**
+ * One row's span, as a window. Built fresh on every read because `seconds` is LIVE —
+ * see the header. The `id` is the ROW's id, which is what makes the carry's latch
+ * stable across the rebuild: two windows describing the same beat compare equal on the
+ * one field the carry actually holds on to.
+ */
+const windowOf = (row: PaceRow, span: PaceSpan): BeatWindow => ({
+  id: row.id,
+  start: span[0],
+  end: span[1],
+  seconds: secondsFor(row, span),
+})
 
 /**
  * SECONDS FOR THE LEAP — the one number here tuned by eye rather than derived, and
- * the dial to turn if the exit feels hurried or laboured.
+ * the dial to turn if the exit feels hurried or laboured. It is `paceJumpSeconds`
+ * now, read at module init, so this is the DEFAULT-time value; the live one reaches
+ * the carry through `beatWindowAt`.
  *
  * It could not be derived, because the flight has no authored seconds anywhere: the
  * exit is written entirely in scroll and surface speed (`LEAP_PACE` is a multiple of
@@ -84,10 +127,13 @@ const endingProgress = (t: number): number => 1 + t * ENDING_SPAN
  * The resulting rate is checked against a ceiling rather than left free — see
  * `beatPaceOf`.
  */
-export const EXIT_JUMP_SECONDS = 0.9
+const JUMP_ROW = paceRow('ending-jump')
+const JUMP_SPAN = JUMP_ROW.spans[0]
+
+export const EXIT_JUMP_SECONDS = secondsFor(JUMP_ROW, JUMP_SPAN)
 
 /**
- * THE EXIT JUMP — the window this task exists for, and the only one wired.
+ * THE EXIT JUMP — the window Task 125 was opened on, and the first one wired.
  *
  * `[GIRL_JUMP_START, GIRL_TRANSFER]` in the ending's t, imported from the module
  * that owns the staging rather than restated, so a retune of the leap moves the
@@ -107,16 +153,22 @@ export const EXIT_JUMP_SECONDS = 0.9
  * beat the reader was carried through is finished in the model, not just on screen,
  * and the rest they come to is the seated world under a still camera —
  * `ZOOM_START` is 0.38, so the pull-back has not begun.
+ *
+ * A SNAPSHOT AT THE DEFAULT DIAL (Task 129), kept for the proofs and benches written
+ * against it. The shipped path reads `beatWindowAt`, which is live.
  */
-export const EXIT_JUMP_WINDOW: BeatWindow = {
-  id: 'exit-jump',
-  start: endingProgress(GIRL_JUMP_START),
-  end: endingProgress(GIRL_TRANSFER),
-  seconds: EXIT_JUMP_SECONDS,
-}
+export const EXIT_JUMP_WINDOW: BeatWindow = windowOf(JUMP_ROW, JUMP_SPAN)
 
-/** Every window with a baseline floor. Ordered, non-overlapping, and short. */
-export const BEAT_WINDOWS: readonly BeatWindow[] = [EXIT_JUMP_WINDOW]
+/**
+ * Every window with a baseline floor, in reader order. Ordered, non-overlapping, and
+ * still short — three rows since Task 129, all of them the ending's.
+ *
+ * A FUNCTION, not an array: the seconds are the pace table's live rates, so a window
+ * built at module init would go stale the first time the panel moved a dial.
+ */
+export function beatWindows(): readonly BeatWindow[] {
+  return FLOOR_ROWS.flatMap((row) => row.spans.map((span) => windowOf(row, span)))
+}
 
 /**
  * The baseline pace, in progress per second — what the carry advances at.
@@ -125,6 +177,10 @@ export const BEAT_WINDOWS: readonly BeatWindow[] = [EXIT_JUMP_WINDOW]
  * governor is tuned to serve in full) and the bound is a test, not a comment: the
  * carry must never move the world faster than an ordinary reader's own hands
  * already do, or the floor stops being a floor and becomes a ride.
+ *
+ * Since Task 129 it is the row's own `rate()` recovered — `seconds` is the span
+ * divided by the rate, so this divides it straight back — which is the arithmetic
+ * that makes a floor and a ceiling on the same row impossible to set apart.
  */
 export function beatPaceOf(window: BeatWindow): number {
   return (window.end - window.start) / window.seconds
@@ -136,10 +192,17 @@ export function beatPaceOf(window: BeatWindow): number {
  * Half-open `[start, end)` on purpose: the carry's own destination is `end`, so
  * arriving there leaves the window by construction and no latch is needed to stop it
  * running twice.
+ *
+ * IT BUILDS THE WINDOW FRESH (Task 129) rather than returning one from a table, so
+ * the `seconds` a caller reads are the dial's value THIS frame. Callers must compare
+ * windows by `id` and never by identity — the carry already did, which is why nothing
+ * downstream had to change for this.
  */
 export function beatWindowAt(progress: number): BeatWindow | null {
-  for (const window of BEAT_WINDOWS) {
-    if (progress >= window.start && progress < window.end) return window
+  for (const row of FLOOR_ROWS) {
+    for (const span of row.spans) {
+      if (progress >= span[0] && progress < span[1]) return windowOf(row, span)
+    }
   }
   return null
 }

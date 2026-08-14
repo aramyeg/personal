@@ -155,9 +155,16 @@ describe('the ending is outside every dwell and every absorption', () => {
     }
   })
 
-  it('never absorbs: the arrival driver stays in pass mode across the whole ending', () => {
+  it('never absorbs: the arrival band never arms across the whole ending', () => {
     // Drive the real state machine at a realistic scroll speed from just before the ending
     // through the bottom of the track. A hold could only arm off a reveal, and there is none.
+    //
+    // IT IS NO LONGER 'pass' THE WHOLE WAY, and that is the pace table rather than the
+    // band (Task 129): the turn, the walk and the leap carry ceilings now, so a reader
+    // scrolling at 0.12 progress/s runs a debt through them and the machine sits in
+    // `release` while it is paid back. What this test is about is ABSORPTION — no
+    // reveal, therefore no hold, therefore no anchor — and that is unchanged and
+    // asserted directly instead of through a proxy.
     let state = initialArrival(0.99)
     const dt = 1 / 60
     for (let i = 1; i <= 600; i++) {
@@ -165,10 +172,13 @@ describe('the ending is outside every dwell and every absorption', () => {
       state = stepArrival(state, raw, dt)
       expect(state.reveal).toBeNull()
       if (raw > 1) {
-        expect(state.mode).toBe('pass')
-        expect(state.progress).toBe(raw)
+        expect(state.mode).not.toBe('hold')
+        // The world never runs ahead of the finger, and never past the track's end.
+        expect(state.progress).toBeLessThanOrEqual(raw + 1e-12)
       }
     }
+    // …and the debt is given back in full: the reader ends exactly where they scrolled.
+    expect(state.mode).toBe('pass')
     expect(state.progress).toBeCloseTo(TRACK_END, 12)
   })
 })

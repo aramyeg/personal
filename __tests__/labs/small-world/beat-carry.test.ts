@@ -15,10 +15,10 @@ import {
   type CarryState,
 } from '@/components/labs/small-world/beat-carry'
 import {
-  BEAT_WINDOWS,
   EXIT_JUMP_WINDOW,
   beatPaceOf,
   beatWindowAt,
+  beatWindows,
 } from '@/components/labs/small-world/beat-windows'
 import { TRACK_END } from '@/components/labs/small-world/ending-timeline'
 import {
@@ -87,20 +87,25 @@ describe('beat windows are authored data about the exit', () => {
   })
 
   it('keeps every window half-open, ordered and disjoint', () => {
-    for (const w of BEAT_WINDOWS) {
+    // A FUNCTION AND FRESH OBJECTS SINCE TASK 129: the seconds are the pace table's
+    // live rate, so a window is built per read and compared by `id` — which is the one
+    // field the carry ever latches on — rather than by identity.
+    const windows = beatWindows()
+    expect(windows.length).toBeGreaterThan(0)
+    for (const w of windows) {
       expect(w.end).toBeGreaterThan(w.start)
       expect(w.seconds).toBeGreaterThan(0)
-      expect(beatWindowAt(w.start)).toBe(w)
+      expect(beatWindowAt(w.start)?.id).toBe(w.id)
       // The carry's own destination must fall OUTSIDE the window, or it would run twice.
-      expect(beatWindowAt(w.end)).not.toBe(w)
+      expect(beatWindowAt(w.end)?.id).not.toBe(w.id)
     }
-    for (let i = 1; i < BEAT_WINDOWS.length; i++) {
-      expect(BEAT_WINDOWS[i].start).toBeGreaterThanOrEqual(BEAT_WINDOWS[i - 1].end)
+    for (let i = 1; i < windows.length; i++) {
+      expect(windows[i].start).toBeGreaterThanOrEqual(windows[i - 1].end)
     }
   })
 
   it('never authors a pace faster than a served reader scrolls, or than the governor allows', () => {
-    for (const w of BEAT_WINDOWS) {
+    for (const w of beatWindows()) {
       const pace = beatPaceOf(w)
       expect(pace).toBeGreaterThan(0)
       // The floor may not outrun the reading speed the ceiling is tuned to serve —

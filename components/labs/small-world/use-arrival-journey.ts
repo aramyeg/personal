@@ -6,11 +6,18 @@ import {
   initialArrival,
   isGoverned,
   leashTargetFor,
+  paceCapAt,
   stepArrival,
   type ArrivalState,
 } from './arrival'
 import { CARRY_IDLE, carryBusy, carryInputEps, stepCarry, type CarryState } from './beat-carry'
 import { TRACK_END, trackOffsetFor, trackProgressAt } from './ending-timeline'
+import {
+  FAST_FORWARD_IDLE,
+  fastForwardBusy,
+  stepFastForward,
+  type FastForwardState,
+} from './fast-forward'
 import {
   PROVENANCE_IDLE,
   isTravelKey,
@@ -76,6 +83,14 @@ export function useArrivalJourney(
     let last = 0
     let carry: CarryState = CARRY_IDLE
     /**
+     * THE FAST-FORWARD's arming clock (Task 129, R2). It sits alongside the carry
+     * rather than inside `stepArrival` for the same reason the carry does: what it
+     * watches is the READER — how far they have pushed the document past the world,
+     * and for how long — and that is a property of the driver's own measurements, not
+     * of the pure step function. `stepArrival` is told the verdict and nothing else.
+     */
+    let ff: FastForwardState = FAST_FORWARD_IDLE
+    /**
      * The scroll position as of the end of the last driver frame, the carry's own
      * write included. Any difference the next frame measures against it is THE
      * READER, which is the one thing `stepCarry` cannot work out for itself — a
@@ -137,8 +152,15 @@ export function useArrivalJourney(
     // The cost is seven frames of tail after the document stops, which is what
     // REST_SECONDS is; during the motion itself the scroll events were scheduling
     // these frames anyway.
+    // ...and now a live FAST-FORWARD too (Task 129), which is the same lesson a
+    // fourth time. Its glide runs at a multiple of the row's rate and finishes on the
+    // span's end; with the loop asleep it would stop wherever the last scroll event
+    // left it, and the reader who asked to be taken to the end of the note would be
+    // parked in the middle of it instead. `fastForwardBusy` goes false the moment the
+    // arming condition lapses, so nothing here spins on a reader who has stopped.
     const busy = () =>
       carryBusy(carry) ||
+      fastForwardBusy(ff) ||
       provenance.episode !== null ||
       arrivalRef.current.mode !== 'pass' ||
       arrivalRef.current.reveal !== null ||
@@ -204,7 +226,58 @@ export function useArrivalJourney(
       rawProgressRef.current = readRaw()
       carryAnchor = rawProgressRef.current
 
-      const next = stepArrival(arrivalRef.current, rawProgressRef.current, dt, reduced.matches, motion)
+      // THE FAST-FORWARD's arming clock, stepped on the SETTLED document — after the
+      // carry's write and its re-measure — so the lead it reads is the real gap
+      // between where the reader has pushed and where the world stands. It is asked
+      // BEFORE `stepArrival` because its verdict is an argument to it, and it is asked
+      // about `arrivalRef.current.progress` (this frame's starting position) for the
+      // same reason the cap is read at PREV progress: the row you are governed by is
+      // the one you are standing in, not the one an uncapped step would have reached.
+      //
+      // "STILL PUSHING" IS THE EPISODE, NOT THIS FRAME'S DELTA, and that correction was
+      // forced by measurement: `readerMoved > eps` never armed the fast-forward once in
+      // 1,500 frames of real flings, because the only state that produces a large lead
+      // is the reader pinned against the leash — and the leash's own `pinScrollTo`
+      // consumes their motion, so the very next frame reads zero. The classifier
+      // already tracks the thing actually being asked about (a run of travel with no
+      // rest in it), it survives both a pinned frame and the eventless momentum after a
+      // flick, and it ends when the document really stops. A retreat still disarms on
+      // the frame it happens, because a retreat must never wait for an episode to close.
+      const lead = rawProgressRef.current - arrivalRef.current.progress
+      const pushing = provenance.episode === 'travel' && readerMoved >= -eps
+      ff = stepFastForward(ff, arrivalRef.current.progress, lead, pushing, dt, reduced.matches)
+
+      // ── T129 DIAGNOSTIC TELEMETRY (throwaway; reverted before any shipped run) ──
+      const __w = window as unknown as { __swPace?: unknown[] }
+      if (!__w.__swPace) __w.__swPace = []
+      const __prev = arrivalRef.current
+      const __cap = paceCapAt(__prev.progress, reduced.matches)
+      if (__w.__swPace.length < 60000) {
+        __w.__swPace.push({
+          t: Math.round(performance.now()),
+          dt: Number(dt.toFixed(5)),
+          p: __prev.progress,
+          raw: rawProgressRef.current,
+          lead: Number(lead.toFixed(6)),
+          cap: __cap === Infinity ? -1 : Number(__cap.toFixed(6)),
+          mode: __prev.mode,
+          motion,
+          push: pushing ? 1 : 0,
+          ffA: ff.active ? 1 : 0,
+          ffH: Number(ff.held.toFixed(3)),
+          ep: provenance.episode ?? 'none',
+        })
+      }
+      // ── end T129 diagnostic ──
+
+      const next = stepArrival(
+        arrivalRef.current,
+        rawProgressRef.current,
+        dt,
+        reduced.matches,
+        motion,
+        ff.active
+      )
 
       // THE LEASH (Task 126). The governor has just decided where the world is; the
       // document is not allowed to be more than `GOVERNOR_MAX_LAG` past it, so it
@@ -258,7 +331,17 @@ export function useArrivalJourney(
       // landing straight into the ref. Same defect as the one Task 109 found here,
       // one span further along: the gate would hold in `stepArrival` and the scroll
       // event would step around it.
+      //
+      // ...AND NOT WHILE A FAST-FORWARD IS GLIDING (Task 129). The third time this
+      // shortcut has been found writing raw past a mechanism that was shaping it, and
+      // the same class of hole every time: `!isGoverned` asks whether a CEILING
+      // applies, and a fast-forward is a governed frame at a different rate — the one
+      // frame where the two disagree is the one where the glide has just landed on the
+      // span's end, whose cap has lifted while the reader's own finger is still a
+      // leash-width past it. Left ungated that frame would hand the whole lead over at
+      // once, which is exactly "the glide stops at the note's end" failing.
       if (
+        !ff.active &&
         arrivalRef.current.mode === 'pass' &&
         !isGoverned(arrivalRef.current.progress, reduced.matches) &&
         governedEntryBetween(
