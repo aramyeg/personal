@@ -1,9 +1,19 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
 import {
   spreadPageAnglesTilted,
   stageTurnT,
+  stripFlapHoldEnvelope,
+  stripFlapTravel,
+  type DissolveGeom,
+  type StripFlapGeom,
   type TurnStage,
 } from '@/components/labs/storybook/book/popup-mechanics'
+import {
+  driveChannelDomain,
+  readChannelUnit,
+  readDrivePhase,
+} from '@/components/labs/storybook/book/drive-phase'
+import { resetUserDrives, writeUserDrive } from '@/components/labs/storybook/user-drive'
 import { CHAPTERS } from '@/components/labs/storybook/content'
 
 /**
@@ -146,6 +156,99 @@ describe('spreadPageAnglesTilted with a stage', () => {
   })
 })
 
+/**
+ * E4 §2d — ONE READER INPUT, SEVERAL STAGGERED OUTPUTS.
+ *
+ * The failure this guards against is a units failure: the drive store keeps
+ * each family's OWN domain, so a follower that assumed 0..1 would read a
+ * half-flipped dissolve (tau = PI/2) as "157% pulled" and sit pinned at its
+ * stop for the reader's whole stroke.
+ */
+describe('driveFrom — a follower riding another piece\'s channel', () => {
+  afterEach(() => resetUserDrives())
+
+  const SOURCE: DissolveGeom = {
+    mech: 'dissolve',
+    side: 'right',
+    d0: 0.2,
+    d1: 0.8,
+    z0: -0.2,
+    z1: 0.2,
+    slats: 9,
+  }
+  const FOLLOWER: StripFlapGeom = {
+    mech: 'stripflap',
+    side: 'right',
+    anchor: 0.4,
+    anchorZ: 0,
+    slot: 0.4,
+    slotZ: 0,
+    hingeX: 0.45,
+    hingeZ: 0.1,
+    hingeDeg: 30,
+    width: 0.3,
+    height: 0.22,
+    travelDeg: [34, 86],
+  }
+  const PHASE = [0, 0.55] as const
+
+  it('normalises the source by ITS OWN domain, not by an assumed 0..1', () => {
+    expect(driveChannelDomain(SOURCE)).toEqual([0, Math.PI])
+    writeUserDrive('src', Math.PI / 2)
+    expect(readChannelUnit(SOURCE, 'src')).toBeCloseTo(0.5, 12)
+    writeUserDrive('src', Math.PI)
+    expect(readChannelUnit(SOURCE, 'src')).toBe(1)
+    // the naive read of the same number would have been 3.14, i.e. pinned
+    expect(readChannelUnit(SOURCE, 'src')).not.toBeCloseTo(Math.PI, 3)
+  })
+
+  it('reads 0 when the reader has not touched the source yet', () => {
+    expect(readChannelUnit(SOURCE, 'src')).toBe(0)
+    expect(readDrivePhase({ channel: 'src', phase: PHASE }, SOURCE)).toBe(0)
+  })
+
+  it('completes its travel over the phase window and holds after it', () => {
+    const at = (tau: number) => {
+      writeUserDrive('src', tau)
+      return readDrivePhase({ channel: 'src', phase: PHASE }, SOURCE)
+    }
+    expect(at(0)).toBe(0)
+    expect(at(Math.PI * 0.275)).toBeCloseTo(0.5, 12)
+    expect(at(Math.PI * 0.55)).toBe(1)
+    expect(at(Math.PI * 0.8)).toBe(1)
+    expect(at(Math.PI)).toBe(1)
+  })
+
+  it('staggers: two followers on one channel peak at different points', () => {
+    const early = { channel: 'src', phase: [0, 0.55] as const }
+    const late = { channel: 'src', phase: [0.4, 1] as const }
+    writeUserDrive('src', Math.PI * 0.3)
+    // a third of the way in, the early piece is most of the way through its
+    // travel and the late one has not started — that IS the double action
+    expect(readDrivePhase(early, SOURCE)).toBeGreaterThan(0.5)
+    expect(readDrivePhase(late, SOURCE)).toBe(0)
+    writeUserDrive('src', Math.PI * 0.7)
+    expect(readDrivePhase(early, SOURCE)).toBe(1)
+    expect(readDrivePhase(late, SOURCE)).toBeGreaterThan(0)
+  })
+
+  it('keeps the shipped visibility stops, and folds flat at book close', () => {
+    // The layer composes shown = (travel0 + q * span) * E(beta); reproduced
+    // here so the composition law is gated, not just the phase map.
+    const travel = stripFlapTravel(FOLLOWER)
+    const shown = (q: number, beta: number) =>
+      (travel[0] + q * (travel[1] - travel[0])) * stripFlapHoldEnvelope(FOLLOWER, beta)
+    const rest = (176 * Math.PI) / 180
+    // the >32deg screen-up crossing (StripFlapGeom.travelDeg) survives at q = 0
+    expect((shown(0, rest) * 180) / Math.PI).toBeGreaterThan(32)
+    // ...and the piece never exceeds its own ceiling
+    expect(shown(1, rest)).toBeLessThanOrEqual(travel[1] + 1e-12)
+    // fold-flat: E(0) = 0 kills ANY driven angle, which is the whole reason the
+    // universal composition rule is multiplicative
+    for (const q of [0, 0.5, 1]) expect(shown(q, 0)).toBe(0)
+  })
+})
+
 describe('declared stage windows', () => {
   it('every layer window lies inside [0, 1] — the endpoint identity depends on it', () => {
     for (const chapter of CHAPTERS) {
@@ -155,6 +258,21 @@ describe('declared stage windows', () => {
         expect(stage.t0, `${layer.id} t0`).toBeGreaterThanOrEqual(0)
         expect(stage.t1, `${layer.id} t1`).toBeLessThanOrEqual(1)
         expect(stage.t0, `${layer.id} window`).toBeLessThan(stage.t1)
+      }
+    }
+  })
+
+  it('every driveFrom names a real layer on its own spread, with a sane phase', () => {
+    for (const chapter of CHAPTERS) {
+      for (const layer of chapter.layers) {
+        const link = layer.driveFrom
+        if (!link) continue
+        const source = chapter.layers.find((l) => l.id === link.channel)
+        expect(source, `${layer.id} -> ${link.channel}`).toBeDefined()
+        expect(source?.id, `${layer.id} drives itself`).not.toBe(layer.id)
+        expect(link.phase[0], `${layer.id} phase lo`).toBeGreaterThanOrEqual(0)
+        expect(link.phase[1], `${layer.id} phase hi`).toBeLessThanOrEqual(1)
+        expect(link.phase[0], `${layer.id} phase`).toBeLessThan(link.phase[1])
       }
     }
   })

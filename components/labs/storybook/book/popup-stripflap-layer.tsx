@@ -56,6 +56,7 @@ import {
   readUserDrive,
   writeUserDrive,
 } from '../user-drive'
+import { readDrivePhase } from './drive-phase'
 import { applyHandleGlow, stepHoverGlow, markHandleHovered } from './handle-hover'
 import { pointerLocalRay } from './user-drive-pointer'
 import { HANDLE_SLOP_STANDING, acceptsHandleHit, hitQuadFor } from './handle-hit'
@@ -154,13 +155,27 @@ export function StripFlapPopupLayer({
   spreadIndex,
   frame,
   committedSpread,
+  driveSource = null,
 }: {
   layer: SceneLayer & StripFlapGeom
   accents: readonly string[]
   spreadIndex: number
   frame: RefObject<TurnFrame | null>
   committedSpread: RefObject<number>
+  /** THE PIECE THIS FLAP RIDES (E4 §2d), resolved by the spread from
+   *  `layer.driveFrom.channel`. Present only for a phase-linked follower; the
+   *  flap needs the source LAYER, not just its id, because normalising a
+   *  foreign channel means knowing which family's units it holds
+   *  (drive-phase.ts). Null when the piece drives itself, which is every flap
+   *  in the book but the inn's arrival rank. */
+  driveSource?: SceneLayer | null
 }) {
+  // A phase-linked flap is NOT a handle: the reader's one gesture lives on the
+  // source piece's tab, and a second grab on the follower would let them drag
+  // the two halves of one double-action out of step. So the pointer wiring
+  // below no-ops for it — including the hover glow, which would otherwise
+  // promise a grab that does nothing.
+  const driven = layer.driveFrom ?? null
   const groupRef = useRef<THREE.Group>(null)
   const shadowRef = useRef<THREE.Mesh>(null)
   const slopRef = useRef<THREE.Mesh>(null)
@@ -238,8 +253,12 @@ export function StripFlapPopupLayer({
     // reader-raised flap is handed over lying down, so its pool is sized to the
     // pose the reader will raise it to — the pool then only has to fade in
     // (below), never re-derive its own geometry mid-drag.
+    // A PHASE-LINKED flap is handed over at the start of its travel too, so it
+    // sizes its pool to the pose the source's stroke will raise it to.
     const standing =
-      layer.restDeg === undefined ? stripFlapRestLift(layer, Math.PI) : travel[1]
+      layer.restDeg === undefined && !layer.driveFrom
+        ? stripFlapRestLift(layer, Math.PI)
+        : travel[1]
     const rest = solveStripFlapPoseAt(layer, standing, Math.PI, 0)
     const lift = shadowLift(peakHeight([rest.left, rest.right]))
     const sign = layer.side === 'left' ? -1 : 1
@@ -297,6 +316,7 @@ export function StripFlapPopupLayer({
   }
 
   const onPointerDown = (e: ThreeEvent<PointerEvent>): void => {
+    if (driven) return
     if (!acceptsHandleHit(e, slopRef.current)) return
     const st = useStorybookStore.getState()
     if (!st.booted || st.turning !== null || st.spread !== spreadIndex) return
@@ -316,6 +336,7 @@ export function StripFlapPopupLayer({
   }
 
   const onPointerMove = (e: ThreeEvent<PointerEvent>): void => {
+    if (driven) return
     markHandleHovered(layer.id, spreadIndex)
     const grab = grabRef.current
     if (!grab) return
@@ -338,9 +359,11 @@ export function StripFlapPopupLayer({
   }
 
   const onPointerOver = (): void => {
+    if (driven) return
     markHandleHovered(layer.id, spreadIndex)
   }
   const onPointerOut = (): void => {
+    if (driven) return
     useStorybookStore.getState().clearHover(layer.id)
   }
 
@@ -403,9 +426,24 @@ export function StripFlapPopupLayer({
     const override = readDriveOverride(layer.id)
     const grabbed = useStorybookStore.getState().grab?.id === layer.id
     const channelA = readUserDrive(layer.id)
+    // The persistence envelope, hoisted: the held/driven branches below and the
+    // ripple's own progress window further down are the SAME cam, and computing
+    // it twice per frame invited the two to drift apart.
+    const env = stripFlapHoldEnvelope(layer, beta)
     let effectiveA: number
     if (override !== null) {
       effectiveA = clamp(rad(override), 0, ANTI_FLIP) // ?sbdrive value is degrees
+    } else if (driven) {
+      // PHASE-LINKED (E4 §2d): this flap has no channel of its own — it rides
+      // the SOURCE piece's, normalised by that family's units and remapped
+      // through its phase window, so one pull erects the rank over the first
+      // part of the stroke and flips the courtyard over the rest. The travel
+      // window is the shipped one (its lower stop is the >32deg visibility
+      // floor), and the composition is the book's universal one,
+      // shown = drive * E(beta) — so a phase-linked flap folds flat at book
+      // close for exactly the same reason a held one does.
+      const q = readDrivePhase(driven, driveSource)
+      effectiveA = (travel[0] + q * (travel[1] - travel[0])) * env
     } else if (grabbed) {
       effectiveA = channelA ?? camA
     } else if (channelA !== undefined) {
@@ -417,7 +455,7 @@ export function StripFlapPopupLayer({
       // the SHOWN lift is angle * stripFlapHoldEnvelope(beta) — the lift-flap
       // persistence composition — so fold-flat at book close is preserved for
       // any held angle without a per-frame return at all.
-      effectiveA = clamp(channelA, travel[0], travel[1]) * stripFlapHoldEnvelope(layer, beta)
+      effectiveA = clamp(channelA, travel[0], travel[1]) * env
     } else {
       effectiveA = camA
     }
@@ -439,7 +477,6 @@ export function StripFlapPopupLayer({
     // fold-flat / turn-step arguments are inherited rather than re-made. A flap
     // with no ripple has one column at phase identity — the same single solve,
     // the same two quads, bit-identical.
-    const env = stripFlapHoldEnvelope(layer, beta)
     const floorA = travel[0] * env
     const topA = travel[1] * env
     const span = topA - floorA
@@ -480,7 +517,7 @@ export function StripFlapPopupLayer({
     // un-driven page-driven flap is exactly 1 at every beta and its pool is
     // bit-identical to the shipped one; only a moved flap changes.
     const standingNow =
-      layer.restDeg === undefined ? camA : travel[1] * stripFlapHoldEnvelope(layer, beta)
+      layer.restDeg === undefined && !driven ? camA : travel[1] * env
     const ref = Math.sin(Math.min(standingNow, ANTI_FLIP))
     const liftFraction = ref > 1e-6 ? clamp(Math.sin(shownA) / ref, 0, 1) : 0
     shadowMaterial.opacity =

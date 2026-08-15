@@ -714,6 +714,14 @@ export function PopupSpread({ layers, accents, spreadIndex, role, frame, committ
         // handle, so it owns pointer wiring + the release return. With no drive
         // the pose it draws is bit-identical to the generic two-panel layer's.
         if (layer.mech === 'stripflap') {
+          // E4 §2d: a phase-linked flap rides ANOTHER piece's drive channel, and
+          // normalising a foreign channel needs the source's family (its units),
+          // not just its id — so the spread, which is the only thing holding the
+          // whole cast, resolves the layer here. The same `layers.find` shape a
+          // child already uses for its parent.
+          const source = layer.driveFrom
+            ? layers.find((l) => l.id === layer.driveFrom?.channel) ?? null
+            : null
           return (
             <StripFlapPopupLayer
               key={layer.id}
@@ -722,6 +730,7 @@ export function PopupSpread({ layers, accents, spreadIndex, role, frame, committ
               spreadIndex={spreadIndex}
               frame={frame}
               committedSpread={committedSpread}
+              driveSource={source}
             />
           )
         }
