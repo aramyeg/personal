@@ -145,6 +145,32 @@
   animation-delay: 0ms;
 }
 
+/* THE TITLE PLATE LEAVES WITH ITS WORDS (E5). `.sb-title-panel` is the only
+   overlay child with a filled background — a dark rounded rectangle floating
+   over the book. The exit rules above animate its CONTENTS, never the panel
+   itself, so on every turn OFF the title spread the emptied plate stayed at
+   full opacity until the 0.72 land cue remounted the panel: ~900ms of a dark
+   rectangle hanging at fixed screen coordinates over a page in mid-flight
+   (decomposition-proven in the tunnel lane). It fades faster than the words —
+   the plate is the first thing that has to get out of the reader's way — and
+   only ever on the way OUT: the panel carries no entrance animation of its
+   own, and its arrival remounts a fresh, resting node. */
+@keyframes sb-plate-exit {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+.sb-overlay[data-sb-phase='exiting'] .sb-title-panel {
+  animation-name: sb-plate-exit;
+  animation-duration: 160ms;
+  animation-timing-function: cubic-bezier(0.4, 0, 1, 1);
+  animation-fill-mode: forwards;
+  animation-delay: 0ms;
+}
+
 /* Reduced motion: instant swap, no entrance/exit. spread-overlay.tsx also
    skips the bridge subscription so content changes only at commit. */
 @media (prefers-reduced-motion: reduce) {
@@ -160,7 +186,8 @@
   .sb-overlay .sb-satchel-grid,
   .sb-overlay .sb-satchel-more,
   .sb-overlay .sb-end-actions,
-  .sb-overlay .sb-colophon {
+  .sb-overlay .sb-colophon,
+  .sb-overlay .sb-title-panel {
     animation: none !important;
   }
 }
