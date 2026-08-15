@@ -379,7 +379,7 @@ void main() {
   float pool = 1.0 - 0.42 * smoothstep(0.18, 1.0, vUv.y);
   pool *= 1.0 - 0.22 * smoothstep(0.30, 1.0, abs(vUv.x - 0.5) * 2.0);
 
-  vec3 col = uGlass + warm * g * (0.75 + 1.55 * g) * pool;
+  vec3 col = uGlass + warm * g * (0.65 + 0.85 * g) * pool;
 
   // Occupants fade in as their room lights. The dancers sway; everyone else holds still.
   if (vOcc > 0.5) {

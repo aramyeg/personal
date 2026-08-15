@@ -129,6 +129,18 @@ export function TheKey() {
 
   const halo = useMemo(() => makeHaloTexture(), [])
 
+  // Posing hook for captures: `?wildwake=` seeds the key itself, not just the wake channel —
+  // this component re-stamps `wake` from its own turn every frame, so seeding anything else
+  // would be overwritten on the next tick. Seeding the turn keeps key pose and cascade in step.
+  useEffect(() => {
+    const raw = new URLSearchParams(window.location.search).get('wildwake')
+    if (raw === null) return
+    const v = clamp01(Number(raw) || 0)
+    targetRef.current = v
+    turnRef.current = v
+    cellRef.current = detentCell(v)
+  }, [])
+
   const materials = useMemo(() => {
     // METALNESS IS A TRAP HERE. A true metal with no environment map has nothing to reflect,
     // so at metalness 0.9 the whole toy rendered jet black on near-black cobbles and simply
@@ -361,7 +373,7 @@ export function TheKey() {
       KEY_TOY.center[2],
     )
 
-    const lit = 0.34 + 0.55 * hoverGlowRef.current + 0.95 * glint + 0.45 * turn
+    const lit = 0.52 + 0.55 * hoverGlowRef.current + 0.95 * glint + 0.45 * turn
     materials.brass.emissiveIntensity = lit
     materials.plate.emissiveIntensity = lit * 0.42
     materials.brass.opacity = fade

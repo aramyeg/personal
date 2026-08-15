@@ -24,6 +24,7 @@ import {
   ARCH,
   ARCH_SHAFT,
   CHIMNEY,
+  LANTERN,
   LIGHT_POOLS,
   PALETTE,
   STAGE,
@@ -377,6 +378,22 @@ export function AtmosphereFx() {
     [glowTex],
   )
 
+  // --- the lantern's flame: the inn's second warm note while it sleeps ---------------------
+  const lanternRef = useRef<THREE.Sprite>(null)
+  const lanternLightRef = useRef<THREE.PointLight>(null)
+  const lanternMat = useMemo(
+    () =>
+      new THREE.SpriteMaterial({
+        map: glowTex,
+        transparent: true,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending,
+        opacity: 0,
+        color: new THREE.Color(PALETTE.lampHot),
+      }),
+    [glowTex],
+  )
+
   // --- three thin gallery shafts ---------------------------------------------------------
   const gallery = useMemo(() => {
     const galleryWindows = WINDOWS.filter((w) => w.room === 'gallery')
@@ -578,16 +595,39 @@ export function AtmosphereFx() {
       const level = passage * stage * breathe
       arch.outer.uniforms.uTime.value = f.time
       arch.inner.uniforms.uTime.value = f.time
-      arch.outer.uniforms.uOpacity.value = level * 0.42
-      arch.inner.uniforms.uOpacity.value = level * 0.55
+      arch.outer.uniforms.uOpacity.value = level * 0.26
+      arch.inner.uniforms.uOpacity.value = level * 0.32
       const group = archGroupRef.current
       if (group) group.visible = level > 0.003
       const flare = flareRef.current
       if (flare) {
-        flareMat.opacity = Math.min(1, level * 0.85)
+        // The flare is a breath in the arch's mouth, not the light itself — the bore's own
+        // edges must stay legible or the arch reads as a fireball stuck to the facade.
+        flareMat.opacity = Math.min(1, level * 0.16)
         flare.visible = flareMat.opacity > 0.004
-        const s = ARCH.halfW * (3.0 + 0.5 * Math.min(1, level))
+        const s = ARCH.halfW * (1.3 + 0.3 * Math.min(1, level))
         flare.scale.set(s, s * 1.05, 1)
+      }
+    }
+
+    // THE LANTERN — an ember all night (the sleeping frame's second warm note), and the very
+    // first thing to answer the key: `passage` saturates within the first few degrees of turn,
+    // so the flare-up reads as cause-and-effect before a single window has lit.
+    {
+      const flicker =
+        1 + 0.09 * Math.sin(f.time * 9.3) + 0.05 * Math.sin(f.time * 15.7 + 2.1)
+      const level = stage * (0.2 + 0.8 * passage) * flicker
+      lanternMat.opacity = Math.min(1, level * 0.5)
+      const sprite = lanternRef.current
+      if (sprite) {
+        sprite.visible = lanternMat.opacity > 0.004
+        const s = LANTERN.radius * (3.4 + 2.6 * passage)
+        sprite.scale.set(s, s * 1.1, 1)
+      }
+      const light = lanternLightRef.current
+      if (light) {
+        light.intensity = (0.16 + 1.15 * passage) * stage * flicker
+        light.visible = light.intensity > 0.004
       }
     }
 
@@ -595,7 +635,7 @@ export function AtmosphereFx() {
     {
       const level = galleryLevel * stage
       gallery.mat.uniforms.uTime.value = f.time
-      gallery.mat.uniforms.uOpacity.value = level * 0.28
+      gallery.mat.uniforms.uOpacity.value = level * 0.2
       const group = galleryGroupRef.current
       if (group) group.visible = level > 0.004
     }
@@ -692,6 +732,25 @@ export function AtmosphereFx() {
         />
         <sprite ref={flareRef} position={archOrigin} material={flareMat} renderOrder={5} />
       </group>
+
+      {/* The lantern's flame and its pool of warmth on the stone. */}
+      <sprite
+        ref={lanternRef}
+        position={LANTERN.pos as unknown as [number, number, number]}
+        material={lanternMat}
+        renderOrder={5}
+        visible={false}
+        name="wild-lantern-flame"
+      />
+      <pointLight
+        ref={lanternLightRef}
+        position={[LANTERN.pos[0], LANTERN.pos[1] + 0.01, LANTERN.pos[2] + 0.03]}
+        color={PALETTE.lampHot}
+        intensity={0}
+        distance={0.55}
+        decay={2}
+        visible={false}
+      />
 
       {/* Thin shafts from the gallery. */}
       <group ref={galleryGroupRef} name="wild-gallery-shafts" visible={false}>
