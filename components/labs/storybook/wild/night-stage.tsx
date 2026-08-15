@@ -547,6 +547,7 @@ export function NightStage() {
   }, [])
 
   const moonRef = useRef<THREE.DirectionalLight>(null)
+  const fillRef = useRef<THREE.DirectionalLight>(null)
   const skyRef = useRef<THREE.Mesh>(null)
   const moonGroupRef = useRef<THREE.Group>(null)
   const haloRef = useRef<THREE.Mesh>(null)
@@ -587,7 +588,7 @@ export function NightStage() {
   }
 
   useFrame(() => {
-    const { open, time, thetaL, thetaR } = readWildFrame(wild)
+    const { open, time, thetaL, thetaR, wake } = readWildFrame(wild)
 
     // THE NIGHT ARRIVES (REVEAL.night). Eased out, not linear: the dark floods in and then
     // settles, which is how a room reads when the lamps go down rather than a cross-fade.
@@ -609,6 +610,10 @@ export function NightStage() {
 
     const moon = moonRef.current
     if (moon) moon.intensity = STAGE.moonlight.intensity * arrived
+
+    // The bounce fill arrives with the night and yields to the lamps as the inn wakes.
+    const fill = fillRef.current
+    if (fill) fill.intensity = STAGE.fill.intensity * arrived * (1 - STAGE.fill.wakeCut * wake)
 
     opacityOf(skyRef.current, arrived)
     opacityOf(hazeRef.current, arrived * 0.92)
@@ -677,6 +682,15 @@ export function NightStage() {
         color={STAGE.moonlight.color}
         intensity={0}
         castShadow
+        userData={{ wildStage: true }}
+      />
+      {/* Moonlight bounce — see STAGE.fill. No shadow: it is scattered light, not a source. */}
+      <directionalLight
+        ref={fillRef}
+        position={STAGE.fill.pos}
+        color={STAGE.fill.color}
+        intensity={0}
+        target={moonTarget}
         userData={{ wildStage: true }}
       />
       <primitive object={moonTarget} />

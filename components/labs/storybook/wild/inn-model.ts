@@ -184,8 +184,16 @@ export const STAGE = {
   /** Moon high-right, opposite the mass. It rims the inn and lands its shadow down-left. */
   moon: { pos: [0.74, 0.92, -2.1] as Vec3, radius: 0.15, haloRadius: 0.62 },
   /** Key light is the moon; direction is from the moon toward the inn. */
-  moonlight: { color: '#9fc0e8', intensity: 1.15 },
+  moonlight: { color: '#9fc0e8', intensity: 1.5 },
   ambient: { color: '#2b3f60', intensity: 0.55 },
+  /**
+   * Moonlight bounce: a dim cool fill from high camera-left, aimed at the facades the moon
+   * can never touch (it sits behind the inn, so every camera-facing wall is in its shadow).
+   * This is what keeps the SLEEPING inn legible on a dim screen — silhouette, sign, shuttered
+   * windows — without warming the frame. It eases off as the inn wakes and the lamps take
+   * over the job of drawing the building.
+   */
+  fill: { pos: [-1.6, 1.5, 2.4] as Vec3, color: '#5f7bad', intensity: 0.85, wakeCut: 0.55 },
   /** Distant town, pure silhouette with a scatter of far-off specks. */
   skyline: { z: -1.3, minX: -1.8, maxX: 1.8, maxY: 0.34 },
   sky: { z: -2.6, halfW: 3.2, top: 1.9, bottom: -0.4 },
@@ -492,7 +500,7 @@ export const WINDOWS: readonly WindowSlot[] = [
 export const ROOM_LIGHTS = [
   // Kept on a short leash: point lights cast no shadow here (D6, one shadow map), so a wide
   // passage light bleeds straight through the hall walls and paints the OUTSIDE of the facade.
-  { room: 'passage' as RoomId, pos: [-0.42, 0.16, -0.3] as Vec3, distance: 0.85, intensity: 1.8 },
+  { room: 'passage' as RoomId, pos: [-0.42, 0.16, -0.3] as Vec3, distance: 0.85, intensity: 1.45 },
   { room: 'taproom' as RoomId, pos: [-0.36, 0.24, -0.05] as Vec3, distance: 0.95, intensity: 1.7 },
   { room: 'gallery' as RoomId, pos: [-0.32, 0.5, 0.0] as Vec3, distance: 0.85, intensity: 1.2 },
   { room: 'stair' as RoomId, pos: [-0.84, 0.5, -0.22] as Vec3, distance: 0.8, intensity: 1.1 },
@@ -513,7 +521,7 @@ export const ARCH_SHAFT = {
 
 /** Warm pools painted on the cobbles under the lit openings. Opacity follows their room. */
 export const LIGHT_POOLS = [
-  { room: 'passage' as RoomId, center: [-0.4, 0.16] as const, rx: 0.24, rz: 0.4, strength: 1 },
+  { room: 'passage' as RoomId, center: [-0.4, 0.16] as const, rx: 0.22, rz: 0.34, strength: 0.6 },
   { room: 'taproom' as RoomId, center: [-0.64, 0.02] as const, rx: 0.14, rz: 0.18, strength: 0.7 },
   { room: 'taproom' as RoomId, center: [-0.1, 0.02] as const, rx: 0.16, rz: 0.2, strength: 0.7 },
   { room: 'kitchen' as RoomId, center: [0.24, -0.16] as const, rx: 0.16, rz: 0.14, strength: 0.5 },
