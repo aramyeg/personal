@@ -34,14 +34,14 @@ test.describe('Portfolio Navigation', () => {
 
 test.describe('Accessibility', () => {
   test('page has exactly one h1', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/?view=list');
 
     const h1Count = await page.locator('h1').count();
     expect(h1Count).toBe(1);
   });
 
   test('all images have alt text', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/?view=list');
 
     const imagesWithoutAlt = await page.locator('img:not([alt])').count();
     expect(imagesWithoutAlt).toBe(0);

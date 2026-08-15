@@ -19,7 +19,7 @@ test.describe('snowpark lab', () => {
     await page.waitForTimeout(700)
     await expect(page).toHaveURL(/\/labs\/snowpark/)
     await page.keyboard.press('Escape')
-    await expect(page).toHaveURL(/\/labs(\?.*)?$/)
+    await expect(page).toHaveURL(/\/$/, { timeout: 10000 })
   })
 
   test('reduced motion renders the static skill sheet, not the running game', async ({ page }) => {

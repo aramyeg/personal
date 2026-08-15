@@ -17,10 +17,10 @@ function pressEscape(prevented: boolean) {
 describe('GalleryChrome Escape handling', () => {
   beforeEach(() => push.mockClear())
 
-  it('navigates to /labs on a plain Escape', () => {
+  it('navigates to the museum on a plain Escape', () => {
     render(<GalleryChrome>lab</GalleryChrome>)
     pressEscape(false)
-    expect(push).toHaveBeenCalledWith('/labs')
+    expect(push).toHaveBeenCalledWith('/')
   })
 
   it('does nothing when another handler already prevented the Escape', () => {
