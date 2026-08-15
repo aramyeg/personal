@@ -154,6 +154,11 @@ export function Ch1Diorama({ spreadIndex, role, frame, committedSpread }: Ch1Dio
     if (root) setRiseClipHeight(worldY(root))
   }, [])
 
+  // PRIORITY -1, and it matters. r3f runs frame subscribers in ascending priority, and children
+  // subscribe before their parents — so at the default priority this callback would land AFTER
+  // the sign, the lantern and the keys had already read the fold matrices, and those three would
+  // ride one frame behind the merged inn for the whole turn. A negative priority runs first and
+  // (unlike a positive one, which is how the grade seizes the loop) does not claim rendering.
   useFrame((_, delta) => {
     clock.current += delta
 
@@ -177,7 +182,7 @@ export function Ch1Diorama({ spreadIndex, role, frame, committedSpread }: Ch1Dio
       writeFoldPoses(poses)
       landingWatch(poses)
     }
-  })
+  }, -1)
 
   const live = role !== 'hidden'
 

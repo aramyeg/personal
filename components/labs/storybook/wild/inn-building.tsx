@@ -1300,6 +1300,11 @@ export function InnBuilding() {
           customDepthMaterial={CASTERS.has(key) ? depth : undefined}
           castShadow={CASTERS.has(key)}
           receiveShadow
+          // The fold happens in the VERTEX shader, so a folded piece leaves the bounding sphere
+          // three computed from the rest geometry — and a piece culled mid-flight is a piece that
+          // vanishes for exactly the frames the reader is watching it move. Twelve meshes on a
+          // spread the camera always sees whole: culling them buys nothing anyway.
+          frustumCulled={false}
         />
       ))}
       <TheSign materials={materials} />
