@@ -26,7 +26,7 @@ describe('StartMenu', () => {
     render(<StartMenu />)
     fireEvent.click(screen.getByText('Turn Off Computer'))
     fireEvent.click(screen.getByRole('button', { name: 'Turn Off' }))
-    expect(push).toHaveBeenCalledWith('/labs')
+    expect(push).toHaveBeenCalledWith('/')
   })
 
   it('renders nothing when closed', () => {

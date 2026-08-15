@@ -15,6 +15,13 @@ describe('labs manifest attic split', () => {
     expect(snowpark!.retrospective).toContain('still playable, as evidence')
   })
 
+  it('retires memory-card to the attic with a retrospective', () => {
+    const memoryCard = atticLabs.find((l) => l.slug === 'memory-card')
+    expect(memoryCard).toBeDefined()
+    expect(memoryCard!.retrospective).toContain('Two builds, one lesson.')
+    expect(memoryCard!.retrospective).toContain('still playable, as evidence')
+  })
+
   it('every attic entry carries a retrospective', () => {
     expect(atticLabs.every((l) => !!l.retrospective)).toBe(true)
   })
@@ -24,5 +31,13 @@ describe('labs manifest attic split', () => {
     expect(xp).toBeDefined()
     expect(xp!.title).toBe('Bliss')
     expect(xp!.status).toBe('live')
+  })
+
+  it('demotes the main site to a hall painting at /classic-claude', () => {
+    const main = hallLabs.find((l) => l.slug === 'main')
+    expect(main).toBeDefined()
+    expect(main!.title).toBe('Classic Claude')
+    expect(main!.href).toBe('/classic-claude')
+    expect(main!.status).toBe('live')
   })
 })
