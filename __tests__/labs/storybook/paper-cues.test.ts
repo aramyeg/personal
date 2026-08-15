@@ -410,7 +410,8 @@ describe('paper-cue vocabulary — the register of who speaks paper', () => {
       'cofferLid: the shut lid, a loose ply sitting on its box',
       'crankWheel: the grip lobe pool',
       'crankWheel: the grip lobe lip',
-      'innCourtyardSpread: the key-board plaque pool, where the LIFT ribbon stood',
+      // (innCourtyardSpread's key-board plaque pool retired with the E3 inn rig
+      //  in E4 — the plaque it pooled under no longer stands on that page.)
       'assayDial: the wax-seal thumb lobe standing proud of the plate',
       'assayCard: the faceplate rim, a ply riveted over the wheel',
     ],
@@ -421,7 +422,8 @@ describe('paper-cue vocabulary — the register of who speaks paper', () => {
       'cofferLid: one ember arrow at the hasp, along the free edge travel',
       'dispatchCablePanel: the SEND-mast sealed-letter chevron set',
       'crankWheel: the rim chevrons (the hand-rolled ink arrows converted)',
-      'innCourtyardSpread: one ember arrow along the key-board leaves\' travel',
+      // (innCourtyardSpread's ember arrow retired with the E3 inn rig in E4 —
+      //  it aimed at key-board leaves that are no longer on the spread.)
       'assayDial: the two ember chevron sets flanking the thumb lobe',
       'bazRaiseStallFace: the setting-out track chevrons, where the cartouche read',
       'swarmTab: the pull-axis chevrons, where STIR THE SWARM was set',

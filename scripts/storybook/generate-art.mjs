@@ -10560,100 +10560,22 @@ function innCourtyardSpread(w, h, seed) {
   // warm spill out of the great door itself
   s += `<ellipse cx="${fx(PX(doorX))}" cy="${fx(PY(doorY + 0.03))}" rx="${fx(PX(0.055))}" ry="${fx(PY(0.032))}" fill="url(#s2pgPool)" opacity="0.95"/>`
 
-  // ---- THE WELCOME DOORMAT, just downstage of the gate span
-  const matY = pageFY(0.3)
-  const matW = 0.128
-  const matH = 0.052
-  // Dark COIR against lit paving, with its own contact shadow and a pale bound
-  // edge: at 0.85 over roofDim the mat measured 19 luminance off the cobbles it
-  // lies on, i.e. below the threshold where a shape still reads at the pinned
-  // camera. A doormat is a dark object on a light floor — paint it that way.
-  s += `<g transform="rotate(-1.2 ${fx(PX(0.5))} ${fx(PY(matY))})">`
-  s += `<rect x="${fx(PX(0.5 - matW / 2) + 2)}" y="${fx(PY(matY - matH / 2) + 6)}" width="${fx(PX(matW))}" height="${fx(PY(matH))}" rx="4" fill="${INK}" opacity="0.34"/>`
-  s += `<rect x="${fx(PX(0.5 - matW / 2))}" y="${fx(PY(matY - matH / 2))}" width="${fx(PX(matW))}" height="${fx(PY(matH))}" rx="4" fill="#6d5334"/>`
-  // coir bristle tooth, so the mat reads as woven rather than as a flat plate
-  for (let i = 0; i <= 46; i++) {
-    const bx = lerp(PX(0.5 - matW / 2) + 4, PX(0.5 + matW / 2) - 4, i / 46)
-    s += `<line x1="${fx(bx)}" y1="${fx(PY(matY - matH / 2) + 4)}" x2="${fx(bx)}" y2="${fx(PY(matY + matH / 2) - 4)}" stroke="${INK}" stroke-width="1.5" opacity="0.14"/>`
-  }
-  s += `<rect x="${fx(PX(0.5 - matW / 2) + 5)}" y="${fx(PY(matY - matH / 2) + 5)}" width="${fx(PX(matW) - 10)}" height="${fx(PY(matH) - 10)}" fill="none" stroke="${INN.stone}" stroke-width="2.6" opacity="0.9"/>`
-  // engraved font-free (ENGRAVE_GLYPHS) — no installed-typeface dependency
-  {
-    const cw2 = PX(0.0102)
-    const gap2 = PX(0.0028)
-    const ch2 = PY(0.0225)
-    const total = 7 * cw2 + 6 * gap2
-    s += engraveWord('WELCOME', PX(0.5) - total / 2, PY(matY) - ch2 / 2 + 1.4, cw2, ch2, gap2, INK, 4.2, 'opacity="0.45"')
-    s += engraveWord('WELCOME', PX(0.5) - total / 2, PY(matY) - ch2 / 2, cw2, ch2, gap2, ROOK.parchLit, 3.2, 'opacity="0.98"')
-  }
-  s += `</g>`
-
-  // ---- THE BRASS-KEY TRAIL: fore edge -> past the key-board -> the door.
-  // (board: right page, d 0.40..0.62 -> x 0.674..0.770, z -0.03..0.42)
-  const trail = (t) => {
-    const mt = 1 - t
-    const P = [[0.985, pageFY(0.5)], [0.9, pageFY(0.52)], [0.84, pageFY(0.1)], [0.62, pageFY(-0.12)]]
-    return [0, 1].map((k) => mt * mt * mt * P[0][k] + 3 * mt * mt * t * P[1][k] + 3 * mt * t * t * P[2][k] + t * t * t * P[3][k])
-  }
-  // BRASS on a walnut under-copy, each on its own contact shadow. Drawn in
-  // WALNUT they were the same colour as the cobble joints and measured x0.99
-  // local contrast against the paving — a named story element, invisible. The
-  // shared keyGlyph is untouched (ch1-sign/-gate and s4 call it); only this
-  // caller's palette changes.
-  const strewnKey = (S) =>
-    `<ellipse cx="0" cy="${fx(S * 0.34)}" rx="${fx(S * 0.42)}" ry="${fx(S * 0.13)}" fill="${INK}" opacity="0.3"/>` +
-    `<g transform="translate(1.6 2.2)" opacity="0.55">${keyGlyph(S, INK, INK)}</g>` +
-    keyGlyph(S, GOLD, GOLD_LIT)
-  for (let k = 0; k < 9; k++) {
-    const [kx, ky] = trail(k / 8 + rr(r, -0.02, 0.02))
-    const S = lerp(h * 0.047, h * 0.03, k / 8)
-    s += `<g transform="translate(${fx(PX(kx + rr(r, -0.008, 0.008)))} ${fx(PY(ky + rr(r, -0.006, 0.006)))}) rotate(${fx(rr(r, -80, 80))})">${strewnKey(S)}</g>`
-  }
-  // ... and two strays on the left page for the wanderers
-  for (const [kx, ky] of [[0.36, 0.8], [0.2, 0.62]])
-    s += `<g transform="translate(${fx(PX(kx))} ${fx(PY(ky))}) rotate(${fx(rr(r, -60, 60))})" opacity="0.8">${strewnKey(h * 0.026)}</g>`
-
-  // ---- THE KEY-BOARD'S PAPER CUES, where the LIFT banner and the manicule
-  // used to stand.
+  // ---- E4: THE DOORMAT, THE KEY TRAIL AND THE KEY-BOARD'S PAPER CUES ARE GONE.
   //
-  // Round 1 answered "the reader cannot tell the board is a playable" with a
-  // parchment ribbon reading LIFT and a printer's manicule pointing at it. Both
-  // are retired by the user's affordance law: written action labels near a
-  // trigger are OUT, and the pointing hand was the same sentence drawn as a
-  // picture — a blind reader logged it as "one white blade-with-a-handle", so
-  // it was not even that. What replaces them is what a lifted flap actually
-  // does to a page, in the book's one light:
-  //
-  //   - THE PLAQUE'S CONTACT POOL. The key-board is a timber plaque standing
-  //     proud of the yard cobble; a piece that stands proud drops a pool
-  //     down-light of itself, deepest where it meets the page. That pool is the
-  //     whole of what the LIFT ribbon was claiming — "this is a separate thing
-  //     sitting on top" — and unlike the ribbon it is true whatever the reader
-  //     does next.
-  //   - ONE EMBER ARROW at the plaque's fore edge, aimed the way the leaves'
-  //     free edges travel. The doors hinge at their spine edge and swing their
-  //     ring handles fore, so fore is the direction of the gesture; the arrow
-  //     is the chapter-4/s5 ember mark, the user's named reference style.
-  //
-  // The board's footprint is DERIVED, not typed off a screenshot: it is
-  // content.ts's ch1-keyboard board box (d 0.40..0.74, z -0.09..0.57) run
-  // through this file's own pageFX/pageFY, the same mapping every other anchor
-  // on this page uses.
-  {
-    const bx0 = PX(pageFX(0.4, 'right'))
-    const bx1 = PX(pageFX(0.74, 'right'))
-    const by0 = PY(pageFY(-0.09))
-    const by1 = PY(pageFY(0.57))
-    const boardD = `M ${fx(bx0)} ${fx(by0)} L ${fx(bx1)} ${fx(by0)} L ${fx(bx1)} ${fx(by1)} L ${fx(bx0)} ${fx(by1)} Z`
-    // A plaque hung on a post stands about a finger's thickness off the ground
-    // it shadows; at this print's scale that is h*0.014 = 9.6 art px, which
-    // throws a 5.7 px pool — a contact shadow, not a slab.
-    s += raisedEdgeShadow(boardD, { lift: h * 0.014, part: 'pool', ink: WALNUT })
-    // The arrow sits clear of the plaque mesh (which covers x 0.674..0.822) and
-    // clear of the yard clutter that starts at 0.86, on the cobble the reader's
-    // hand crosses to reach the ring handles.
-    s += cueArrow(PX(0.843), PY(pageFY(0.24)), w * 0.052, { dir: 0, ink: WALNUT })
-  }
+  // All three were furniture for the E3 stage set. E4 replaced that set with the
+  // single tunnel diorama, and what the retired pieces left behind on the print
+  // was clutter the diorama has to be read THROUGH:
+  //   - the WELCOME doormat sat astride the gutter, where the spine crease and
+  //     the two page halves already fight for the eye, and its engraved letters
+  //     land on ~14 screen px of a 27deg floor — a pixel smear, not a word.
+  //     (The affordance law retires the printed word anyway.)
+  //   - the BRASS-KEY TRAIL was a line of gold squiggles leading past a piece
+  //     that no longer exists, to a door that no longer opens there.
+  //   - the KEY-BOARD's plaque pool and ember arrow are contact marks under and
+  //     beside a plaque that was removed with the rest of the E3 rig; a pool
+  //     with nothing standing over it is a stain.
+  // Nothing is painted in their place: the cobble fan already covers the ground
+  // they stood on, and a courtyard that is only courtyard is the point.
 
   // ---- THE GOOSE FAMILY crossing lower-left, heading for the gate.
   //
@@ -10722,22 +10644,23 @@ function innCourtyardSpread(w, h, seed) {
   s += bootTrail(0.08, 0.97, 0.44, pageFY(0.05), 9)
   s += bootTrail(0.9, 0.99, 0.56, pageFY(0.12), 8)
 
-  // ---- S2-7 — THE COACHING YARD, filling the spread's dead right third.
+  // ---- S2-7 — THE COACHING YARD's GROUND, on the spread's right third.
   //
-  // The blind reader: "Past the LIFT board there is nothing but cobblestone
-  // until the page edge, while everything of interest is packed into the middle
-  // 40%. The plaque floats over that void rather than over anything." The board
-  // itself now reaches image x 0.822 (it was 0.770); this fills the rest.
+  // E3 filled this quarter with a props table — a stone horse trough, a
+  // mounting block, a parked hand-cart, a spilled feed sack, a coil of rope and
+  // a grated drain — because the retired key-board plaque floated over an empty
+  // page there. Under the E4 tunnel diorama every one of those objects lands at
+  // 20-40 screen px on a 27deg floor, behind the popup's own silhouette, and
+  // the judges read the lot as random pixel clutter: pale rectangles and dark
+  // blocks with no readable subject. They are deleted.
   //
-  // PRINT, not paper, and deliberately so: everything here is a thing that lies
-  // ON a yard floor and can be honestly drawn in plan at a 27deg reading angle
-  // — a kerbed turning circle, the wheel ruts that cut it, a stone horse
-  // trough, a mounting block, a parked hand-cart, a spilled feed sack, a coil
-  // of rope and a drain. A printed floor may not stand things up: a lantern
-  // POST drawn on the paving would read as a post lying down, so the posts on
-  // the fore wall are represented by what they actually put on the ground —
-  // three lamplight pools stepping up the page toward the gate, which is also
-  // the directional line the void was missing.
+  // What is left is GROUND, which is what a printed floor may honestly carry at
+  // this angle: the kerbed turning circle, the wheel ruts that cut it, and the
+  // three lamplight pools stepping up the page toward the gate. All three are
+  // low-contrast marks IN the paving rather than objects standing on it (a
+  // lantern POST drawn on the paving would read as a post lying down — the
+  // posts are represented by what they put on the ground), so they give the
+  // quarter direction and wear without giving the eye a shape to decode.
   {
     const yardCx = 0.905, yardCy = pageFY(0.26)
     // the coach turning circle: a kerbed ring of setts
@@ -10754,48 +10677,8 @@ function innCourtyardSpread(w, h, seed) {
       s += `<path d="${rut}" fill="none" stroke="${WALNUT}" stroke-width="6" opacity="0.24"/>`
       s += `<path d="${rut}" fill="none" stroke="${INN.stoneLit}" stroke-width="2" opacity="0.3" transform="translate(0 -3)"/>`
     }
-    // THE STONE HORSE TROUGH, in plan against the fore wall
-    {
-      const tx = PX(0.938), ty = PY(0.9), tw = PX(0.078), th2 = PY(0.05)
-      s += `<rect x="${fx(tx - tw / 2 + 3)}" y="${fx(ty - th2 / 2 + 5)}" width="${fx(tw)}" height="${fx(th2)}" rx="4" fill="${INK}" opacity="0.3"/>`
-      s += `<rect x="${fx(tx - tw / 2)}" y="${fx(ty - th2 / 2)}" width="${fx(tw)}" height="${fx(th2)}" rx="4" fill="${INN.stoneLit}" stroke="${WALNUT}" stroke-width="2.6"/>`
-      s += `<rect x="${fx(tx - tw / 2 + 6)}" y="${fx(ty - th2 / 2 + 6)}" width="${fx(tw - 12)}" height="${fx(th2 - 12)}" rx="3" fill="#5d7a82"/>` // water
-      s += `<path d="M ${fx(tx - tw / 2 + 10)} ${fx(ty - 2)} q ${fx(tw * 0.16)} -4 ${fx(tw * 0.32)} 0 q ${fx(tw * 0.16)} 4 ${fx(tw * 0.32)} 0" fill="none" stroke="${INN.snow}" stroke-width="2" opacity="0.55"/>` // ripple
-    }
-    // THE MOUNTING BLOCK — three stone steps beside the trough
-    for (let k = 0; k < 3; k++) {
-      const bw = PX(0.05 - k * 0.011), bx = PX(0.845), by = PY(0.86 + k * 0.024)
-      s += `<rect x="${fx(bx - bw / 2)}" y="${fx(by)}" width="${fx(bw)}" height="${fx(PY(0.022))}" rx="2" fill="${INN.stoneLit}" stroke="${WALNUT}" stroke-width="2.2"/>`
-      s += `<rect x="${fx(bx - bw / 2)}" y="${fx(by)}" width="${fx(bw)}" height="4" fill="${INN.snow}" opacity="0.35"/>`
-    }
-    // THE PORTER'S HAND-CART parked by the circle: bed, shafts, two wheels
-    {
-      const cx3 = PX(0.955), cy3 = PY(pageFY(0.1)), cw4 = PX(0.062), ch4 = PY(0.062)
-      s += `<g transform="rotate(-14 ${fx(cx3)} ${fx(cy3)})">`
-      s += `<ellipse cx="${fx(cx3)}" cy="${fx(cy3 + 7)}" rx="${fx(cw4 * 0.7)}" ry="${fx(ch4 * 0.5)}" fill="${INK}" opacity="0.26"/>`
-      s += `<rect x="${fx(cx3 - cw4 / 2)}" y="${fx(cy3 - ch4 / 2)}" width="${fx(cw4)}" height="${fx(ch4)}" rx="3" fill="${WOOD}" stroke="${WOOD_EDGE}" stroke-width="2.6"/>`
-      for (let p = 1; p < 4; p++)
-        s += `<line x1="${fx(cx3 - cw4 / 2)}" y1="${fx(cy3 - ch4 / 2 + (ch4 * p) / 4)}" x2="${fx(cx3 + cw4 / 2)}" y2="${fx(cy3 - ch4 / 2 + (ch4 * p) / 4)}" stroke="${WOOD_EDGE}" stroke-width="1.8" opacity="0.7"/>`
-      for (const sy of [-ch4 * 0.3, ch4 * 0.3])
-        s += `<line x1="${fx(cx3 - cw4 / 2)}" y1="${fx(cy3 + sy)}" x2="${fx(cx3 - cw4 * 1.15)}" y2="${fx(cy3 + sy * 0.6)}" stroke="${WOOD}" stroke-width="4.4" stroke-linecap="round"/>` // shafts
-      for (const wy of [-ch4 * 0.62, ch4 * 0.62]) {
-        s += `<ellipse cx="${fx(cx3 + cw4 * 0.06)}" cy="${fx(cy3 + wy)}" rx="${fx(cw4 * 0.3)}" ry="${fx(ch4 * 0.12)}" fill="none" stroke="${IRON}" stroke-width="4"/>`
-        s += `<line x1="${fx(cx3 - cw4 * 0.24)}" y1="${fx(cy3 + wy)}" x2="${fx(cx3 + cw4 * 0.36)}" y2="${fx(cy3 + wy)}" stroke="${IRON}" stroke-width="2"/>`
-      }
-      s += `</g>`
-    }
-    // a spilled FEED SACK and a COIL OF ROPE, the small litter that says "used"
-    s += `<g transform="translate(${fx(PX(0.86))} ${fx(PY(pageFY(0.36)))}) rotate(18)">` +
-      `<ellipse cx="0" cy="4" rx="${fx(PX(0.026))}" ry="${fx(PY(0.02))}" fill="${INK}" opacity="0.24"/>` +
-      `<path d="M ${fx(-PX(0.024))} ${fx(PY(0.016))} Q ${fx(-PX(0.03))} ${fx(-PY(0.014))} 0 ${fx(-PY(0.018))} Q ${fx(PX(0.03))} ${fx(-PY(0.014))} ${fx(PX(0.024))} ${fx(PY(0.016))} Z" fill="#c8ab74" stroke="${WALNUT}" stroke-width="2.2"/>` +
-      `<path d="M ${fx(-PX(0.008))} ${fx(-PY(0.018))} q ${fx(PX(0.008))} ${fx(-PY(0.012))} ${fx(PX(0.016))} 0" fill="none" stroke="${WALNUT}" stroke-width="2.4"/>` +
-      `<g opacity="0.65">${[0, 1, 2, 3, 4].map((k) => `<circle cx="${fx(PX(0.02) + k * 5)}" cy="${fx(PY(0.014) + (k % 2) * 4)}" r="2.2" fill="#d8b95e"/>`).join('')}</g></g>`
-    for (let k = 0; k < 3; k++)
-      s += `<ellipse cx="${fx(PX(0.99))}" cy="${fx(PY(pageFY(0.42)))}" rx="${fx(PX(0.022 - k * 0.006))}" ry="${fx(PY(0.017 - k * 0.005))}" fill="none" stroke="#9c8a5e" stroke-width="3.4"/>` // rope coil
-    // the yard DRAIN, a grated square where the ruts converge
-    s += `<rect x="${fx(PX(0.9))}" y="${fx(PY(pageFY(0.44)))}" width="${fx(PX(0.03))}" height="${fx(PY(0.024))}" fill="#3a3128" stroke="${INN.stoneLit}" stroke-width="2.4"/>`
-    for (let k = 1; k < 4; k++)
-      s += `<line x1="${fx(PX(0.9) + (PX(0.03) * k) / 4)}" y1="${fx(PY(pageFY(0.44)))}" x2="${fx(PX(0.9) + (PX(0.03) * k) / 4)}" y2="${fx(PY(pageFY(0.44)) + PY(0.024))}" stroke="${INN.stoneLit}" stroke-width="1.6" opacity="0.6"/>`
+    // (E4: the trough, the mounting block, the hand-cart, the feed sack, the
+    // rope coil and the drain grate stood here. Deleted — see the note above.)
     // THREE LAMPLIGHT POOLS stepping up the right quarter toward the gate —
     // what the yard's lantern posts leave on the paving (the posts themselves
     // stand on the fore wall's crest, and a floor print may not draw them)
