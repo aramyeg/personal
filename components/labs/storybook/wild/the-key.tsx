@@ -444,7 +444,19 @@ export function TheKey() {
     const fade = ramp(f.open, REVEAL.dressing[0], REVEAL.dressing[1])
     const shown = !f.hidden && fade > 0.01
     root.visible = shown
-    armedRef.current = shown && f.open > 0.9
+    // ON STAGE? — and asked of the BOOK, not of this diorama's own frame.
+    //
+    // The E5 fuse made the diorama resident from load, and this component's pointer handlers live
+    // on `window`, so between them they put a live grab surface on every spread in the book: a
+    // real-pointer review took the hidden key while chapter II was displayed, turned it to 0.16
+    // and fired a click, which would have had the reader arrive at chapter I with the inn already
+    // part lit. The wild frame cannot answer this on its own — a resident diorama reports itself
+    // open — so the store's own displayed spread is the authority. `turning !== null` is included
+    // because a key that can be grabbed mid-turn is a key being dragged out from under the hand
+    // (store.beginGrab refuses it anyway, law H2; this makes the refusal visible one step earlier).
+    const book = useStorybookStore.getState()
+    const onStage = book.spread === ctx.spreadIndex && book.turning === null
+    armedRef.current = shown && f.open > 0.9 && onStage
     if (!armedRef.current && physics.held) endGrab()
     if (!shown) return
 

@@ -486,14 +486,21 @@ trace('T12', 'harness: ?wildwake seeding and ?sbpose suppression', () => {
   const hasPoseGate = /pointerPinned|idleClockPinned/.test(shell)
   const hasDebug = /__wildKey/.test(shell) && /wilddebug/.test(shell)
   const hasWildwake = /wildwake/.test(shell)
+  // ON-STAGE GATE. Found by a real-pointer review, not by this bench: the diorama is resident
+  // from load and the key's handlers are on `window`, so without this the hidden key can be
+  // turned — and clicked — while another chapter is displayed, and the reader arrives at chapter
+  // I with the inn already part lit. The wild frame reports a resident diorama as open, so the
+  // authority has to be the book's own displayed spread.
+  const hasStageGate = /book\.spread === ctx\.spreadIndex/.test(shell) && /book\.turning/.test(shell)
   return {
-    facts: { exact, quiet, held, seatedOk, hasPoseGate, hasDebug, hasWildwake },
+    facts: { exact, quiet, held, seatedOk, hasPoseGate, hasStageGate, hasDebug, hasWildwake },
     checks: [
       ['seed sets turn/target exactly', exact],
       ['seed sets seatedIndex', seatedOk],
       ['seed fires no phantom click', quiet],
       ['a pose seeded on a notch stays put', held],
       ['shell gates pointer input on a pinned pose', hasPoseGate],
+      ['shell arms only on the displayed spread, no turn in flight', hasStageGate],
       ['shell still seeds from ?wildwake', hasWildwake],
       ['shell still exposes __wildKey under ?wilddebug', hasDebug],
     ],
