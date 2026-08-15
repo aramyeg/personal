@@ -88,6 +88,7 @@ import { HANDLE_SLOP_FLAT, acceptsHandleHit, handleSlopFactor } from './handle-h
 import { NUDGE_SPAN_ANGLE, TAP_EPS, nudgeOffset } from './handle-nudge'
 import { useHandleTap } from './use-handle-tap'
 import { crankTangentialDelta, projectHubAngle, projectPageD, type HubHit } from './handle-projection'
+import { writeWorldDusk } from './world-grade'
 
 const FLAT_EPSILON = 0.02
 const SHADOW_Y_LIFT = 0.001
@@ -485,7 +486,13 @@ export function DissolvePopupLayer({
     const visible = role !== 'hidden' && beta > FLAT_EPSILON && cull > 0
     group.visible = visible
     if (shadowGroupRef.current) shadowGroupRef.current.visible = visible
-    if (!visible) return
+    if (!visible) {
+      // Keep the world-dusk channel fed while the rack itself is turn-culled,
+      // ramped down with the cull so the spread's nightfall fades with the
+      // turn instead of cliff-dropping at the staleness cutoff.
+      writeWorldDusk(spreadIndex, beta > FLAT_EPSILON ? (readDissolveTau(layer) / Math.PI) * cull : 0)
+      return
+    }
 
     // HOVER RESPONSE (BW-1): the piece under the reader's hand catches the
     // candlelight. Light rather than motion, deliberately — a geometric lift
@@ -546,6 +553,10 @@ export function DissolvePopupLayer({
       .copy(STAGE_SAND)
       .lerp(STAGE_NIGHT, tau / Math.PI)
       .lerp(STAGE_GOLD, stageGlow * 0.85)
+    // ...and the flip drives NIGHTFALL ACROSS THE SPREAD (world-grade.ts):
+    // page print and wings sink, the lamp-lit inn stays bright. The shown tau
+    // is already envelope-carried, so book-close resolves the grade for free.
+    writeWorldDusk(spreadIndex, tau / Math.PI)
     const pose = solveDissolvePose(layer, tau, thetaL, thetaR)
     writeQuad(baseGeom, pose.base)
     pose.slats.forEach((quad, k) => {

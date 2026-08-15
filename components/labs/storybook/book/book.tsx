@@ -43,6 +43,7 @@ import { TurningPage } from './turning-page'
 import { PopupSpread, type PopupRole } from './popup-spread'
 import { CoverDecals } from './cover-decals'
 import { useSpreadPrints } from './use-page-print'
+import { readWorldDusk } from './world-grade'
 import { plyLift } from './lift-ladder'
 import { useGuardedDispose } from './material-pool'
 
@@ -137,6 +138,12 @@ const CLOSED_CENTER_OFFSET_X = -PAGE_W / 2
 // brightness step reads as a flash on the landing page.
 const SHEET_WHITE = new THREE.Color('#ffffff')
 const SHEET_BACK_SHADE = new THREE.Color('#b9ad99')
+// World-dusk page grade (world-grade.ts): the print's albedo multiplier at
+// full courtyard flip. Cool and deep enough that painted lamp gold on the
+// popups reads as glowing against it; not so dark the print's drawing dies.
+const PAGE_DAY = SHEET_WHITE
+const PAGE_NIGHT = new THREE.Color('#5d68a6')
+const DUSK_SCRATCH = new THREE.Color()
 // Turning sheet underside ROUGHNESS, eased on the SAME shade weight as the
 // color above (E-G4 item 4): the lifting card stock scatters light in mid-air
 // (rougher than a flat page), but at both flat poses it must read as the same
@@ -624,6 +631,13 @@ export function Book() {
       leftPageMaterial.needsUpdate = true
     }
 
+    // WORLD DUSK (world-grade.ts): the committed spread's dissolve drives
+    // nightfall over the page print — sky and courtyard sink toward night
+    // while the popup paintings keep their own light. Fails toward white.
+    const dusk = readWorldDusk(sp)
+    rightPageMaterial.color.lerpColors(PAGE_DAY, PAGE_NIGHT, dusk)
+    leftPageMaterial.color.copy(rightPageMaterial.color)
+
     // The mid-turn sheet's two faces: the print it lifted with and the one
     // it lands as (same hold-last rule as the static pages — never blank).
     if (f && !f.isCover) {
@@ -643,6 +657,13 @@ export function Book() {
       // tint popped ~30% brightness on the landing page at commit.
       const shade = Math.sin(Math.PI * easeTurnWeighted(f.t))
       sheetBackMaterial.color.lerpColors(SHEET_WHITE, SHEET_BACK_SHADE, shade)
+      // World-dusk hand-off parity: each sheet face carries the SAME dusk
+      // grade as the static page whose print it shows, or lift-off/landing
+      // pops the brightness exactly like the constant-tint bug above did.
+      const frontDusk = f.dir === 'next' ? dusk : readWorldDusk(sp - 1)
+      sheetFrontMaterial.color.lerpColors(PAGE_DAY, PAGE_NIGHT, frontDusk)
+      const backDusk = f.dir === 'next' ? readWorldDusk(sp + 1) : dusk
+      sheetBackMaterial.color.multiply(DUSK_SCRATCH.lerpColors(PAGE_DAY, PAGE_NIGHT, backDusk))
       // Same weight as the color: roughness converges to the static page's 0.9
       // at both flat poses so the landing hand-off has no specular/brightness
       // step, and holds the rougher mid-air underside where shade peaks.

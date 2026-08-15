@@ -30,8 +30,12 @@ import { liveSpreadRole, spreadPageAnglesTilted, type PanelQuad } from './popup-
 import { easeTurnWeighted } from './page-geometry'
 import type { TurnFrame } from './use-turn-driver'
 import { useLayerTexture } from './use-layer-texture'
+import { readWorldDusk } from './world-grade'
 
 const FLAT_EPSILON = 0.02
+// World-dusk grade endpoints (see the useFrame note).
+const WING_DAY = new THREE.Color('#ffffff')
+const WING_NIGHT = new THREE.Color('#7d84b4')
 
 /** Static uvs, quad-ordered exactly as the position writer walks the pose:
  *  one quad per storey, root first, corners [inner-base, outer-base,
@@ -134,6 +138,11 @@ export function StagedChainPopupLayer({
     const visible = role !== 'hidden' && beta > FLAT_EPSILON && texture !== null
     mesh.visible = visible
     if (!visible) return
+    // World dusk (world-grade.ts): the yard walls sink with the page — one
+    // step SHALLOWER than the page print so they still read in front of it —
+    // while the keepstack inn (untinted, lamp-lit paint) owns the night.
+    const dusk = readWorldDusk(spreadIndex)
+    material.color.lerpColors(WING_DAY, WING_NIGHT, dusk)
     writePose(geometry, solveStagedChainPose(layer, thetaL, thetaR).panels)
   })
 
