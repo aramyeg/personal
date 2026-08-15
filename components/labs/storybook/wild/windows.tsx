@@ -32,7 +32,8 @@ import {
   type WindowSlot,
 } from './inn-model'
 import { applyRiseClip } from './rise-clip'
-import { readWildFrame, useWild } from './wild-frame'
+import { catCrossingAt, STAGE_LIFE } from './stage-life'
+import { ramp, readWildFrame, useWild } from './wild-frame'
 
 // -----------------------------------------------------------------------------------------
 // THE IGNITE CURVE — a candle catching, not a crossfade
@@ -98,6 +99,11 @@ const OCCUPANT_INDEX: Record<Occupant, number> = {
   ledger: 4,
   child: 5,
 }
+
+/** Columns in the occupant atlas. Six standing occupants plus the walking cat, so 4x2. */
+const OCCUPANT_COLS = 4
+/** The walking cat's cell — the only occupant that is not chosen per window in `inn-model`. */
+const CAT_WALK_CELL = 6
 
 const CELL = 128
 /** Painted margin inside every cell, so linear filtering at a cell seam picks up empty pixels
@@ -171,12 +177,15 @@ function paintShapeAtlas(): THREE.CanvasTexture {
 }
 
 /**
- * 3x2 atlas of occupant silhouettes. Each pane is ~32x47 reference pixels on screen, so these
+ * 4x2 atlas of occupant silhouettes. Each pane is ~32x47 reference pixels on screen, so these
  * are painted as BOLD single masses with one readable gesture apiece — a fiddle arm, two
  * linked bodies, a pair of ears. Detail below about four pixels would be a smudge.
+ *
+ * Cells 0-5 are the STANDING occupants, chosen per window in `inn-model`. Cell 6 is the only one
+ * that moves across its glass: the walking cat (see OCCUPANT_GRID and the crossing in the frag).
  */
 function paintOccupantAtlas(): THREE.CanvasTexture {
-  const ctx = makeCanvas(CELL * 3, CELL * 2)
+  const ctx = makeCanvas(CELL * OCCUPANT_COLS, CELL * 2)
   ctx.fillStyle = '#000000'
   ctx.strokeStyle = '#000000'
   ctx.lineCap = 'round'
@@ -184,7 +193,7 @@ function paintOccupantAtlas(): THREE.CanvasTexture {
 
   const at = (i: number): void => {
     ctx.save()
-    ctx.translate((i % 3) * CELL, Math.floor(i / 3) * CELL)
+    ctx.translate((i % OCCUPANT_COLS) * CELL, Math.floor(i / OCCUPANT_COLS) * CELL)
   }
   const done = (): void => ctx.restore()
 
@@ -294,6 +303,55 @@ function paintOccupantAtlas(): THREE.CanvasTexture {
   ctx.fill()
   done()
 
+  // 6 — THE WALKING CAT. Painted feet-down at the bottom of the cell and facing +u, because the
+  // crossing slides this cell across one pane's glass and lifts it to the sill; a cat drawn
+  // anywhere but on the cell's floor would walk through the air. Side-on and long: at this size
+  // the read is the SILHOUETTE — low back, upright head, tail up — not the animal.
+  at(6)
+  ctx.beginPath()
+  ctx.ellipse(60, 96, 34, 15, 0, 0, Math.PI * 2)
+  ctx.fill()
+  ctx.beginPath()
+  ctx.ellipse(86, 92, 16, 15, 0, 0, Math.PI * 2)
+  ctx.fill()
+  head(101, 79, 13)
+  // Ears, and a blunt muzzle so the head is not a ball.
+  ctx.beginPath()
+  ctx.moveTo(93, 71)
+  ctx.lineTo(91, 57)
+  ctx.lineTo(102, 67)
+  ctx.closePath()
+  ctx.fill()
+  ctx.beginPath()
+  ctx.moveTo(105, 69)
+  ctx.lineTo(110, 57)
+  ctx.lineTo(113, 71)
+  ctx.closePath()
+  ctx.fill()
+  ctx.beginPath()
+  ctx.ellipse(111, 84, 7, 5, 0, 0, Math.PI * 2)
+  ctx.fill()
+  // Four legs, mid-stride: the near pair gathered, the far pair reaching.
+  ctx.lineWidth = 8
+  for (const [x0, x1] of [
+    [92, 95],
+    [80, 74],
+    [44, 39],
+    [56, 60],
+  ]) {
+    ctx.beginPath()
+    ctx.moveTo(x0, 100)
+    ctx.lineTo(x1, 120)
+    ctx.stroke()
+  }
+  // The tail, up and hooked — the one line that says cat from across a room.
+  ctx.lineWidth = 8
+  ctx.beginPath()
+  ctx.moveTo(28, 94)
+  ctx.quadraticCurveTo(10, 84, 16, 56)
+  ctx.stroke()
+  done()
+
   return canvasTexture(ctx)
 }
 
@@ -319,11 +377,13 @@ attribute float aGlow;
 attribute float aPhase;
 attribute float aShape;
 attribute float aOcc;
+attribute float aCross;
 varying vec2 vUv;
 varying float vGlow;
 varying float vPhase;
 varying float vShape;
 varying float vOcc;
+varying float vCross;
 
 void main() {
   vUv = uv;
@@ -331,6 +391,7 @@ void main() {
   vPhase = aPhase;
   vShape = aShape;
   vOcc = aOcc;
+  vCross = aCross;
   // Each pane rides the fold chunk of the wall it is cut into. The instance matrix places it at
   // its REST position first; the fold map then moves that, exactly as it moves the wall's own
   // vertices — so a window can never drift out of its hole mid-fold.
@@ -346,11 +407,14 @@ const FRAG = /* glsl */ `
 uniform sampler2D uShapes;
 uniform sampler2D uOccupants;
 uniform float uTime;
+/** The cat crossing: (slide in pane widths, gate 0..1, facing -1/+1, sill height in pane heights). */
+uniform vec4 uCross;
 varying vec2 vUv;
 varying float vGlow;
 varying float vPhase;
 varying float vShape;
 varying float vOcc;
+varying float vCross;
 
 ${ATLAS_UV}
 
@@ -397,10 +461,28 @@ void main() {
     }
     float occ = 0.0;
     if (oUv.x > 0.0 && oUv.x < 1.0 && oUv.y > 0.0 && oUv.y < 1.0) {
-      occ = texture2D(uOccupants, atlasUv(oUv, vOcc, vec2(3.0, 2.0))).a;
+      occ = texture2D(uOccupants, atlasUv(oUv, vOcc, vec2(${OCCUPANT_COLS}.0, 2.0))).a;
     }
     occ *= smoothstep(0.22, 0.72, g);
     col = mix(col, col * 0.09 + uGlass * 0.30, occ);
+  }
+
+  // THE CAT CROSSING. One pane, once every twenty-odd seconds: the walking cell slid across the
+  // glass on the shared clock, lifted to the sill, bobbing a hair per step, and mirrored on the
+  // return leg so it does not moonwalk home. Costs no geometry and no draw call — this is the
+  // whole reason the occupants are an atlas.
+  if (vCross > 0.5 && uCross.y > 0.002) {
+    vec2 cUv = vec2(
+      vUv.x - uCross.x,
+      vUv.y - uCross.w + ${STAGE_LIFE.cat.bob.toFixed(4)} * sin(uTime * ${((Math.PI * 2) / STAGE_LIFE.cat.bobPeriod).toFixed(3)})
+    );
+    if (uCross.z < 0.0) cUv.x = 1.0 - cUv.x;
+    float walk = 0.0;
+    if (cUv.x > 0.0 && cUv.x < 1.0 && cUv.y > 0.0 && cUv.y < 1.0) {
+      walk = texture2D(uOccupants, atlasUv(cUv, ${CAT_WALK_CELL}.0, vec2(${OCCUPANT_COLS}.0, 2.0))).a;
+    }
+    walk *= smoothstep(0.22, 0.72, g) * uCross.y;
+    col = mix(col, col * 0.09 + uGlass * 0.30, walk);
   }
 
   // Glazing bars. Rectangular lights only — a bar across a bullseye reads as a crack.
@@ -445,6 +527,15 @@ function foldSlotFor(slot: WindowSlot): number {
   return foldSlot(ROOM_FOLD[slot.room])
 }
 
+/**
+ * Which pane the cat walks across, and which room has to be lit for it to be worth walking.
+ *
+ * A missing id is NOT an error: the attribute stays zero, the crossing never fires, and the inn is
+ * exactly the inn that shipped without it — the same deliberate failure mode as fold slot 0.
+ */
+const CAT_PANE = WINDOWS.findIndex((slot) => slot.id === STAGE_LIFE.cat.pane)
+const CAT_ROOM: RoomId | null = CAT_PANE >= 0 ? WINDOWS[CAT_PANE].room : null
+
 /** Deterministic per-window phase — a hash, not Math.random, so a reload looks the same. */
 function phaseFor(index: number): number {
   const s = Math.sin(index * 127.1 + 311.7) * 43758.5453
@@ -474,11 +565,13 @@ export function InnWindows() {
     const shape = new Float32Array(n)
     const occ = new Float32Array(n)
     const fold = new Float32Array(n)
+    const cross = new Float32Array(n)
     WINDOWS.forEach((slot, i) => {
       phase[i] = phaseFor(i)
       shape[i] = SHAPE_INDEX[slot.shape]
       occ[i] = OCCUPANT_INDEX[slot.occupant]
       fold[i] = foldSlotFor(slot)
+      cross[i] = i === CAT_PANE ? 1 : 0
     })
     const glowAttr = new THREE.InstancedBufferAttribute(glow, 1)
     glowAttr.setUsage(THREE.DynamicDrawUsage)
@@ -487,6 +580,7 @@ export function InnWindows() {
     geo.setAttribute('aShape', new THREE.InstancedBufferAttribute(shape, 1))
     geo.setAttribute('aOcc', new THREE.InstancedBufferAttribute(occ, 1))
     geo.setAttribute('aFold', new THREE.InstancedBufferAttribute(fold, 1))
+    geo.setAttribute('aCross', new THREE.InstancedBufferAttribute(cross, 1))
     return geo
   }, [])
 
@@ -499,6 +593,7 @@ export function InnWindows() {
         uShapes: { value: shapes },
         uOccupants: { value: occupants },
         uTime: { value: 0 },
+        uCross: { value: new THREE.Vector4(0, 0, 1, STAGE_LIFE.cat.sill) },
         uGlass: { value: new THREE.Color(PALETTE.glassDark) },
         uDim: { value: new THREE.Color('#ff6b1e') },
         uMid: { value: new THREE.Color(PALETTE.lamp) },
@@ -558,6 +653,17 @@ export function InnWindows() {
     }
 
     material.uniforms.uTime.value = f.time
+
+    // THE CAT. Its schedule is a pure function of the shared clock, and it is gated on the room
+    // being lit — a silhouette needs something to be a silhouette against. The gate is a ramp
+    // rather than a threshold so reversing the key fades the cat out instead of deleting it.
+    if (CAT_ROOM) {
+      const cross = catCrossingAt(f.time)
+      const lit = roomLevel(f.wake, CAT_ROOM)
+      const gate = cross.gate * ramp(lit, STAGE_LIFE.cat.litFloor * 0.55, STAGE_LIFE.cat.litFloor)
+      const u = material.uniforms.uCross.value as THREE.Vector4
+      u.set(cross.shift, gate, cross.dir, STAGE_LIFE.cat.sill)
+    }
 
     const attr = geometry.getAttribute('aGlow') as THREE.InstancedBufferAttribute
     const arr = attr.array as Float32Array

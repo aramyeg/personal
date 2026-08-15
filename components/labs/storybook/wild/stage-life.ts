@@ -242,8 +242,13 @@ export const STAGE_LIFE = {
     reach: 1.15,
     /** The pane's room must be at least this lit — a cat in a dark window is not a cat. */
     litFloor: 0.25,
-    /** Height of the sill walk in pane space, and the bob of the shoulders as it steps. */
-    sill: 0.1,
+    /**
+     * How far up the glass the cat walks, in pane heights: the walking cell is painted feet-down,
+     * so this is the interior floor standing a little above the window's own bottom edge. Raise it
+     * and the cat walks a shelf; drop it to 0 and it walks the very bottom of the light.
+     */
+    sill: 0.08,
+    /** Shoulder bob per step, in pane heights, and the seconds one step takes. */
     bob: 0.014,
     bobPeriod: 0.62,
   },
