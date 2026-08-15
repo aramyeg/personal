@@ -323,6 +323,13 @@ export default function BookScene() {
   return (
     <Canvas
       dpr={[1, 2]}
+      // E4 TUNNEL: real cast shadows, PCFSoft. This is a global switch but
+      // shadow casting and receiving are OPT-IN PER MESH, and every other
+      // popup in the book is unlit MeshBasicMaterial with both flags at their
+      // default false — so nothing outside the tunnel diorama changes. (The
+      // tone mapping below stays NoToneMapping; that is a separate, deliberate
+      // decision about painted prints, not about lighting.)
+      shadows="soft"
       // E-G5 floor (b): r3f v9 defaults gl.toneMapping to ACESFilmic, which
       // film-compresses every unlit painted print — a flat aspect-true backdrop
       // measured a ~17% luminance + saturation loss before any other degrader.

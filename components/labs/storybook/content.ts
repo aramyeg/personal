@@ -149,301 +149,28 @@ export const END_CLOSING_LINE =
 // the full Part-A invariant suite (flat fold, containment, no tearing,
 // separation) — sizes were chosen against those bounds.
 
-// Chapter I — E3 s2 scene pack "The Inn of a Hundred Keys" (register R3
-// THEATER-warm; .superpowers/sdd/scenes/s2-scene-pack.md, bench
-// e3s2-reach.mjs 9/9). WELCOME — an enclosure opening toward the reader:
-// a Birmingham-118 STAGE SET of three width-graded gutter-spanning valley
-// folds (rear widest: mountain 1.9 > inn row 1.5 > gate 0.76), the full-
-// span lamplit inn row as the hero plane carrying a dormer and the hanging
-// key-sign on its crease (G6 multi-stage: folds on the fold) plus the
-// great brass KEY rotor turning in the lock as the page opens, the open
-// gate plane downstage, and the innkeeper's family strip-erected as ONE
-// linked welcome rank in the courtyard air between them. The old
-// single-sheet backdrop, the 0.72-wide inn painting with its two dress
-// patches, the standalone sign v-fold and the fully-occluded yard platform
-// are retired into this graded theater (v-fold count NET ZERO). The
-// key-board playable, the stable box and the fore-edge wall are KEPT
-// verbatim (repaint only).
+// Chapter I — E4 TUNNEL CANDIDATE (was the E3 s2 scene pack "The Inn of a
+// Hundred Keys": a twelve-piece graded stage set of v-folds, children, a
+// strip-erected welcome rank, a lift-flap key-board and a gabled stable).
+// That whole crowd is retired here in favour of ONE structure — see below.
 const CH1_LAYERS: readonly SceneLayer[] = [
-  // PLANE A — the sleeping mountain (rear, widest; the DIM plane). Solver
-  // drift from the pack's pre-flight (phi 83/rho 88.8/skew -1.5/creaseU
-  // 0.45/apexZ -0.52): that config's 5.8deg standing margin flops the crease
-  // ~0.3 world TOWARD the reader at the near-flat rest pose, spearing plane
-  // B's band, and its closed fold overreached the page (1.169 > 1.15).
-  // phi 80/rho 88 (margin 8) with a centered crease stands the mountain up
-  // (rest z <= -0.45), folds flat at 1.13, and the deeper apex keeps the
-  // glue ends inside the page. Asymmetry moved to the painted crest.
-  { id: 'ch1-mountain', kind: 'backdrop', role: 'backdrop', mech: 'vfold', apexZ: -0.55, vDir: -1, phiDeg: 80, rhoDeg: 88, creaseU: 0.5, width: 1.9, height: 0.92 },
-  // PLANE B — the inn row (mid, THE HERO): edge-to-edge lamplit facades at
-  // phi 74, a real toward-reader cant so the window art reads at the
-  // lid-dominant camera and its children get a live crease dihedral.
-  // Role 'scenery' (a stage-set plane, not a volumetric prop): the pack's
-  // R2 covenant-allowlist rename predates the C1v2 census — a story-role
-  // v-fold now needs >= 2 dress patches, and this scene retires the inn's
-  // dresses into the plane's own paint per the stage-set grammar.
-  { id: 'ch1-inn-row', kind: 'hero', role: 'scenery', mech: 'vfold', apexZ: -0.2, vDir: -1, phiDeg: 74, rhoDeg: 86, skewDeg: 2, creaseU: 0.58, width: 1.5, height: 0.68 },
-  // Folds on the fold (G6): the attic dormer and the hanging key-sign ride
-  // the inn row's own crease — Reinhart's V-fold off a V-fold.
-  // (dormer mount dropped 0.66 -> 0.63: the child's glue edge runs ~0.030
-  // up the crease past its mount, and the pack's 0.66 left it 0.010 off the
-  // end of B's 0.68 crease — A11 glue-on-the-paper.)
-  { id: 'ch1-dormer', kind: 'midground', role: 'scenery', mech: 'child', parentId: 'ch1-inn-row', mount: 0.63, vDir: 1, phiDeg: 64, rhoDeg: 85, width: 0.16, height: 0.14 },
-  // IDLE (BW-2): the key-sign HANGS from the inn crease, which is the one
-  // thing on this spread a draught would obviously move. Sway swivels the whole
-  // die about its own crease axis — a shop sign turning on its irons, ~1.2deg,
-  // which walks its outer corner about 1.5 thousandths of a page width.
-  { id: 'ch1-sign', kind: 'hero', role: 'scenery', mech: 'child', parentId: 'ch1-inn-row', mount: 0.3, vDir: 1, phiDeg: 62, rhoDeg: 84, width: 0.14, height: 0.16, idle: { kind: 'sway' } },
-  // The first of a hundred keys standing proud of the great door AS the
-  // book opens. The pack's rotor form is GEARED-DEAD here (honest
-  // rejection, the s6 mech-37 precedent): any rivet-riding decoration on a
-  // wall-regime stage panel inherits the panel's late bloom and measures
-  // max/mean ~3.5-4.1 against the rotor family's 2.0 character ceiling
-  // (measured across phi 56..74 and spin/radius/restAt sweeps). A third
-  // small fold on the door crease keeps the beat kinetic with a family
-  // whose ceiling was calibrated on exactly this seat regime.
-  // IDLE (BW-2): the great brass key gets the LIGHT treatment, not motion — a
-  // lamplit inn row is exactly where polished brass would breathe in and out of
-  // the lamp. Glint leaves the geometry alone, so the key stands as still and
-  // proud as the scene wants it to while the spread stops being pixel-frozen.
-  { id: 'ch1-key', kind: 'hero', role: 'scenery', mech: 'child', parentId: 'ch1-inn-row', mount: 0.1, vDir: 1, phiDeg: 62, rhoDeg: 84, width: 0.11, height: 0.09, idle: { kind: 'glint' } },
-  // PLANE C — the open gate (front, narrowest): the gates open toward the
-  // reader exactly when the spread opens. Its 0.376 panel x-reach + 0.02
-  // margin clears the kept key-board at boardD0 0.40 (bench C1).
-  // IDLE (BW-2, WAVE-2 accent pass): the two gate lanterns are the only OPEN
-  // FLAMES the reader stands next to, so the gate plane takes the 'glint' — a
-  // sub-visible brightness breath on the print, which is what a lantern in a
-  // yard does and what a rigid die-cut is allowed to do. NOT sway: this plane
-  // is a stone gateway.
+  // E4 TUNNEL CANDIDATE. The twelve-piece D-series crowd (mountain / inn row
+  // / dormer / sign / key / gate / rank / key-board / stable + dresses / fore
+  // wall) is REPLACED by ONE structure: the chapter as a lit theatre box.
   //
-  // The chimney smoke could NOT be tagged and is a deliberate non-fix: the
-  // smoke curl is cut into ch1-inn-row's OWN silhouette (innRowStage builds it
-  // into the roofline path), so the only handle on it is the hero plane itself
-  // — and idle-life forbids tagging a spread hero. Giving the smoke its own
-  // motion means a new crease-child die and a new reach proof, which is a scene
-  // change, not an accent tag.
-  { id: 'ch1-gate', kind: 'midground', role: 'scenery', mech: 'vfold', apexZ: 0.16, vDir: -1, phiDeg: 82, rhoDeg: 87.5, creaseU: 0.5, width: 0.76, height: 0.42, idle: { kind: 'glint' } },
-  // The WELCOME RANK — innkeeper with lantern, spouse with the enchanted
-  // ledger, waving child, dog, die-cut as ONE linked chain and stood up
-  // frontal by a hidden strip under the floor (law L5). Tip radius 0.576;
-  // z band 0.23..0.57 clears the gate slab by 0.07 and the frieze by 0.09.
-  // S2-5 THE RANK NOW HAS A PAYOFF. Once the book-wide hit fixes made this
-  // handle answer at all, what it did was WRONG: page-driven, the strip is taut
-  // and the family is handed over already at the 90deg anti-flip stop, so the
-  // only gesture available was pushing the welcome party face-down through flat
-  // onto the cobbles — and below ~32deg a flap's own tip projects BELOW its
-  // hinge at this camera, so the last of that travel reads as the family
-  // inverting (the s6 tea-corner finding, same class).
+  // A raked stage deck (20.8 deg, which lifts the effective view onto the
+  // stage floor from 26.1 to 46.9 deg) carries six receding cut-paper planes,
+  // entered through one carriage arch, with a glowing trap door down to the
+  // kitchen. Depth is the hero. The pieces are EXTRUDED CONTOURS, not textured
+  // quads, so every die-cut has a real side wall that catches real light --
+  // the one thing E3's alpha-billboard depth stack could never do.
   //
-  // The s6 opt-ins, on this piece: the strip ships SLACK (`restDeg`) and the
-  // READER raises the rank. At rest the family leans back at 44deg — clearly
-  // standing, well above the inversion crossing, so the courtyard is never
-  // empty of figures — and pulling them to 90deg brings the whole linked chain
-  // upright: lantern raised, ledger out, child waving. That IS the chapter
-  // ("he was welcomed"), it is the direction the story runs in, and both ends
-  // detent so the piece clicks home instead of asymptoting.
-  //
-  // ROUND-2, S2R2-3: THE RANK LIES FORE AND IS GRABBED OFF ITS OWN TIP CIRCLE.
-  // A blind re-reader put 900 px of drag through this handle and got "one tiny
-  // change and then saturation — the figure card shifts about 8-12 px and tips
-  // a couple of degrees; every offset from -50 px to -900 px produces the
-  // identical pixel diff". Both halves of that were one geometric fact: the
-  // rank's swing plane is the y-z plane, which the pinned camera (parked on
-  // x = 0) sees EXACTLY EDGE-ON.
-  //
-  // (1) WHAT THE READER SEES. The travel note below was derived with the tip's
-  // screen height as R*443*sin(A - 33.3deg) — monotone, ~60 px across the
-  // window. That is the FORE-lying sign, and `flat = hinge x n` points fore only
-  // on the RIGHT page. This is a LEFT-side flap, so it shipped aft-lying, whose
-  // screen height is R*443*sin(A + 33.3deg): a sinusoid PEAKING AT 56.7deg,
-  // which the window [44, 90] straddles. Both of its ends therefore sit at
-  // nearly the same screen height and the whole 46deg of travel measured 16 px
-  // worst-vertex. `lie: 'fore'` restores the sign the derivation assumed and the
-  // travel is ~60 px again, monotone, with the rank bowing toward the reader at
-  // rest and coming upright as it is raised. The z footprint SHRINKS into the
-  // band this piece was already cleared in (tip 0.40..0.551 against the old
-  // 0.23..0.57), so no clearance argument is reopened.
-  //
-  // (2) WHAT THE READER'S HAND DOES. The swing plane containing the view
-  // direction also breaks the pointer projection: |ray . planeNormal| = 0.10, so
-  // ~20 px of sideways drag swept the whole window and the other way missed the
-  // plane and wrote nothing. `grabProjection: 'cylinder'` reads the angle off
-  // the flap's own tip circle instead (handle-projection class B1-C), which is
-  // conditioned by the circle's angular width from the camera rather than by a
-  // vanishing dot product: ~1:1 with the paper, live in both directions.
-  //
-  // ROUND-2, S2R2-3: THE RANK IS SKEWED UNTIL A READER CAN SEE IT MOVE.
-  // A blind re-reader put 900 px of drag through this handle and got "one tiny
-  // change and then saturation - the figure card shifts about 8-12 px and tips
-  // a couple of degrees; every offset from -50 px to -900 px produces the
-  // identical pixel diff". Two failures, one geometric fact: at hingeDeg 0 this
-  // flap's tip sweeps the y-z plane, and the pinned camera parks on x = 0 and
-  // therefore sees that plane EXACTLY EDGE-ON.
-  //
-  // (1) THE TRAVEL WAS NEVER THERE. The note below derives ~60 screen px from
-  // the tip chord alone, which is a WORLD length. On screen the tip's height is
-  // R*443*sin(A + 33.3deg) for an aft-lying flap (the derivation lives on
-  // StripFlapGeom.hingeDeg): its climb in y and its retreat in z project to
-  // OPPOSITE screen directions and very nearly cancel. That curve PEAKS at
-  // 56.7deg and the window [44, 90] straddles the peak, so both ends sit at
-  // almost the same screen height and the whole mechanism measured 16 px. It is
-  // not a regression; it never moved.
-  //   The FORE lie is monotone and measures 67 px, and it is wrong for this
-  //   piece: below ~33deg a fore-lying flap's print faces the floor, so at the
-  //   44deg rest the rank showed 0.31 of its face and stood 18 px tall - the
-  //   welcome party face-down on the cobbles, the exact failure round 1 chose
-  //   this window to avoid.
-  //   So the lever is the HINGE SKEW, which trades cancelling vertical for
-  //   page-fore travel on the 441 px/world axis that has nothing to cancel it.
-  //   Swept: 25deg -> 26 px, 30 -> 31, 34 -> 34, 38 -> 38, 45 -> 44, 55 -> 52,
-  //   with the standing rank's face-on falling 0.90 -> 0.78 -> 0.70 -> 0.51.
-  //   38 was the first choice and is REJECTED by the collision ratchet (it adds
-  //   2 mid-turn brushes on a spread whose ceiling may only ever fall), so the
-  //   shipped skew is 34 with hingeZ/slotZ/anchorZ 0.40 -> 0.42. Measured on
-  //   the shipped piece: 31.0 px of worst-vertex travel across the window
-  //   (1.9x what it had, over the 25 px floor), the die 134 px tall at rest and
-  //   127 standing (it was 95 and 85 - the group also reads bigger, which the
-  //   same reader wanted), face-on 0.85 at rest and 0.78 standing against 0.94
-  //   and 0.90 before. The rank now reads as a queue angled toward the gate
-  //   rather than a police line-up.
-  //   CLEARANCES UNCHANGED, and that is why hingeZ moved with the skew: the
-  //   die's z band is 0.234..0.535 against round 1's 0.23..0.57, so the gate
-  //   slab keeps its 0.07 and the frieze gains 0.035. Fore reach grows 0.51 ->
-  //   0.561, well inside the 1.15 page. D-G2 Part 1 (hard zero at rest) and
-  //   both severity ratchets are green at these numbers and were the binding
-  //   constraint on the skew.
-  //
-  // (2) THE HAND WAS NEVER ANSWERED. The edge-on swing plane also breaks the
-  // pointer projection: |ray . planeNormal| = 0.10, so 10 px of drag drove the
-  // piece to its far stop, and the other way the ray missed the infinite plane
-  // and the layer wrote nothing at all. `grabProjection: 'cylinder'` reads the
-  // angle off the flap's own tip circle instead (handle-projection class B1-C),
-  // conditioned by that circle's angular width from the camera rather than by a
-  // vanishing dot product. Measured on the shipped piece: 10 px -> 7deg,
-  // 40 px -> 28deg, 80 px -> the stop, and live in both directions.
-  //
-  // Travel derived, not eyeballed: 46deg of hinge sweep on a 0.21-deep flap
-  // moves the tip 2*0.21*sin(23deg) = 0.164 world; what a reader SEES of that
-  // is the projection above, gated in handle-drag-regression.test.ts against
-  // the 25 px visible-excursion floor.
-  //
-  // CUE-SWEEP: THE CYLINDER COMES OFF. (2) above was prescribed against the
-  // PRE-SKEW rank, and (1) of the same round then skewed the hinge — which is
-  // what actually cured the condition class B1-C exists for. On the SHIPPED
-  // piece |view . hinge| is 0.454, not the 0.10 the note quotes, and 120 probes
-  // out to +-0.5 world find the plane read live in every direction, so "the ray
-  // missed the infinite plane and the layer wrote nothing" is no longer true
-  // here. Both halves of the fix landed; only one of them was still needed.
-  //   What the opt-in left behind was the book's worst gesture-axis liar: 110.9
-  // degrees, the reader having to drag DOWN (0.28, -0.96) to raise paper that
-  // goes UP-RIGHT (0.80, 0.61). The mechanism is the radius. The cylinder read
-  // takes its angle where the ray crosses the TIP circle at `height`, but the
-  // reader grabs the flap's middle at height/2, so the ray enters that circle 71
-  // degrees round the arc from where the paper is (115deg against this rank's
-  // 44deg rest) and the projector's screen gradient is the tangent AT THAT WRONG
-  // ANGLE. The error IS the arc gap: near enough for a flap resting at the top
-  // of its window (ch6-clerk, same page side, same 30deg skew, rests at 90 and
-  // scores 26), hopeless for one resting mid-arc. It does not parameterise out —
-  // swept over every hingeDeg from 0 to 90 the cylinder runs 148.8 -> 50.2 and
-  // never crosses the 45 bar, and dropping the radius to the grab radius makes
-  // the ray near-TANGENT to its own circle (roots 64.9 and 44.0 astride a 54.4
-  // closest approach, gradient singular: 94.8 near, 84.8 far).
-  //   THE PLANE READ IS THE 1:1 ONE, which is the part the round-2 note read
-  // backwards. It points 17.9 degrees off the paper, and its "10 px of drag drove
-  // the piece to its far stop" is not a defect: the grabbed paper itself only
-  // travels 15 screen px across the whole window, so a handle that FOLLOWS the
-  // paper is over in 15 px by definition. The cylinder's 80 px stroke was bought
-  // by not following it — a 4.9x gearing wearing a projector's clothes, and the
-  // 111 degrees was the bill. Saturation here is the excursion finding restated,
-  // and its dial is hingeDeg, capped at 38 by the collision ratchet above (for
-  // whoever reopens it: 45deg reads 44 px of worst-vertex travel, 22 px under the
-  // grabbing finger, and 2.8 degrees of mismatch).
-  { id: 'ch1-rank', kind: 'midground', role: 'figure', mech: 'stripflap', side: 'left', anchor: 0.2, anchorZ: 0.45, slot: 0.26, slotZ: 0.45, hingeX: 0.34, hingeZ: 0.45, hingeDeg: 30, width: 0.34, height: 0.21, restDeg: 44, travelDeg: [44, 90] },
-  // LIFT-THE-FLAP (E2.2 Batch B, new family): the chapter's conceit AND its
-  // playable (G4). A page-flat KEY-BOARD plaque riveted into the RIGHT page's
-  // open mid-ground meadow (where loose brass keys are already printed) carries
-  // a row of four numbered inn doors; the reader lifts each to find a hanging
-  // brass key — behind door 3, the innkeeper's cat (the surprise). Page-rooted
-  // and page-flat (the winch/volvelle seat: lid-orientation reads best at the
-  // pinned camera; the inn hero is a single v-fold PAINTING, so its flaps live
-  // on a piece I fully control). Doors HOLD their open/shut state through page
-  // turns; the page-openness envelope eases them shut at book close. Numbers
-  // bench-verified in derive-liftflap.mjs (L1-L9). Clears the stable (z 0.43+)
-  // and the spine v-folds (it sits out at d 0.4+).
-  // S2-1 THE BOARD IS RESCALED TO READ AT 1x. A blind reader: "the whole board
-  // is ~110x95 px on a 1600x900 screen; the digits 1-4 are ~10px tall... A
-  // reader at normal distance sees a brown smudge with yellow dots."
-  //
-  // Derived from the pinned camera, not eyeballed (book-scene.tsx: pos
-  // (0,1.85,3.05), lookAt (0,0.38,0.05), fov 34, so k = (900/2)/tan(17deg) =
-  // 1471.9 px per unit of screen-plane offset, at depth 3.337 over the board):
-  //   * one world unit along the page-fore axis d  = 441 screen px
-  //   * one world unit along the spine axis z      = 244 screen px  (0.55x — z
-  //     is the foreshortened axis at a 27deg reading angle)
-  //   * one world unit of standing height y        = 371 screen px
-  // The board was 0.22 x 0.45 world = 97 x 110 px, and each door 0.16 x 0.085 =
-  // 71 x 21 px, into which a 512x272 art plate was mapped — a 2.4x HORIZONTAL
-  // STRETCH of every glyph on top of the smallness. Both are fixed here: the
-  // board grows to 0.34 x 0.66 world = 150 x 161 px (2.2x the area), each door
-  // to 0.26 x 0.142 = 115 x 35 px, and the art canvases are re-cut to the
-  // pieces' SCREEN aspects (board 512x552, door 512x155) so a circle drawn in
-  // the painter is a circle on the page. Digits land ~19px.
-  //
-  // Bands are the painter's own layout, so nothing has to be kept in sync by
-  // hand: keyboardBoard lays out `gap = h*0.028` and `slot = (h - 5*gap)/4`,
-  // i.e. gap = 0.028*Z and slot = 0.215*Z of the board's z span Z = 0.66 ->
-  // gap 0.0185, slot 0.142, which is exactly the ladder below.
-  //
-  // Clearances re-checked at the new size: d stays >= 0.40 (the gate's 0.376
-  // panel reach + 0.02 margin, bench C1) and ends at 0.74, well inside the
-  // 1.15 page; z runs -0.09..0.57, clear of the inn row's glue band about
-  // z -0.2 and of the fore wall's apex at z 0.66.
-  {
-    id: 'ch1-keyboard', kind: 'foreground', role: 'scenery', mech: 'liftflap', side: 'right',
-    hingeD: 0.435, leafLen: 0.26, boardD0: 0.4, boardD1: 0.74, boardZ0: -0.09, boardZ1: 0.57,
-    // S2-2, and it is NOT a uv flip. Captured at 1x with ?sbdrive: at the old
-    // 95deg ceiling a lifted leaf is 9deg off EDGE-ON to the reading camera and
-    // renders as a ~7px-wide sliver — its face, its number and its ring all
-    // gone. Between about 40 and 80deg it is visible but its art frame has
-    // swung: the leaf's long axis (image-x) rotates from screen-RIGHT at shut
-    // to screen-UP at vertical, so the numeral tilts with it. That 90deg swing
-    // is what the blind reader read as "rotated 180deg / mirrored glyphs".
-    //
-    // No uv assignment can fix it, and the memory law's own general clause
-    // says so: a rigid texture cannot be upright in two poses 90deg apart. The
-    // numeral's own up-vector (-image-y = -z) in fact projects screen-UP at
-    // EVERY lift angle — that is gated below — so nothing is inverted; what
-    // was wrong was the CEILING. It drops 95 -> 64deg, where the leaf still
-    // presents 67% of its shut-pose screen area and reads as a little door
-    // standing open on its straps. Nothing is lost from the reveal: the 1x
-    // capture shows the niche key FULLY uncovered by 55deg, because the key art
-    // sits in the aperture's fore half (bench L6). The open threshold follows
-    // it down so a door still registers open well before the stop.
-    liftMaxDeg: 64, regOpenDeg: 46,
-    doors: [
-      { z0: -0.072, z1: 0.07, reveal: 'key', plate: 1 },
-      { z0: 0.089, z1: 0.231, reveal: 'key', plate: 2 },
-      { z0: 0.249, z1: 0.391, reveal: 'cat', plate: 3 },
-      { z0: 0.41, z1: 0.552, reveal: 'key', plate: 4 },
-    ],
-  },
-  // VOLUMETRIC: the stable is a gabled OPEN-FRONT barn at the gate — the
-  // user's canonical pop-up structure ("left wall, right wall and a
-  // ceiling", C6 round-1 verdict 2026-07-11): open front toward the
-  // reader, hollow interior, back wall as the brace. Sized down and kept
-  // forward so the inn's painted story and the signpost stay clear.
-  { id: 'ch1-stable', kind: 'backdrop', role: 'story', mech: 'box', a: 0.13, height: 0.15, z0: 0.43, z1: 0.58, roof: 'gable', gableRise: 0.075, capFront: false },
-  // Dress on the stable: a weathervane overhanging the ridge, a hay bale low against the side wall.
-  // S2-6(b): the vane grows ~17% (it read as a 12px "blue nib" at 1x, which is
-  // how a barn came to read as a tented ledger with a quill in it) — the die
-  // keeps its 0.583 aspect, so the repainted cockerel simply lands bigger.
-  { id: 'ch1-stable-vane', kind: 'backdrop', role: 'scenery', mech: 'dress', parentId: 'ch1-stable', seat: 'roofL', u: 0.12, v: 0.02, width: 0.082, height: 0.14 },
-  { id: 'ch1-stable-hay', kind: 'backdrop', role: 'scenery', mech: 'dress', parentId: 'ch1-stable', seat: 'wallR', u: 0.01, v: 0, width: 0.14, height: 0.08 },
-  // The old coaching-yard platform is RETIRED (riser-silhouette law: the
-  // full-span inn row buries it — struts behind a hero read as invisible
-  // scaffolding; pack Q2 approved, no gate requires a per-chapter platform
-  // post-E3). The fore-edge wall is KEPT at its station; its art is re-cut
-  // as the key-baluster courtyard frieze.
-  { id: 'ch1-wall', kind: 'foreground', role: 'scenery', mech: 'vfold', apexZ: 0.66, vDir: 1, phiDeg: 84, rhoDeg: 88, width: 1.25, height: 0.2 },
+  // The cut vocabulary lives in book/tunnel-cuts.ts, the choreography in
+  // book/popup-tunnel.ts, the renderer in book/popup-tunnel-layer.tsx.
+  // One reader handle: a brass ring at the fore edge of the deck. Pulling it
+  // parts the yard gates first, then brings a coach up the tunnel -- one
+  // gesture, two separated events.
+  { id: 'ch1-tunnel', kind: 'hero', role: 'story', mech: 'tunnel' },
 ]
 
 // Chapter II — airy alpine spread, no foreground fringe: one big leaning
@@ -1853,7 +1580,7 @@ export const CHAPTERS: readonly Chapter[] = [
       "Once upon a time, in a stone-built city beneath a sleeping mountain, a young clerk of the merchant’s guild grew tired of selling things and resolved instead to make them. He apprenticed himself to the code-wrights of BlueNet, and his first great labor was an enchanted ledger for the Inn of a Hundred Keys — a book that knew every guest, every room, and every candle lit therein. And the innkeepers marveled, for nothing was ever lost again.",
     accents: ['#6a8f5f', '#b0603f', '#e8a978'],
     layers: CH1_LAYERS,
-    hero: 'ch1-inn-row', // vfold, expected sweep ~0.8 (s1 stripflap / s3 child — rotation holds)
+    hero: 'ch1-tunnel', // E4: the chapter IS one structure, so it is its own hero
   },
   {
     spread: 3,

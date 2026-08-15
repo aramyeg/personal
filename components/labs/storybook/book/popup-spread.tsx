@@ -57,6 +57,7 @@ import { OanavePopupLayer } from './popup-oanave-layer'
 import { DressPopupLayer, RotorPopupLayer, fanMemberLayers } from './popup-anatomy-layers'
 import { VolvellePopupLayer } from './popup-volvelle-layer'
 import { LiftFlapPopupLayer } from './popup-liftflap-layer'
+import { TunnelPopupLayer } from './popup-tunnel-layer'
 import type { TurnFrame } from './use-turn-driver'
 import { useLayerSprite } from './use-layer-texture'
 import { applyUvRect } from '../art-atlas'
@@ -148,6 +149,7 @@ const foldSplit = (layer: SceneLayer): number => {
   if (layer.mech === 'mfoldrange') return 0.5 // per-rank atlas uvs live in the range layer
   if (layer.mech === 'stagedchain') return 0.5 // per-storey atlas bands live in the staged-chain layer
   if (layer.mech === 'dispatchline') return 0.5 // die-cut panel + rider uvs live in the dispatch-line layer
+  if (layer.mech === 'tunnel') return 0.5 // extruded cut pieces, lit — no printed die, no fold line
   if (layer.mech === 'kinetic') return layer.flapW / (layer.flapW + layer.armW) // flap | arm
   if (layer.mech === 'oanave') return 0.5 // host + relief uvs live in the oanave layer (fold at 0.5, symmetric)
   return layer.creaseU ?? 0.5
@@ -198,6 +200,7 @@ export function dieFlipped(layer: SceneLayer, parent: SceneLayer | undefined): b
   if (layer.mech === 'mfoldrange') return false // per-rank atlas uvs live in the range layer
   if (layer.mech === 'stagedchain') return false // per-storey atlas bands live in the staged-chain layer
   if (layer.mech === 'dispatchline') return false // die-cut panel + rider uvs live in the dispatch-line layer
+  if (layer.mech === 'tunnel') return false // no printed die at all — extruded contours, lit in 3D
   const rest = solveLayerPose(layer, parent, Math.PI, 0)
   const v: [number, number, number] = [
     rest.right[3][0] - rest.right[0][0],
@@ -790,6 +793,20 @@ export function PopupSpread({ layers, accents, spreadIndex, role, frame, committ
         if (layer.mech === 'volvelle') {
           return (
             <VolvellePopupLayer
+              key={layer.id}
+              layer={layer}
+              spreadIndex={spreadIndex}
+              frame={frame}
+              committedSpread={committedSpread}
+            />
+          )
+        }
+        // E4: the whole chapter as ONE lit theatre box (see popup-tunnel-layer
+        // for why this family transforms rigid extrusions instead of rewriting
+        // quad buffers like every other renderer here).
+        if (layer.mech === 'tunnel') {
+          return (
+            <TunnelPopupLayer
               key={layer.id}
               layer={layer}
               spreadIndex={spreadIndex}

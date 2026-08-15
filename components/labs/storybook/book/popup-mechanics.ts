@@ -111,6 +111,11 @@ import type { OanaveGeom } from './popup-oanave'
 // (popup-stagedchain only needs PanelQuad/Vec3 from this file).
 import type { StagedChainGeom } from './popup-stagedchain'
 import type { DispatchLineGeom } from './popup-dispatchline'
+// The E4 tunnel (chapter I): a raked stage deck carrying six receding die-cut
+// planes. TYPE-ONLY here — popup-tunnel imports nothing from this file, so
+// there is no cycle, and its pose is a rigid-transform record rather than a
+// MechPose, solved by solveTunnelPose in its own module.
+import type { TunnelGeom } from './popup-tunnel'
 
 export type Vec3 = readonly [number, number, number]
 
@@ -932,6 +937,7 @@ export type LayerGeom =
   | OanaveGeom
   | StagedChainGeom
   | DispatchLineGeom
+  | TunnelGeom
 
 /** A solved mechanism pose: two world-space panel quads plus the axes a
  *  cascaded child needs to mount on (unit vectors; apex in world space).
@@ -1646,6 +1652,8 @@ export function solveLayerPose(
       throw new Error('storybook: staged-chain layers are multi-storey with per-joint cams — use solveStagedChainPose (popup-stagedchain)')
     case 'dispatchline':
       throw new Error('storybook: dispatch-line layers are a die-cut chain panel + an in-plane rider — use solveStagedChainPose + dispatchLineBasketQuad (popup-dispatchline)')
+    case 'tunnel':
+      throw new Error("storybook: 'tunnel' is solved by solveTunnelPose (popup-tunnel)")
     case 'oanave':
       // The nave rank's HOST is the shipped v-fold wall solver verbatim; the
       // dihedral-slaved relief strata are extra patches (oanavePatches in
