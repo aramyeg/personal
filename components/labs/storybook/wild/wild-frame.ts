@@ -26,6 +26,16 @@ export type WildFrame = {
   role: WildRole
   /** Live dihedral, 0 (shut) .. ~3.07 (open). */
   beta: number
+  /**
+   * The two page planes this spread is printed on, as the book itself defines them: each page
+   * runs from the spine along [cos theta, sin theta, 0]. A flat-open book would read PI and 0;
+   * the stacks under each side tilt them (at chapter I one sheet lies under the left page and
+   * eight under the right, so the right is by far the steeper). Anything that has to lie ON the
+   * paper rather than float over it — the courtyard, above all — poses off these and not off a
+   * flat y, because a flat plane sinks under the paper as |x| grows and the old page art shows.
+   */
+  thetaL: number
+  thetaR: number
   /** Curtain-up progress, 0 .. 1, eased. Drives every reveal on the stage. */
   open: number
   /** The key's turn, 0 (asleep) .. 1 (every room lit). Reader-driven, reversible. */
@@ -84,6 +94,8 @@ export function readWildFrame(ctx: WildContextValue): WildFrame {
   return {
     role,
     beta,
+    thetaL,
+    thetaR,
     open: opennessFromBeta(beta),
     wake: clamp01(ctx.wake.current),
     time: ctx.clock.current,

@@ -24,7 +24,7 @@ import { useEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
 
 import { useStorybookStore } from '../store'
-import { KEY_TOY, PALETTE, REVEAL } from './inn-model'
+import { KEY_TOY, PALETTE, REVEAL, STAGE } from './inn-model'
 import { damp, ramp, readWildFrame, useWild } from './wild-frame'
 
 const TURN_RAD = (KEY_TOY.turnDeg * Math.PI) / 180
@@ -165,7 +165,7 @@ export function TheKey() {
       opacity: 0,
     })
     const hole = new THREE.MeshBasicMaterial({
-      color: '#00ff00',
+      color: '#07090f',
       transparent: true,
       opacity: 0,
     })
@@ -367,9 +367,13 @@ export function TheKey() {
       11,
       dt,
     )
+    // The escutcheon is set into the COURTYARD, not the page: the cobble halves ride the tilted
+    // page planes, so at this x the paving stands sin(thetaR)*x above flat — a key seated at
+    // page height is a key buried under the stones.
+    const pavingY = Math.sin(f.thetaR) * KEY_TOY.center[0] + STAGE.cobbleY + 0.002
     root.position.set(
       KEY_TOY.center[0],
-      KEY_TOY.center[1] + HOVER_LIFT * hoverGlowRef.current,
+      KEY_TOY.center[1] + pavingY + HOVER_LIFT * hoverGlowRef.current,
       KEY_TOY.center[2],
     )
 

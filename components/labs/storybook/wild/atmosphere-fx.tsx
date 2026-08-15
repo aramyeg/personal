@@ -439,21 +439,16 @@ export function AtmosphereFx() {
     return { geo, mat, attr }
   }, [])
 
+  // Pool matrices are recomposed against the LIVE page angles (see the useFrame): the cobble
+  // halves ride the tilted pages, so a pool laid flat at cobbleY is a pool under the paving.
+  const poolScratch = useMemo(
+    () => ({ m: new THREE.Matrix4(), q: new THREE.Quaternion(), e: new THREE.Euler(), p: new THREE.Vector3(), s: new THREE.Vector3() }),
+    [],
+  )
+
   useEffect(() => {
     const mesh = poolsRef.current
-    if (!mesh) return
-    const m = new THREE.Matrix4()
-    const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(-Math.PI / 2, 0, 0))
-    const p = new THREE.Vector3()
-    const s = new THREE.Vector3()
-    LIGHT_POOLS.forEach((pool, i) => {
-      p.set(pool.center[0], STAGE.cobbleY + 0.002, pool.center[1])
-      s.set(pool.rx * 2, pool.rz * 2, 1)
-      m.compose(p, q, s)
-      mesh.setMatrixAt(i, m)
-    })
-    mesh.instanceMatrix.needsUpdate = true
-    mesh.frustumCulled = false
+    if (mesh) mesh.frustumCulled = false
   }, [])
 
   // --- smoke -------------------------------------------------------------------------------
@@ -640,20 +635,33 @@ export function AtmosphereFx() {
       if (group) group.visible = level > 0.004
     }
 
-    // POOLS on the cobbles.
+    // POOLS on the cobbles — seated on the tilted paving, not on a flat floor.
     {
       const mesh = poolsRef.current
       if (mesh) {
         pools.mat.uniforms.uTime.value = f.time
         const arr = pools.attr.array as Float32Array
+        const { m, q, e, p, s } = poolScratch
         let any = 0
         LIGHT_POOLS.forEach((pool, i) => {
           const wobble = 1 + 0.06 * Math.sin(f.time * (1.9 + i * 0.31) + i * 1.7)
           const v = roomLevel(f.wake, pool.room) * pool.strength * stage * wobble
           arr[i] = v
           any = Math.max(any, v)
+          const theta = pool.center[0] >= 0 ? f.thetaR : f.thetaL - Math.PI
+          e.set(-Math.PI / 2, 0, theta, 'ZYX')
+          q.setFromEuler(e)
+          p.set(
+            pool.center[0],
+            Math.tan(theta) * pool.center[0] + STAGE.cobbleY + 0.003,
+            pool.center[1],
+          )
+          s.set(pool.rx * 2, pool.rz * 2, 1)
+          m.compose(p, q, s)
+          mesh.setMatrixAt(i, m)
         })
         pools.attr.needsUpdate = true
+        mesh.instanceMatrix.needsUpdate = true
         mesh.visible = any > 0.004
       }
     }

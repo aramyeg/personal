@@ -42,8 +42,32 @@ import { ramp, readWildFrame, useWild } from './wild-frame'
 // STAGE GEOMETRY THE CONTRACT DOES NOT OWN
 // ---------------------------------------------------------------------------------------------
 
-/** The courtyard floor: exactly the open spread, so the page is fully dressed and no further. */
+/**
+ * The courtyard floor: exactly the open spread, so the page is fully dressed and no further.
+ *
+ * IT IS TWO HALVES, NOT ONE PLANE. The book's pages are not flat — each one tilts up from the
+ * spine by however many sheets of paper lie under it, and at this chapter that is one sheet on
+ * the left and eight on the right, so the right page climbs about eight times as steeply as the
+ * left. A single flat sheet of cobbles laid at STAGE.cobbleY therefore dives under the paper a
+ * few centimetres out from the gutter and the chapter's OWN printed art surfaces through it for
+ * most of both pages. So the courtyard is hinged at the spine like the pages are, and each half
+ * rides its own page's live angle.
+ */
 const COBBLES = { halfW: 1.15, halfD: 0.75, repeat: [6, 4] as const }
+
+/**
+ * How far each half floats above its page, measured square to the paper. The paper also bulges
+ * slightly between the rest tilts, so this is a clearance rather than a fit — big enough to
+ * survive the bulge, small enough that nothing standing on the cobbles looks stilted.
+ */
+const COBBLE_LIFT = STAGE.cobbleY
+
+/** The two halves, and which way each one's own texture is shifted so the spread does not
+ *  read as one paving pattern printed twice. */
+const HALVES = [
+  { side: -1, key: 'left', offset: 0.37 },
+  { side: 1, key: 'right', offset: 0 },
+] as const
 
 /**
  * The seam patch. STAGE.sky is a vertical card at z = -2.6 and it is cut off by the desk plane
@@ -283,7 +307,7 @@ function paintMist(seed: number): THREE.CanvasTexture {
 }
 
 /** Cobbles: staggered courses of worn stones with dark joints. Tiles in both axes. */
-function paintCobbles(): THREE.CanvasTexture {
+function paintCobbles(): HTMLCanvasElement {
   const S = 512
   const [canvas, g] = surface(S, S)
   const r = rng(0x0cb6)
@@ -337,10 +361,21 @@ function paintCobbles(): THREE.CanvasTexture {
     g.fillRect(x, y, 1.4, 1.4)
   }
 
+  return canvas
+}
+
+/**
+ * One half's paving. Each half is its own texture rather than one shared instance, because the
+ * two halves need different offsets: the same tile run printed twice either side of the gutter
+ * is the one pattern a reader's eye finds instantly.
+ */
+function cobbleTexture(canvas: HTMLCanvasElement, offsetU: number): THREE.CanvasTexture {
   const texture = toTexture(canvas)
   texture.wrapS = THREE.RepeatWrapping
   texture.wrapT = THREE.RepeatWrapping
-  texture.repeat.set(COBBLES.repeat[0], COBBLES.repeat[1])
+  // Half the width carries half the tiles, so a stone is the same size as it always was.
+  texture.repeat.set(COBBLES.repeat[0] / 2, COBBLES.repeat[1])
+  texture.offset.x = offsetU
   return texture
 }
 
@@ -481,17 +516,17 @@ export function NightStage() {
   const scene = useThree((s) => s.scene)
   const roomLights = useRoomLights(scene)
 
-  const art = useMemo(
-    () => ({
+  const art = useMemo(() => {
+    const paving = paintCobbles()
+    return {
       sky: paintSky(),
       halo: paintRadialGlow('rgba(196,218,255,0.85)', 'rgba(120,158,214,0.22)'),
       haze: paintHaze(),
       skyline: paintSkyline(),
       mist: STAGE.mist.map((_, i) => paintMist(0x4d15 + i * 977)),
-      cobbles: paintCobbles(),
-    }),
-    []
-  )
+      cobbles: HALVES.map((half) => cobbleTexture(paving, half.offset)),
+    }
+  }, [])
 
   useEffect(
     () => () => {
@@ -499,7 +534,7 @@ export function NightStage() {
       art.halo.dispose()
       art.haze.dispose()
       art.skyline.dispose()
-      art.cobbles.dispose()
+      for (const c of art.cobbles) c.dispose()
       for (const m of art.mist) m.dispose()
     },
     [art]
@@ -518,7 +553,9 @@ export function NightStage() {
   const skylineRef = useRef<THREE.Mesh>(null)
   const hazeRef = useRef<THREE.Mesh>(null)
   const farGroundRef = useRef<THREE.Mesh>(null)
-  const cobbleRef = useRef<THREE.Mesh>(null)
+  /** One hinge group and one paving mesh per page half. */
+  const cobbleHingeRefs = useRef<(THREE.Group | null)[]>([])
+  const cobbleRefs = useRef<(THREE.Mesh | null)[]>([])
   const mistRefs = useRef<(THREE.Mesh | null)[]>([])
 
   // The moon is the book's only shadow caster, and its frustum is fitted to the mass rather
@@ -550,7 +587,7 @@ export function NightStage() {
   }
 
   useFrame(() => {
-    const { open, time } = readWildFrame(wild)
+    const { open, time, thetaL, thetaR } = readWildFrame(wild)
 
     // THE NIGHT ARRIVES (REVEAL.night). Eased out, not linear: the dark floods in and then
     // settles, which is how a room reads when the lamps go down rather than a cross-fade.
@@ -594,32 +631,23 @@ export function NightStage() {
       opacityOf(skyline, arrived)
     }
 
-    // Cobbles: fade up, and settle down the last hair onto the page as they resolve.
-    const cobbles = cobbleRef.current
-    if (cobbles) {
+    // THE COURTYARD CONFORMS TO THE PAGE. Each half swings on the spine to its own page's live
+    // angle: a page runs from the spine along [cos theta, sin theta], so the right half turns by
+    // thetaR and the left — whose theta is measured back from PI — by thetaL - PI. Both are read
+    // fresh every frame, so the paving follows a page that is being turned instead of tearing
+    // off it. The lift is applied inside the hinge, which makes it a clearance measured square
+    // to the paper rather than a height above a flat floor that no longer exists.
+    cobbleHingeRefs.current[0]?.rotation.set(0, 0, thetaL - Math.PI)
+    cobbleHingeRefs.current[1]?.rotation.set(0, 0, thetaR)
+
+    // Fade up, and settle the last hair down onto the paper as they resolve.
+    for (const cobbles of cobbleRefs.current) {
+      if (!cobbles) continue
       const material = cobbles.material as THREE.MeshStandardMaterial
       material.opacity = paved
       material.transparent = paved < 0.995
-      cobbles.position.y = STAGE.cobbleY + (1 - paved) * 0.012
+      cobbles.position.y = COBBLE_LIFT + (1 - paved) * 0.012
       cobbles.visible = paved > 0.004
-      // TEMP PROBE
-      const w = new THREE.Vector3()
-      cobbles.getWorldPosition(w)
-      if (!(cobbles as unknown as { _p?: boolean })._p && paved > 0.9) {
-        ;(cobbles as unknown as { _p?: boolean })._p = true
-        console.warn(
-          'WILD cobble probe',
-          JSON.stringify({
-            paved,
-            open,
-            opacity: material.opacity,
-            transparent: material.transparent,
-            visible: cobbles.visible,
-            world: [w.x, w.y, w.z],
-            parentVisible: cobbles.parent?.visible,
-          })
-        )
-      }
     }
 
     // Mist drifts horizontally off the shared clock. The texture scrolls rather than the card,
@@ -713,24 +741,36 @@ export function NightStage() {
         <meshBasicMaterial transparent opacity={0} depthWrite={false} color="#0c1220" />
       </mesh>
 
-      {/* THE COURTYARD. The one surface that takes the moon's shadow. */}
-      <mesh
-        ref={cobbleRef}
-        rotation={[-Math.PI / 2, 0, 0]}
-        position={[0, STAGE.cobbleY, 0]}
-        receiveShadow
-        renderOrder={-24}
-      >
-        <planeGeometry args={[COBBLES.halfW * 2, COBBLES.halfD * 2]} />
-        <meshStandardMaterial
-          map={art.cobbles}
-          color={"#ff00ff"}
-          roughness={0.88}
-          metalness={0}
-          transparent
-          opacity={0}
-        />
-      </mesh>
+      {/* THE COURTYARD. The one surface that takes the moon's shadow — and the only one that
+          has to lie ON the paper, so it is hinged at the spine exactly as the pages are. The
+          two halves meet along the gutter with a hair of overlap rather than a seam. */}
+      {HALVES.map((half, i) => (
+        <group
+          key={half.key}
+          ref={(group) => {
+            cobbleHingeRefs.current[i] = group
+          }}
+        >
+          <mesh
+            ref={(mesh) => {
+              cobbleRefs.current[i] = mesh
+            }}
+            rotation={[-Math.PI / 2, 0, 0]}
+            position={[(half.side * COBBLES.halfW) / 2, COBBLE_LIFT, 0]}
+            receiveShadow
+            renderOrder={-24}
+          >
+            <planeGeometry args={[COBBLES.halfW, COBBLES.halfD * 2]} />
+            <meshStandardMaterial
+              map={art.cobbles[i]}
+              roughness={0.88}
+              metalness={0}
+              transparent
+              opacity={0}
+            />
+          </mesh>
+        </group>
+      ))}
 
       {/* MIST. Cool, always — its warm answer to lamplight belongs to the atmosphere lane. */}
       {STAGE.mist.map((band, i) => (

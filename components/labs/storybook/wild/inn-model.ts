@@ -79,14 +79,22 @@ export const DORMERS = [
   { id: 'dormer-small', cx: -0.12, halfW: 0.085, apexY: 0.75, frontZ: -0.02, sillY: 0.635 },
 ] as const
 
-/** Chimney stack, right of the ridge, straddling the spine so it masks the gutter. */
+/**
+ * Chimney stack, at the right-hand end of the ridge, riding the gutter so it masks the spine.
+ *
+ * Its plan is centred ON the spine rather than pushed right, and that is load-bearing: the shaft
+ * runs all the way to the ground, so any part of it standing outboard of HALL's right wall is a
+ * breast across the KITCHEN's face — the one wall the moon actually lights. Kept inboard, the
+ * stack is buried in the hall below the roof and is a silhouette only where it should be, above
+ * it. Do not widen it past HALL's right wall without moving the kitchen windows.
+ */
 export const CHIMNEY = {
-  min: [-0.02, 0, -0.4] as Vec3,
-  max: [0.11, 0.9, -0.27] as Vec3,
+  min: [-0.065, 0, -0.4] as Vec3,
+  max: [0.065, 0.9, -0.27] as Vec3,
   /** Corbelled cap flares beyond the shaft. */
   cap: { baseY: 0.9, topY: 0.94, oversail: 0.018 },
   /** Smoke leaves here once the kitchen is lit. */
-  vent: [0.045, 0.94, -0.335] as Vec3,
+  vent: [0, 0.94, -0.335] as Vec3,
   skin: 'brick' as const,
 }
 
@@ -185,7 +193,7 @@ export const STAGE = {
   mist: [
     { z: -0.95, y: 0.12, halfW: 1.7, height: 0.5, speed: 0.011, opacity: 0.3 },
     { z: -0.55, y: 0.08, halfW: 1.5, height: 0.38, speed: -0.017, opacity: 0.22 },
-    { z: 0.3, y: 0.06, halfW: 1.4, height: 0.3, speed: 0.023, opacity: 0.14 },
+    { z: 0.3, y: 0.06, halfW: 1.4, height: 0.3, speed: 0.023, opacity: 0.07 },
   ],
   cobbleY: 0.004,
 } as const
@@ -354,23 +362,31 @@ const BANDS: readonly Band[] = [
 /** The stair windows spiral, so they are authored as a helix rather than a band. */
 const STAIR_STEPS = 5
 
+/**
+ * How far the helix wanders across the tower's face, and why it only ever wanders one way.
+ *
+ * THE TOWER'S RIGHT-HAND FACE IS NOT A FACE. It is the joint: the hall is engaged 0.02 into it
+ * below the first floor and the jetty oversails 0.06 past it above, so that whole wall is inside
+ * the range and a window cut into it is a window inside a wall. The helix therefore reads on the
+ * FRONT face alone, and stays left of the tower's centre line — anything drifting right of it
+ * goes behind the hall (low) or the jetty and roof (high). The climb still reads as a spiral,
+ * because a spiral seen from outside IS a run of lights wandering across one face as it rises.
+ */
+const STAIR_SWING = 0.055
+
 function stairSlots(): WindowSlot[] {
   const [lo, hi] = ROOM_CASCADE.stair
   const cxTower = (TOWER.min[0] + TOWER.max[0]) / 2
   const out: WindowSlot[] = []
   for (let i = 0; i < STAIR_STEPS; i += 1) {
     const f = i / (STAIR_STEPS - 1)
-    // Alternate between the tower's front and right faces so the run reads as a spiral.
-    const onFront = i % 2 === 0
     const y = 0.16 + f * 0.52
-    const swing = Math.sin(f * Math.PI * 1.6) * 0.05
+    const swing = (-STAIR_SWING * (1 - Math.sin(f * Math.PI * 1.6))) / 2
     out.push({
       id: `stair-${i}`,
       room: 'stair',
-      pos: onFront
-        ? [cxTower + swing, y, TOWER.max[2] + PROUD]
-        : [TOWER.max[0] + PROUD, y, (TOWER.min[2] + TOWER.max[2]) / 2 + swing],
-      facing: onFront ? FRONT : RIGHT,
+      pos: [cxTower + swing, y, TOWER.max[2] + PROUD],
+      facing: FRONT,
       w: 0.055,
       h: 0.07,
       shape: 'tall',
@@ -381,7 +397,24 @@ function stairSlots(): WindowSlot[] {
   return out
 }
 
-/** The two dormer gables plus a pair of tiny roof lights — the last things to wake. */
+/**
+ * A point on the front roof's weathering surface at this z, and the surface's own normal. The
+ * roof lights are the only openings that lie IN a slope instead of in a wall, so their seat is
+ * DERIVED from ROOF rather than written down: a hand-placed one sat ten millimetres under the
+ * shingles, where the slab covered it completely and no amount of dressing could find it.
+ */
+function roofSeat(z: number): { y: number; normal: Vec3 } {
+  const dz = ROOF.ridgeZ - ROOF.frontEaveZ
+  const dy = ROOF.ridgeY - ROOF.eaveY
+  const len = Math.hypot(dz, dy)
+  return {
+    y: ROOF.eaveY + ((z - ROOF.frontEaveZ) * dy) / dz,
+    // Of the slope's two normals, the one facing out of the roof: up and toward the reader.
+    normal: [0, -dz / len, dy / len],
+  }
+}
+
+/** The two dormer gables plus a tiny roof light — the last things to wake. */
 function atticSlots(): WindowSlot[] {
   const [lo, hi] = ROOM_CASCADE.attic
   const slots: WindowSlot[] = DORMERS.map((d, i) => ({
@@ -395,11 +428,14 @@ function atticSlots(): WindowSlot[] {
     at: lo + (hi - lo) * (i === 0 ? 0.0 : 0.55),
     occupant: i === 0 ? ('ledger' as const) : ('none' as const),
   }))
+  // Set between the two dormers, where the slope is otherwise blank.
+  const lightZ = -0.14
+  const seat = roofSeat(lightZ)
   slots.push({
     id: 'attic-light-0',
     room: 'attic',
-    pos: [-0.33, 0.72, -0.14],
-    facing: [0, 0.72, 0.69],
+    pos: [-0.33, seat.y + seat.normal[1] * PROUD, lightZ + seat.normal[2] * PROUD],
+    facing: seat.normal,
     w: 0.05,
     h: 0.045,
     shape: 'round',
@@ -450,7 +486,7 @@ export const WINDOWS: readonly WindowSlot[] = [
  * room. Four lights, not thirty.
  */
 export const ROOM_LIGHTS = [
-  { room: 'passage' as RoomId, pos: [-0.42, 0.2, -0.3] as Vec3, distance: 1.1, intensity: 2.6 },
+  { room: 'passage' as RoomId, pos: [-0.42, 0.2, -0.3] as Vec3, distance: 1.1, intensity: 1.8 },
   { room: 'taproom' as RoomId, pos: [-0.36, 0.24, -0.05] as Vec3, distance: 0.95, intensity: 1.7 },
   { room: 'gallery' as RoomId, pos: [-0.32, 0.5, 0.0] as Vec3, distance: 0.85, intensity: 1.2 },
   { room: 'stair' as RoomId, pos: [-0.84, 0.5, -0.22] as Vec3, distance: 0.8, intensity: 1.1 },
@@ -464,9 +500,9 @@ export const ARCH_SHAFT = {
   origin: [ARCH.cx, (ARCH.springY + ARCH.apexY) / 2, ARCH.frontZ] as Vec3,
   /** Points at the reader and slightly down, following the camera's depression. */
   direction: [0.08, -0.24, 1] as Vec3,
-  length: 0.85,
-  startHalfW: ARCH.halfW,
-  endHalfW: ARCH.halfW * 3.1,
+  length: 0.66,
+  startHalfW: ARCH.halfW * 0.92,
+  endHalfW: ARCH.halfW * 1.9,
 }
 
 /** Warm pools painted on the cobbles under the lit openings. Opacity follows their room. */

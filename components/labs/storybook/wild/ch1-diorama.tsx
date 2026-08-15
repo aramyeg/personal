@@ -44,77 +44,6 @@ import { TheKey } from './the-key'
 import { InnWindows } from './windows'
 import { ramp, readWildFrame, WildContext, type WildContextValue } from './wild-frame'
 
-// ==== TEMPORARY LOOK-DEV PROXY — DELETE BEFORE REPORTING ====================================
-import { HALL, JETTY, CHIMNEY, TOWER, WINDOWS, PALETTE } from './inn-model'
-import { applyRiseClip } from './rise-clip'
-import { useWild } from './wild-frame'
-
-function MassingProxy() {
-  const { wake } = useWild()
-  const mat = useMemo(
-    () =>
-      applyRiseClip(
-        new THREE.MeshStandardMaterial({ color: PALETTE.stoneCold, roughness: 0.92, metalness: 0 })
-      ),
-    []
-  )
-  const glass = useMemo(() => {
-    const m = new THREE.MeshBasicMaterial({ color: new THREE.Color(PALETTE.glassDark) })
-    return applyRiseClip(m)
-  }, [])
-  const litRef = useRef<THREE.Group>(null)
-
-  useEffect(() => {
-    const p = new URLSearchParams(window.location.search)
-    wake.current = p.get('wildwake') ? Number(p.get('wildwake')) : 0
-  }, [wake])
-
-  useFrame(() => {
-    const g = litRef.current
-    if (!g) return
-    const w = wake.current
-    g.children.forEach((c, i) => {
-      const m = (c as THREE.Mesh).material as THREE.MeshBasicMaterial
-      const on = w > WINDOWS[i].at ? 1 : 0
-      m.color.setRGB(0.05 + 5.2 * on, 0.04 + 3.1 * on, 0.03 + 1.1 * on)
-    })
-  })
-
-  const boxes = [HALL, JETTY, TOWER, CHIMNEY].map((b) => ({
-    min: b.min as unknown as number[],
-    max: b.max as unknown as number[],
-  }))
-
-  return (
-    <group>
-      {boxes.map((b, i) => (
-        <mesh
-          key={i}
-          castShadow
-          receiveShadow
-          material={mat}
-          position={[(b.min[0] + b.max[0]) / 2, (b.min[1] + b.max[1]) / 2, (b.min[2] + b.max[2]) / 2]}
-        >
-          <boxGeometry args={[b.max[0] - b.min[0], b.max[1] - b.min[1], b.max[2] - b.min[2]]} />
-        </mesh>
-      ))}
-      <group ref={litRef}>
-        {WINDOWS.map((w) => (
-          <mesh
-            key={w.id}
-            position={[w.pos[0], w.pos[1], w.pos[2]]}
-            rotation={w.facing[0] === 1 ? [0, Math.PI / 2, 0] : [0, 0, 0]}
-            material={glass.clone()}
-          >
-            <planeGeometry args={[w.w, w.h]} />
-          </mesh>
-        ))}
-      </group>
-    </group>
-  )
-}
-// ==== END TEMPORARY PROXY ====================================================================
-
 export type Ch1DioramaProps = {
   spreadIndex: number
   role: PopupRole
@@ -155,6 +84,17 @@ export function Ch1Diorama({ spreadIndex, role, frame, committedSpread }: Ch1Dio
     () => ({ spreadIndex, frame, committedSpread, wake, clock }),
     [spreadIndex, frame, committedSpread]
   )
+
+  // THE POSING HOOK. `?wildwake=0.62` drops the key's turn straight into the channel the toy
+  // otherwise owns, so a capture can be taken at a chosen point in the cascade and compared
+  // against the last one taken there. Read once at mount; the toy takes the channel back the
+  // moment it is on screen and grabbable.
+  useEffect(() => {
+    const param = new URLSearchParams(window.location.search).get('wildwake')
+    if (param === null) return
+    const value = Number(param)
+    if (Number.isFinite(value)) wake.current = value
+  }, [])
 
   // Renderer capabilities the diorama borrows and gives back. `localClippingEnabled` arms
   // RISE_CLIP; the shadow map is off by default on this Canvas (book-scene mounts no `shadows`
@@ -214,7 +154,6 @@ export function Ch1Diorama({ spreadIndex, role, frame, committedSpread }: Ch1Dio
           <group ref={riseRef} name="wild-rise" position={[0, -MASS_APEX_Y, 0]}>
             <InnBuilding />
             <InnWindows />
-            <MassingProxy />
           </group>
           <AtmosphereFx />
           <TheKey />
