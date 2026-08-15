@@ -252,12 +252,9 @@ export const KEY_TOY = {
   shaftLength: 0.11,
   /** Detents the turn passes through, as fractions of the full sweep. */
   detents: [0, 0.34, 0.68, 1],
-  /** Radius within which a pointer grabs the key. The accept gate is this plus bowRadius, and
-   *  it must cover the key's own reach — the bow's far rim lies shaftLength + 2*bowRadius =
-   *  0.254 from the escutcheon, and the leaned camera grazes the page so shallowly that a
-   *  finger-width of screen maps to several centimetres of paving. 0.17 rejected presses ON
-   *  the visible handle. */
-  grabRadius: 0.25,
+  // The grab gate is NOT here: it moved into KEY_FEEL (`grabRPage` / `grabRPx` / `hitDiscR`) in
+  // wild/key-physics.ts when the toy was rebuilt to the feel-spec, because the accept test is a
+  // property of the mechanism's feel and not of the escutcheon's geometry.
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -553,11 +550,17 @@ export const MASS_APEX_Y = TOWER.cap.apexY
  *
  * Beat 2 — the inn arriving — used to be a clipping-plane RISE and is now the FOLD-BIRTH: the
  * building erects in seven staged hinge events whose own windows live in `wild/fold-birth.ts`
- * (they span open 0.16..0.99). The other three beats are untouched; the night still arrives with
- * the leaf, the courtyard still resolves under it, the dressing still lands last.
+ * (they span open 0.16..0.99). The night still arrives with the leaf and the dressing still lands
+ * last.
+ *
+ * PAPER FIRST, THEN FOLDS. `courtyard` used to run 0.46..0.80 — behind the fold-birth, which meant
+ * the hall's walls creased up off a floor that was not there yet and the well and barrels rose out
+ * of bare page. It now leads the building (0.20..0.52, resolved by the time the walls are half
+ * up): the paving is laid, and then the inn is folded up standing on it. This is the one reveal
+ * timing that has to be read against `FOLD_EVENTS`, not against the other beats.
  */
 export const REVEAL = {
   night: [0.0, 0.34] as const,
-  courtyard: [0.46, 0.8] as const,
+  courtyard: [0.2, 0.52] as const,
   dressing: [0.72, 1.0] as const,
 } as const
