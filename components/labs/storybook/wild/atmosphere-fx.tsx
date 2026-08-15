@@ -565,6 +565,7 @@ export function AtmosphereFx() {
       uniforms: {
         uTime: { value: 0 },
         uOpacity: { value: 0 },
+        uWind: { value: 0 },
         uWarm: { value: new THREE.Color('#6b5340') },
         uCool: { value: new THREE.Color('#39445c') },
       },
