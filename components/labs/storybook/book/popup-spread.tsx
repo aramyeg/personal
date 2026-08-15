@@ -61,6 +61,7 @@ import type { TurnFrame } from './use-turn-driver'
 import { useLayerSprite } from './use-layer-texture'
 import { applyUvRect } from '../art-atlas'
 import { idleClockPinned, idleOffset, idlePeak, idleSeed, type IdleKind } from './idle-life'
+import { Ch1Diorama } from '../wild/ch1-diorama'
 
 const SHADOW_HEIGHT = 0.16
 const SHADOW_Y_LIFT = 0.001
@@ -527,6 +528,21 @@ function PopupLayer({
  *  spread ± 1) but only visible while `role !== 'hidden'`. Children find
  *  their parent in the same spread's layer list. */
 export function PopupSpread({ layers, accents, spreadIndex, role, frame, committedSpread }: PopupSpreadProps) {
+  // WILD lane, standing decision D1: chapter 1 is not a paper mechanism. Spread 2 bypasses the
+  // solver entirely and hands the page to a lit diorama, which supplies its own
+  // `popup-spread-2` group with the same visibility semantics every other spread has.
+  // CH1_LAYERS stays in content.ts untouched; it simply no longer renders.
+  if (spreadIndex === 2) {
+    return (
+      <Ch1Diorama
+        spreadIndex={spreadIndex}
+        role={role}
+        frame={frame}
+        committedSpread={committedSpread}
+      />
+    )
+  }
+
   return (
     <group visible={role !== 'hidden'} name={`popup-spread-${spreadIndex}`}>
       {layers.map((layer) => {
