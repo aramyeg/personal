@@ -25,6 +25,13 @@
  *                      own or of any ancestor.
  *   E  ABOVE THE PAGE  no piece's swept volume dips below the page plane mid-flight, beyond the
  *                      depth it already occupies at rest plus its own landing dip.
+ *   W  WALL TIME       the block that exists because A-E all passed while the feature was
+ *                      invisible. Gates A-E prove the geometry over `open` 0..1; they say nothing
+ *                      about how much of the READER'S time each event gets. The first shipped
+ *                      version spent 18-33 ms on each of its first six events because `open` was
+ *                      a smoothstep of a dihedral that was itself a quint of wall time, and the
+ *                      whole seven-event build ran in 261 ms. Every number here is measured
+ *                      through the REAL WildFrame on the REAL driver curve.
  *
  * Run:  node scripts/storybook/bench/e5-foldbirth.mjs      (from the worktree root)
  */
@@ -159,7 +166,11 @@ console.log('\n=== B1 · FOLD FLAT AT open = 0 ===')
 console.log('\n=== B2 · REST POSE AT open = 1 (positions within 1e-4 of the model) ===')
 {
   const IDENT = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]
-  for (const open of [1, 0.995, 0.99]) {
+  // The last event now lands exactly ON the commit — that is what buys it its 150 ms — so `open`
+  // just short of 1 is legitimately still inside the dressing's settle lobe. The contract is
+  // therefore stated where it actually lives: EXACT at 1 and past it, and everything before that
+  // is the settle and nothing else.
+  for (const open of [1, 1.2]) {
     const poses = solveFoldBirth(open)
     let worst = 0
     let worstCrease = 0
@@ -168,11 +179,13 @@ console.log('\n=== B2 · REST POSE AT open = 1 (positions within 1e-4 of the mod
       worstCrease = Math.max(worstCrease, Math.abs(pose.crease))
     }
     gate(
-      worst < 1e-4 && worstCrease < 1e-9,
-      `open ${open.toFixed(3)}: every chunk map is the identity`,
+      worst < 1e-12 && worstCrease < 1e-12,
+      `open ${open.toFixed(2)}: every chunk map is the identity`,
       `worst |M - I| ${worst.toExponential(1)}  worst crease ${worstCrease.toExponential(1)}`
     )
   }
+  // (Continuity into rest — that the LAST frame of the turn is already essentially at rest, so
+  // the role flip to 'current' costs no snap — is a wall-time question and is gated in block W.)
   const poses = solveFoldBirth(1)
   let worstDrift = 0
   for (const pose of poses) {
@@ -342,6 +355,156 @@ console.log('\n=== THE SHAPE OF THE BUILD (informational: apex height per event)
       return top.toFixed(3).padStart(8)
     })
     console.log(`  ${open.toFixed(2)}  ${row.join('')}`)
+  }
+}
+
+// ---------------------------------------------------------------------------------------------
+// W · WALL TIME. Measured through the REAL WildFrame, driven by the REAL turn driver curve, on
+// the real title -> chapter-I turn. No re-implementation: a stub context is handed the published
+// progress the driver would publish at each millisecond, and `open` is read back out.
+// ---------------------------------------------------------------------------------------------
+console.log('\n=== W · WALL-TIME DISTRIBUTION (title -> chapter I, the incoming turn) ===')
+{
+  const frame = await load('components/labs/storybook/wild/wild-frame.ts')
+  const driver = await load('components/labs/storybook/book/use-turn-driver.ts')
+  const { readWildFrame } = frame
+  const { TURN_MS, SETTLE_MS, turnPublishedT } = driver
+  const TOTAL_MS = TURN_MS + SETTLE_MS
+
+  const SPREAD = 2
+  const COMMITTED = 1 // the turn INTO chapter I going forward is 1 : t : next
+  const stub = (t) => ({
+    spreadIndex: SPREAD,
+    frame: { current: { t, dir: 'next', isCover: false } },
+    committedSpread: { current: COMMITTED },
+    wake: { current: 0 },
+    clock: { current: 0 },
+  })
+
+  // open(ms) and, from it, every piece's staged progress at that millisecond.
+  const openAt = new Float64Array(TOTAL_MS + 1)
+  for (let ms = 0; ms <= TOTAL_MS; ms += 1) {
+    openAt[ms] = readWildFrame(stub(turnPublishedT(ms, TURN_MS))).open
+  }
+
+  /** First millisecond at which `open` has reached a value. */
+  const msAtOpen = (target) => {
+    for (let ms = 0; ms <= TOTAL_MS; ms += 1) if (openAt[ms] >= target) return ms
+    return Number.NaN
+  }
+
+  const legibleMs = msAtOpen(1e-9)
+  gate(
+    openAt[0] === 0 && openAt[TOTAL_MS] >= 1 - 1e-9,
+    'the curtain starts shut and is fully open by the commit',
+    `open(0) ${openAt[0]}  open(${TOTAL_MS}) ${openAt[TOTAL_MS].toFixed(6)}  legible at ${legibleMs}ms`
+  )
+
+  let monotone = true
+  for (let ms = 1; ms <= TOTAL_MS; ms += 1) if (openAt[ms] < openAt[ms - 1] - 1e-12) monotone = false
+  gate(monotone, 'the curtain never runs backwards during the turn', '')
+
+  console.log('\n  event      open window     ms start  ms land   ms end    base travel')
+  const MIN_BASE_MS = 150
+  let worstBase = Infinity
+  const landings = []
+  for (const ev of FOLD_EVENT_ORDER) {
+    const w = FOLD_EVENTS[ev]
+    const land = w.t0 + SETTLE_TAIL * (w.t1 - w.t0)
+    const m0 = msAtOpen(w.t0 + 1e-9)
+    const ml = msAtOpen(land)
+    const m1 = msAtOpen(Math.min(w.t1, 1) - 1e-9)
+    const base = ml - m0
+    worstBase = Math.min(worstBase, base)
+    landings.push({ ev, ml })
+    console.log(
+      `  ${ev.padEnd(9)}  ${w.t0.toFixed(3)}-${w.t1.toFixed(3)}   ${String(m0).padStart(8)} ${String(ml).padStart(8)} ${String(m1).padStart(8)}   ${String(base).padStart(6)} ms`
+    )
+  }
+  gate(
+    worstBase >= MIN_BASE_MS,
+    `every event gets at least ${MIN_BASE_MS} ms of base travel`,
+    `worst ${worstBase} ms`
+  )
+
+  // Landings must arrive separated, or seven events read as one.
+  let worstGap = Infinity
+  let ordered = true
+  for (let i = 1; i < landings.length; i += 1) {
+    const gap = landings[i].ml - landings[i - 1].ml
+    if (gap <= 0) ordered = false
+    worstGap = Math.min(worstGap, gap)
+  }
+  gate(ordered && worstGap >= 60, 'landings arrive in order and at least 60 ms apart', `worst gap ${worstGap} ms`)
+
+  // FIRST VISIBLE MOTION: the first millisecond at which any piece has cleared the page sink and
+  // actually started travelling. Before that the fold is real but under the paper.
+  let firstVisibleMs = Number.NaN
+  for (let ms = 0; ms <= TOTAL_MS; ms += 1) {
+    const poses = solveFoldBirth(openAt[ms])
+    if (poses.some((p) => p.sink === 0 && p.u > 0)) {
+      firstVisibleMs = ms
+      break
+    }
+  }
+  const firstVisibleT = turnPublishedT(firstVisibleMs, TURN_MS)
+  gate(
+    firstVisibleT < 0.45,
+    'the first fold motion is visible before t = 0.45 of the turn',
+    `${firstVisibleMs} ms, published t ${firstVisibleT.toFixed(3)}`
+  )
+
+  const lastEnd = msAtOpen(1 - 1e-9)
+  const spanFrac = (lastEnd - firstVisibleMs) / TOTAL_MS
+  gate(
+    spanFrac >= 0.55,
+    'the build is distributed across the turn, not burst into one corner',
+    `${firstVisibleMs}..${lastEnd} ms = ${(spanFrac * 100).toFixed(0)}% of the ${TOTAL_MS} ms turn`
+  )
+
+  // NO SNAP AT THE COMMIT. The last event lands exactly on the commit, so the very last frame of
+  // the turn had better already be at rest — otherwise the role flip to 'current' (which forces
+  // open = 1) would finish the fold in a single frame.
+  {
+    const IDENT = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]
+    let worst = 0
+    for (const pose of solveFoldBirth(openAt[TOTAL_MS - 1])) {
+      for (let i = 0; i < 16; i += 1) worst = Math.max(worst, Math.abs(pose.matrix[i] - IDENT[i]))
+    }
+    gate(
+      worst < 1e-3,
+      'the last frame of the turn is already at rest — the commit costs no snap',
+      `worst |M - I| at ${TOTAL_MS - 1} ms: ${worst.toExponential(1)}`
+    )
+  }
+
+  // LEAVING. The same clock has to run the inn back down as the leaf goes the other way, and it
+  // has to reach dead flat BEFORE the commit hides the spread — a piece still half erect when the
+  // role flips would snap.
+  {
+    const out = (t) => ({
+      spreadIndex: SPREAD,
+      frame: { current: { t, dir: 'next', isCover: false } },
+      committedSpread: { current: SPREAD }, // leaving chapter I forwards: spread 2 is outgoing
+      wake: { current: 0 },
+      clock: { current: 0 },
+    })
+    const series = []
+    for (let ms = 0; ms <= TOTAL_MS; ms += 1) series.push(readWildFrame(out(turnPublishedT(ms, TURN_MS))).open)
+    let mono = true
+    for (let ms = 1; ms <= TOTAL_MS; ms += 1) if (series[ms] > series[ms - 1] + 1e-12) mono = false
+    const flatAt = series.findIndex((v) => v <= 1e-9)
+    gate(
+      series[0] >= 1 - 1e-9 && mono && flatAt > 0 && flatAt <= TOTAL_MS,
+      'leaving chapter I folds the inn back down, monotonically, before the commit',
+      `open(0) ${series[0].toFixed(3)}  flat at ${flatAt} ms of ${TOTAL_MS}`
+    )
+  }
+
+  console.log('\n  the other three curtain beats, in the same currency:')
+  const model = await load('components/labs/storybook/wild/inn-model.ts')
+  for (const [name, [a, b]] of Object.entries(model.REVEAL)) {
+    console.log(`    ${name.padEnd(10)} open ${a.toFixed(2)}-${b.toFixed(2)}  ->  ${msAtOpen(a + 1e-9)}..${msAtOpen(b - 1e-9)} ms`)
   }
 }
 

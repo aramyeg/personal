@@ -76,24 +76,36 @@ export type FoldEventName =
   | 'crest'
   | 'dressing'
 
-/** A piece's own slice of the curtain-up, as fractions of the WILD frame's eased `open`. */
+/** A piece's own slice of the curtain-up, as fractions of the WILD frame's `open`. */
 export type FoldWindow = { readonly t0: number; readonly t1: number }
 
 /**
- * Seven separated erection events. Spans are equal (0.17) and step by 0.11, so every adjacent
- * pair overlaps by 0.06 — 35% of the shorter window, inside the donor's 40% ceiling. Overlap is
- * what keeps the build continuous; more than 40% and the events stop reading as separate.
+ * Seven separated erection events, filling the curtain END TO END.
+ *
+ * THE UNITS MATTER, AND THEY CHANGED. `open` is no longer a smoothstep of the dihedral; it is
+ * the curtain clock, which is 0 until the spread is legible and then LINEAR IN WALL TIME to the
+ * turn's commit (see wild-frame.ts for the measurement that forced it). So a window of width w
+ * is now worth w * ~978 ms of the reader's actual time, and these windows are sized in exactly
+ * that currency.
+ *
+ * Spans are equal (0.215) and step by ~0.131, so every adjacent pair overlaps by ~0.084 — 39%
+ * of the window, just inside the donor's 40% ceiling. That is the tightest legal packing, and it
+ * is what buys each event its ~151 ms of base travel: seven events at 40% overlap need about
+ * 4.6 window-widths of clock, and the clock is only as long as the turn.
+ *
+ * The first window opens at 0 — the ground floor creases up in the same breath the night starts
+ * arriving — and the last closes at 1, landing the sign as the page commits.
  *
  * The order is structural, not arbitrary: nothing may erect before what it stands on.
  */
 export const FOLD_EVENTS: Record<FoldEventName, FoldWindow> = {
-  walls: { t0: 0.16, t1: 0.33 },
-  tower: { t0: 0.27, t1: 0.44 },
-  jetty: { t0: 0.38, t1: 0.55 },
-  yard: { t0: 0.49, t1: 0.66 },
-  roof: { t0: 0.6, t1: 0.77 },
-  crest: { t0: 0.71, t1: 0.88 },
-  dressing: { t0: 0.82, t1: 0.99 },
+  walls: { t0: 0.0, t1: 0.215 },
+  tower: { t0: 0.131, t1: 0.346 },
+  jetty: { t0: 0.262, t1: 0.477 },
+  yard: { t0: 0.392, t1: 0.607 },
+  roof: { t0: 0.523, t1: 0.738 },
+  crest: { t0: 0.654, t1: 0.869 },
+  dressing: { t0: 0.785, t1: 1.0 },
 }
 
 /** Events in start order — the order the window-overlap law is checked in. */
