@@ -591,8 +591,8 @@ export function AtmosphereFx() {
       const level = passage * stage * breathe
       arch.outer.uniforms.uTime.value = f.time
       arch.inner.uniforms.uTime.value = f.time
-      arch.outer.uniforms.uOpacity.value = level * 0.2
-      arch.inner.uniforms.uOpacity.value = level * 0.2
+      arch.outer.uniforms.uOpacity.value = level * 0.15
+      arch.inner.uniforms.uOpacity.value = level * 0.14
       const group = archGroupRef.current
       if (group) group.visible = level > 0.003
       const flare = flareRef.current

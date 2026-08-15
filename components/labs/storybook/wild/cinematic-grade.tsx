@@ -48,7 +48,7 @@ import { ramp, readWildFrame, useWild } from './wild-frame'
  */
 const BLOOM = {
   asleep: { strength: 0.46, threshold: 0.82 },
-  woken: { strength: 0.72, threshold: 0.74 },
+  woken: { strength: 0.58, threshold: 0.8 },
   radius: 0.52,
 } as const
 
