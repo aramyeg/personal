@@ -51,7 +51,9 @@ import {
   keepStackSpirePoses,
   keepStackSpireRaven,
   keepStackStoryGeoms,
+  keepStackStoryPoses,
   type KeepStackGeom,
+  type KeepStageSolver,
 } from './popup-keepstack'
 import { easeTurnWeighted } from './page-geometry'
 import { peakHeight, shadowLift } from './shadow-light'
@@ -113,17 +115,25 @@ type SolvedKeep = {
   raven: readonly [PanelQuad, PanelQuad] | null
 }
 
-function solveKeep(geom: KeepStackGeom, thetaL: number, thetaR: number): SolvedKeep {
-  const stories = keepStackStoryGeoms(geom)
-  const box = stories.map((g) => solveBoxPose(g, thetaL, thetaR).map((p) => ({ face: p.face, quad: p.quad })))
-  const plates = stories.map((g) => {
-    if (!g.plate) return null
-    const plate = keepStackFacadePlate(geom, g.key, thetaL, thetaR)
+function solveKeep(
+  geom: KeepStackGeom,
+  thetaL: number,
+  thetaR: number,
+  angles?: KeepStageSolver
+): SolvedKeep {
+  // E4: every family below reads the SAME per-part clock resolver, so a story
+  // (or the balcony, or the spire) that carries its own `stage` window erects
+  // in its own beat while staying glued to the part below it.
+  const stories = keepStackStoryPoses(geom, thetaL, thetaR, angles)
+  const box = stories.map((s) => s.patches.map((p) => ({ face: p.face, quad: p.quad })))
+  const plates = stories.map((s) => {
+    if (!s.geom.plate) return null
+    const plate = keepStackFacadePlate(geom, s.key, thetaL, thetaR, angles)
     return plate ? ([plate.plateL, plate.plateR] as const) : null
   })
-  const deck = keepStackBalconyDeck(geom, thetaL, thetaR)
-  const poses = keepStackSpirePoses(geom, thetaL, thetaR)
-  const finial = keepStackSpireRaven(geom, thetaL, thetaR)
+  const deck = keepStackBalconyDeck(geom, thetaL, thetaR, angles)
+  const poses = keepStackSpirePoses(geom, thetaL, thetaR, angles)
+  const finial = keepStackSpireRaven(geom, thetaL, thetaR, angles)
   return {
     box,
     plates,
@@ -348,19 +358,37 @@ export function KeepStackMergedLayer({
     if (!group) return
     const f = frame.current
     const role = liveSpreadRole(spreadIndex, committedSpread.current, f?.dir ?? null)
-    const { thetaL, thetaR } = spreadPageAnglesTilted(
-      spreadIndex,
-      committedSpread.current,
-      f?.dir ?? null,
-      f ? easeTurnWeighted(f.t) : 0
-    )
+    const easedT = f ? easeTurnWeighted(f.t) : 0
+    // E4 PER-PART STAGING. One clock, read through each part's own window: a
+    // part with no window of its own falls back to the layer's, and a layer
+    // with no window either lands on the raw eased clock — the pre-E4 angles,
+    // for every part, exactly.
+    const resolve: KeepStageSolver = (stage) =>
+      spreadPageAnglesTilted(
+        spreadIndex,
+        committedSpread.current,
+        f?.dir ?? null,
+        easedT,
+        stage ?? layer.stage
+      )
+    const { thetaL, thetaR } = resolve(undefined)
     const beta = thetaL - thetaR
-    const visible = role !== 'hidden' && beta > FLAT_EPSILON
+    // The keep is visible once ANY of its parts has left the page: the ground
+    // story leads, but a keep whose only window opens late must not be culled
+    // while its own clock still reads flat.
+    const maxBeta = Math.max(
+      beta,
+      ...layer.stories.map((s) => {
+        const a = resolve(s.stage)
+        return a.thetaL - a.thetaR
+      })
+    )
+    const visible = role !== 'hidden' && maxBeta > FLAT_EPSILON
     group.visible = visible
     if (shadowGroupRef.current) shadowGroupRef.current.visible = visible
     if (!visible) return
 
-    const solved = solveKeep(layer, thetaL, thetaR)
+    const solved = solveKeep(layer, thetaL, thetaR, resolve)
     const pos = geometry.getAttribute('position') as THREE.BufferAttribute
     const arr = pos.array as Float32Array
     const edgeArr = (edgeGeometry.getAttribute('position') as THREE.BufferAttribute).array as Float32Array

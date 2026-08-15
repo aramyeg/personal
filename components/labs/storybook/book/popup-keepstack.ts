@@ -33,8 +33,8 @@
  * swings out on its jutting hinge."
  */
 
-import { plyLift } from './lift-ladder'
-import type { BoxFace, BoxGeom, BoxPatch, FanMember, PanelQuad, Vec3 } from './popup-mechanics'
+import { PLY, plyLift } from './lift-ladder'
+import type { BoxFace, BoxGeom, BoxPatch, FanMember, PanelQuad, TurnStage, Vec3 } from './popup-mechanics'
 import { openElevation, solveBoxPose } from './popup-mechanics'
 import { solveFanPose } from './popup-anatomy'
 
@@ -92,6 +92,21 @@ export type KeepStorySpec = {
    *  the cap plane's lateral); `height` is the run UP the cap plane from the base
    *  edge. mesh aspect width/height MUST equal the delivered art aspect. */
   plate?: { width: number; height: number }
+  /** E4 PER-PART STAGING: this story's own erection window inside the page
+   *  turn (popup-mechanics `TurnStage`). Omitted = erects across the whole
+   *  turn, i.e. the pre-E4 behaviour, bit-identical. A staged story runs its
+   *  whole travel inside its window while STAYING GLUED to the lid below it as
+   *  that lid is itself still rising — see `keepStackStoryPoses`. */
+  stage?: TurnStage
+  /** DIE-CUT ARCH declared in content (E4 §2c), mirroring `OanaveGeom.aperture`
+   *  (popup-oanave.ts). Aperture in this engine is ALPHA IN THE PAINTED ART,
+   *  not punched geometry: this field cuts nothing, it records for the painter
+   *  and for the covenant test WHERE the hole in this story's facade plate is.
+   *  `halfW` across the plate crease, `apexH` up the plate from its base edge,
+   *  both in world units and both inside the plate's own width/2 x height box.
+   *  The box's front CAP stays solid behind the plate at PLATE_LIFT, so the
+   *  hole shows real paper at a real depth offset rather than the background. */
+  aperture?: { halfW: number; apexH: number }
 }
 
 /** The jutting gold dispatch balcony — a deck riding the ground story's flat
@@ -102,6 +117,13 @@ export type KeepBalconySpec = {
   halfW: number
   z0: number
   z1: number
+  /** E4 PER-PART STAGING. The deck already rides the ground story's lid, so
+   *  its own window cannot be a second dihedral — it is a FLAP about the lid's
+   *  front edge: before the window the deck lies FOLDED BACK onto the roof
+   *  (psi = 180deg, still in the lid plane, so still dead flat at book-closed),
+   *  and across the window it swings forward over the arch to psi = 0, its
+   *  shipped jutting pose. Omitted = psi is 0 throughout, bit-identical. */
+  stage?: TurnStage
 }
 
 /** The hero raven finial riding the FAN SPIRE'S PEAK member (Concept A). A
@@ -134,6 +156,11 @@ export type KeepSpireSpec = {
   vDir: 1 | -1
   members: readonly FanMember[]
   raven?: KeepSpireRavenSpec
+  /** E4 PER-PART STAGING: the fan's own erection window. The fan is solved at
+   *  its own remapped dihedral and RE-SEATED on the top story's lid AS THAT
+   *  LID CURRENTLY LIES, so before its window the whole spire lies folded flat
+   *  ON the roof and then erects off it. Omitted = bit-identical. */
+  stage?: TurnStage
 }
 
 export type KeepStackGeom = {
@@ -208,6 +235,239 @@ export function keepStackTelescopes(geom: KeepStackGeom): boolean {
   return geom.stories.every((s, k) => k === 0 || s.a <= geom.stories[k - 1].a + 1e-12)
 }
 
+// ---------------------------------------------------------------------------
+// E4 PER-PART STAGING — the box-on-lid chain with its parts on different clocks.
+//
+// THE PROBLEM. `baseH` seats a story by offsetting its whole bisector-x by the
+// heights below it. That works ONLY because parent and child share one beta:
+// the lid at lid-distance t sits at bisector (H + t*cos(h), +-t*sin(h)), which
+// is exactly where the child's glue lines land when the child uses the same h.
+// Give the child its own h and the two stop agreeing — the glue lines float
+// above the lid (child behind its parent) or sink through it (child ahead).
+//
+// THE FIX — RE-SEATING. A story's left half is a rigid body GLUED TO THE LEFT
+// LID HALF of the story below; the same for the right. So solve the child on
+// its own clock in its OWN page frame (baseH 0) and then map each half rigidly
+// onto the parent's lid half: decompose a corner in the child's own page basis
+// (e = along the page, n = the page normal), recompose in the seat's basis, and
+// translate to the seat's crease. The glue line (u = a, w = 0) therefore lands
+// EXACTLY on the lid at lid-distance a whatever the two clocks are doing, and
+// when the clocks agree the map degenerates to the pure baseH translation —
+// bit-identical, which the bench asserts to 1e-15.
+//
+// THE WELD. Corners that live on the CREASE (the backbone, the caps' inner
+// edge, a plate's crease edge, the fan apex) belong to BOTH halves at once. A
+// per-half rigid map would tear them apart into a slot down the middle of the
+// piece, so those corners take the MEAN of the two half-images: the piece stays
+// closed at every stage value and the break lands where it cannot be seen —
+// crease-adjacent panels shear by O(H * sin(h_seat - h_own)) instead of gaping.
+// Paper physics is a tool here, not a rule (E4 contract §0); fold-flat at
+// book-closed and the rest pose are the two things that stay exact.
+//
+// THE PLY LADDER. A story lying folded flat ON its parent's lid is coplanar
+// with it (that IS what flat-folding means), so the flat plies are separated by
+// paper thickness exactly as real folded stock is — scaled by
+// sin|h_seat - h_own| so the lift is EXACTLY 0 at rest and at book-closed.
+
+/** The page angles one part of the keep runs on. */
+export type KeepAngles = { thetaL: number; thetaR: number }
+
+/** Resolves a part's own page angles from its stage window — the layer hands
+ *  in `spreadPageAnglesTilted(..., stage)` so every part reads one turn clock
+ *  through its own window. Omitted anywhere below = every part shares the
+ *  passed-in angles, which is the pre-E4 behaviour exactly. */
+export type KeepStageSolver = (stage?: TurnStage) => KeepAngles
+
+/** The unstaged solver: every part runs on the one dihedral it is handed. */
+export const fixedKeepAngles =
+  (thetaL: number, thetaR: number): KeepStageSolver =>
+  () => ({ thetaL, thetaR })
+
+/** A dihedral's world frame: the bisector, the lateral, and the half-angle
+ *  that places the two page (or lid) halves at +-h about the bisector. */
+type HalfFrame = { bis: Vec3; lat: Vec3; h: number }
+
+function halfFrame(angles: KeepAngles): HalfFrame {
+  const m = (angles.thetaL + angles.thetaR) / 2
+  return {
+    bis: [Math.cos(m), Math.sin(m), 0],
+    lat: [-Math.sin(m), Math.cos(m), 0],
+    h: clamp(angles.thetaL - angles.thetaR, 0, Math.PI) / 2,
+  }
+}
+
+/** One half-plane's in-plane direction `e` (crease -> outward) and outward
+ *  normal `n`. sign +1 = the left half, -1 = the right. */
+function halfAxes(f: HalfFrame, sign: number): { e: Vec3; n: Vec3 } {
+  const ch = Math.cos(f.h)
+  const sh = Math.sin(f.h)
+  return {
+    e: [ch * f.bis[0] + sign * sh * f.lat[0], ch * f.bis[1] + sign * sh * f.lat[1], 0],
+    n: [sh * f.bis[0] - sign * ch * f.lat[0], sh * f.bis[1] - sign * ch * f.lat[1], 0],
+  }
+}
+
+/** The surface a part is glued to: a crease point plus the frame whose two
+ *  half-planes ARE the two halves of that surface. For the ground story this
+ *  is the page pair itself; for everything above it, the lid below. */
+type KeepSeat = { frame: HalfFrame; origin: Vec3 }
+
+/** Map one corner of a part solved in its own page frame onto one half of its
+ *  seat, lifted `lift` off the seat along that half's outward normal. */
+function reseatHalf(p: Vec3, own: HalfFrame, seat: KeepSeat, sign: number, lift: number): Vec3 {
+  const o = halfAxes(own, sign)
+  const s = halfAxes(seat.frame, sign)
+  const u = p[0] * o.e[0] + p[1] * o.e[1]
+  const w = p[0] * o.n[0] + p[1] * o.n[1] + lift
+  return [
+    seat.origin[0] + u * s.e[0] + w * s.n[0],
+    seat.origin[1] + u * s.e[1] + w * s.n[1],
+    p[2],
+  ]
+}
+
+/** `sigma` +1/-1 = the corner belongs to the left/right half; 0 = it lives on
+ *  the crease and belongs to both, so it takes the mean of the two images (the
+ *  weld). */
+function reseatCorner(p: Vec3, own: HalfFrame, seat: KeepSeat, sigma: number, lift: number): Vec3 {
+  if (sigma > 0) return reseatHalf(p, own, seat, 1, lift)
+  if (sigma < 0) return reseatHalf(p, own, seat, -1, lift)
+  const a = reseatHalf(p, own, seat, 1, lift)
+  const b = reseatHalf(p, own, seat, -1, lift)
+  return [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2, (a[2] + b[2]) / 2]
+}
+
+function reseatQuad(q: PanelQuad, sigma: readonly number[], own: HalfFrame, seat: KeepSeat, lift: number): PanelQuad {
+  return [
+    reseatCorner(q[0], own, seat, sigma[0], lift),
+    reseatCorner(q[1], own, seat, sigma[1], lift),
+    reseatCorner(q[2], own, seat, sigma[2], lift),
+    reseatCorner(q[3], own, seat, sigma[3], lift),
+  ]
+}
+
+const CREASE_EPS = 1e-9
+
+/** Which half each corner of a solved part belongs to, DERIVED (never
+ *  hard-coded off another module's corner order) from a reference solve at the
+ *  flat-open pose (thetaL PI, thetaR 0): there the bisector is +y and the
+ *  lateral is -x, so a corner's side is the sign of -x and a crease corner is
+ *  the one with x == 0. Every part's patch list is constant in its geometry,
+ *  so this mask is too. */
+function halfSigns(reference: readonly PanelQuad[]): number[][] {
+  return reference.map((q) => q.map((c) => (Math.abs(c[0]) < CREASE_EPS ? 0 : c[0] < 0 ? 1 : -1)))
+}
+
+/** Paper thickness between a flat-folded part and the surface it lies on. */
+const STAGE_PLY = PLY
+
+/** How far a part is lifted off its seat: zero when the part and its seat run
+ *  the same clock (so REST AND BOOK-CLOSED ARE EXACT), one ply-count's worth of
+ *  stock when the part lies folded flat on a surface it would otherwise be
+ *  coplanar with. */
+function stageLift(own: HalfFrame, seat: KeepSeat, plies: number): number {
+  return plies * STAGE_PLY * Math.sin(Math.abs(seat.frame.h - own.h))
+}
+
+/** Face -> ply index in the flat-folded stack. A flat-folded box lies wall
+ *  first, then its lid folded back OVER that wall; caps fold out past the wall
+ *  ends in z and never overlap it. */
+function facePlies(face: BoxFace): number {
+  return face === 'lidL' || face === 'lidR' || face === 'roofL' || face === 'roofR' ? 2 : 1
+}
+
+/** One story of a staged keep: the box geom the renderers already expect (with
+ *  its cumulative `baseH` for art ids, shadows and plate lookup), its own
+ *  solved-and-re-seated patches, and the LID FRAME it offers to whatever rides
+ *  above it. */
+export type KeepStoryPose = {
+  key: string
+  geom: BoxGeom & { key: string; plate?: KeepStorySpec['plate'] }
+  /** The frame this story's own clock puts it in. */
+  own: HalfFrame
+  /** The lid it is glued to. */
+  seat: KeepSeat
+  /** Its own lid — the seat for the story / spire above. */
+  lid: KeepSeat
+  patches: readonly BoxPatch[]
+}
+
+/**
+ * The whole story stack, each story solved on its OWN clock and re-seated on
+ * the lid below it AS THAT LID CURRENTLY LIES.
+ *
+ * The seat chain. Every lid in the stack is parallel to the ground story's own
+ * page pair (a flat lid is parallel to the surface its box stands on, and a
+ * rigid per-half map preserves that), so all seats share ONE frame and differ
+ * only in their crease origin. Story k's crease sits `height * cos(h_seat -
+ * h_own)` further up the bisector than story k-1's: the welded image of the
+ * child's own backbone-top, which is `height` when the clocks agree.
+ *
+ * The one approximation, stated honestly: a re-seated story's lid is SHEARED
+ * (its wall-top edge leaves the seat plane by `height * cos(h_seat) *
+ * sin(h_own - h_seat)`), so a story two levels up rides a plane that is off its
+ * parent's warped lid by that much. It is 0 at rest, 0 at full open, and 0
+ * whenever the ground story leads — which is the only staging order that reads
+ * as construction anyway. The bench measures it (`seat drift`).
+ */
+export function keepStackStoryPoses(
+  geom: KeepStackGeom,
+  thetaL: number,
+  thetaR: number,
+  angles?: KeepStageSolver
+): KeepStoryPose[] {
+  const resolve = angles ?? fixedKeepAngles(thetaL, thetaR)
+  const seatFrame = halfFrame(resolve(geom.stories[0]?.stage))
+  const out: KeepStoryPose[] = []
+  let origin: Vec3 = [0, 0, 0]
+  let base = 0
+  for (const s of geom.stories) {
+    const ownAngles = resolve(s.stage)
+    const own = halfFrame(ownAngles)
+    const seat: KeepSeat = { frame: seatFrame, origin }
+    const solveGeom: BoxGeom = {
+      mech: 'box',
+      a: s.a,
+      height: s.height,
+      z0: s.z0,
+      z1: s.z1,
+      roof: s.roof,
+      gableRise: s.gableRise,
+      capFront: s.capFront,
+      capBack: s.capBack,
+      baseH: 0,
+    }
+    const local = solveBoxPose(solveGeom, ownAngles.thetaL, ownAngles.thetaR)
+    const sigma = halfSigns(solveBoxPose(solveGeom, Math.PI, 0).map((p) => p.quad))
+    const patches = local.map((p, i) => ({
+      face: p.face,
+      quad: reseatQuad(p.quad, sigma[i], own, seat, stageLift(own, seat, facePlies(p.face))),
+    }))
+    const rise = s.height * Math.cos(seatFrame.h - own.h)
+    const lid: KeepSeat = {
+      frame: seatFrame,
+      origin: [origin[0] + rise * seatFrame.bis[0], origin[1] + rise * seatFrame.bis[1], 0],
+    }
+    out.push({
+      key: s.key,
+      geom: {
+        ...solveGeom,
+        capFrontArt: s.plate ? false : undefined,
+        baseH: base,
+        key: s.key,
+        plate: s.plate,
+      },
+      own,
+      seat,
+      lid,
+      patches,
+    })
+    origin = lid.origin
+    base += s.height
+  }
+  return out
+}
+
 /** The two half-decks of the jutting balcony, riding the ground story's flat
  *  lid at lid-distance t in [0, halfW] and overhanging +z. Returns null when
  *  the keep carries no balcony. Corner order [bl, br, tr, tl] like a lid panel.
@@ -215,25 +475,40 @@ export function keepStackTelescopes(geom: KeepStackGeom): boolean {
 export function keepStackBalconyDeck(
   geom: KeepStackGeom,
   thetaL: number,
-  thetaR: number
+  thetaR: number,
+  angles?: KeepStageSolver
 ): { deckL: PanelQuad; deckR: PanelQuad } | null {
   if (!geom.balcony) return null
-  const hall = geom.stories[0]
   const bal = geom.balcony
-  const beta = clamp(thetaL - thetaR, 0, Math.PI)
-  const m = (thetaL + thetaR) / 2
-  const h = beta / 2
-  const ch = Math.cos(h)
-  const sh = Math.sin(h)
-  const cm = Math.cos(m)
-  const sm = Math.sin(m)
-  // The ground story sits at baseH 0, so its lid rides bisector-x = H + t*ch.
-  const W = (x: number, y: number, z: number): Vec3 => [x * cm - y * sm, x * sm + y * cm, z]
-  // Each half-deck lifts along its own lid-half normal (bisector (sh, -sign*ch),
-  // a unit vector), magnitude BALCONY_LIFT*sh -> 0 at close, ~BALCONY_LIFT at open.
-  const lift = BALCONY_LIFT * sh
-  const lidPt = (t: number, sign: number, z: number): Vec3 =>
-    W(hall.height + t * ch + lift * sh, sign * (t * sh - lift * ch), z)
+  const resolve = angles ?? fixedKeepAngles(thetaL, thetaR)
+  const seat = keepStackStoryPoses(geom, thetaL, thetaR, angles)[0].lid
+  const { h } = seat.frame
+  // E4 STAGING — THE FLAP. The deck lies IN the lid plane, so it has no second
+  // dihedral of its own to run; what it has is a hinge on the lid's front edge.
+  // psi runs 180deg (folded BACK onto the roof, still in the lid plane, so
+  // still dead flat at book-closed and clear of the arch) -> 0deg (the shipped
+  // jutting pose) across the deck's window. Its progress through that window is
+  // read off its own clock against its seat's — 1 (done) whenever the deck
+  // carries no window at all, which is the pre-E4 pose exactly.
+  const own = halfFrame(resolve(bal.stage))
+  const done = !bal.stage || h < CREASE_EPS ? 1 : clamp(own.h / h, 0, 1)
+  const psi = Math.PI * (1 - done)
+  const cpsi = Math.cos(psi)
+  const spsi = Math.sin(psi)
+  const hingeZ = geom.stories[0].z1
+  // Each half-deck lifts along its own lid-half normal, magnitude
+  // BALCONY_LIFT*sin(h) -> 0 at close, ~BALCONY_LIFT at open.
+  const lift = BALCONY_LIFT * Math.sin(h)
+  const lidPt = (t: number, sign: number, z: number): Vec3 => {
+    const { e, n } = halfAxes(seat.frame, sign)
+    const dz = z - hingeZ
+    const w = lift + dz * spsi
+    return [
+      seat.origin[0] + t * e[0] + w * n[0],
+      seat.origin[1] + t * e[1] + w * n[1],
+      hingeZ + dz * cpsi,
+    ]
+  }
   const half = (sign: number): PanelQuad => [
     lidPt(0, sign, bal.z0),
     lidPt(0, sign, bal.z1),
@@ -263,23 +538,33 @@ export type KeepSpireMemberPose = {
 export function keepStackSpirePoses(
   geom: KeepStackGeom,
   thetaL: number,
-  thetaR: number
+  thetaR: number,
+  angles?: KeepStageSolver
 ): KeepSpireMemberPose[] | null {
   if (!geom.spire || geom.spire.members.length === 0) return null
-  const m = (thetaL + thetaR) / 2
-  const cm = Math.cos(m)
-  const sm = Math.sin(m)
-  const seat = keepStackSeatHeight(geom)
-  // seat translation: bisector-x offset (seat, 0, 0) rotated to world by m.
-  const delta: Vec3 = [seat * cm, seat * sm, 0]
-  const tr = (q: PanelQuad): PanelQuad => [add3(q[0], delta), add3(q[1], delta), add3(q[2], delta), add3(q[3], delta)]
-  return solveFanPose(
-    { mech: 'fan', apexZ: geom.spire.apexZ, vDir: geom.spire.vDir, members: geom.spire.members },
-    thetaL,
-    thetaR
-  ).map((pose) => {
-    const left = tr(pose.left)
-    return { left, right: tr(pose.right), crease: pose.crease, tip: left[3] }
+  const resolve = angles ?? fixedKeepAngles(thetaL, thetaR)
+  const stories = keepStackStoryPoses(geom, thetaL, thetaR, angles)
+  const seat = stories[stories.length - 1].lid
+  const ownAngles = resolve(geom.spire.stage)
+  const own = halfFrame(ownAngles)
+  const fan = { mech: 'fan', apexZ: geom.spire.apexZ, vDir: geom.spire.vDir, members: geom.spire.members } as const
+  // E4 staging: the fan is solved on its OWN clock in its own page frame and
+  // re-seated on the top lid AS THAT LID CURRENTLY LIES (unstaged, the map is
+  // exactly the old `seat * (cm, sm, 0)` translation). Every member's glue line
+  // therefore stays down on the lid panels whatever the two clocks are doing,
+  // and before its window the whole spire lies folded flat ON the roof.
+  const poses = solveFanPose(fan, ownAngles.thetaL, ownAngles.thetaR)
+  const reference = solveFanPose(fan, Math.PI, 0)
+  const lift = stageLift(own, seat, 1)
+  const sigma = halfSigns(reference.flatMap((p) => [p.left, p.right]))
+  return poses.map((pose, i) => {
+    const left = reseatQuad(pose.left, sigma[i * 2], own, seat, lift)
+    const right = reseatQuad(pose.right, sigma[i * 2 + 1], own, seat, lift)
+    // The ridge direction after re-seating: apex -> tip of the mapped member
+    // (identical to the solved `pose.crease` whenever the clocks agree).
+    const ridge: Vec3 = [left[3][0] - left[0][0], left[3][1] - left[0][1], left[3][2] - left[0][2]]
+    const len = Math.hypot(ridge[0], ridge[1], ridge[2]) || 1
+    return { left, right, crease: scale3(ridge, 1 / len), tip: left[3] }
   })
 }
 
@@ -293,9 +578,10 @@ export function keepStackSpirePoses(
 export function keepStackSpireRaven(
   geom: KeepStackGeom,
   thetaL: number,
-  thetaR: number
+  thetaR: number,
+  angles?: KeepStageSolver
 ): { crestL: PanelQuad; crestR: PanelQuad } | null {
-  const poses = keepStackSpirePoses(geom, thetaL, thetaR)
+  const poses = keepStackSpirePoses(geom, thetaL, thetaR, angles)
   if (!poses || !geom.spire?.raven) return null
   const peak = poses[poses.length - 1]
   const { finialH } = geom.spire.raven
@@ -328,43 +614,47 @@ export function keepStackFacadePlate(
   geom: KeepStackGeom,
   storyKey: string,
   thetaL: number,
-  thetaR: number
+  thetaR: number,
+  angles?: KeepStageSolver
 ): { plateL: PanelQuad; plateR: PanelQuad } | null {
-  const seat = keepStackStoryGeoms(geom).find((g) => g.key === storyKey)
-  if (!seat || !seat.plate) return null
-  const beta = clamp(thetaL - thetaR, 0, Math.PI)
-  const m = (thetaL + thetaR) / 2
-  const h = beta / 2
-  const ch = Math.cos(h)
-  const sh = Math.sin(h)
-  const cm = Math.cos(m)
-  const sm = Math.sin(m)
-  const baseH = seat.baseH ?? 0
-  const W = (x: number, y: number, z: number): Vec3 => {
-    const X = x + baseH
-    return [X * cm - y * sm, X * sm + y * cm, z]
-  }
-  const { width, height } = seat.plate
-  const a = seat.a
+  const story = keepStackStoryPoses(geom, thetaL, thetaR, angles).find((g) => g.key === storyKey)
+  if (!story || !story.geom.plate) return null
+  // The plate rides its OWN story's cap, so it is solved on that story's clock
+  // in the story's own page frame (baseH 0) and re-seated exactly as the cap is
+  // — the two stay coplanar at every stage value, which is the whole point of
+  // the die-cut idiom. Corner roles below: [crease-bottom, crease-top,
+  // outer-top, outer-bottom], so the first two weld across the crease.
+  const { own, seat } = story
+  const ch = Math.cos(own.h)
+  const sh = Math.sin(own.h)
+  const W = (x: number, y: number, z: number): Vec3 => [
+    x * own.bis[0] + y * own.lat[0],
+    x * own.bis[1] + y * own.lat[1],
+    z,
+  ]
+  const { width, height } = story.geom.plate
+  const a = story.geom.a
   // The cap's BASE edge (bisector-x = a*ch, the tier floor / wall-top seam) is the
   // plate's BOTTOM; the crease is at (y=0, z = z1 + a*ch) and the crease->outer
   // direction in the cap plane is (y,z) = (sh, -ch) per unit wh (toward the front
   // wall corner, hitting it exactly at wh = a).
   const X0 = a * ch
-  const zc = seat.z1 + a * ch
+  const zc = story.geom.z1 + a * ch
   const wh = width / 2
   // PLATE_LIFT: rigid per-half translation along the cap-half outward normal
   // (see the constant) so the plate never shares the rendered cap's plane.
   const lift = PLATE_LIFT * sh
+  const stage = stageLift(own, seat, 1)
   const half = (sign: number): PanelQuad => {
     const dy = sign * lift * ch
     const dz = lift * sh
-    return [
+    const local: PanelQuad = [
       W(X0, dy, zc + dz),
       W(X0 + height, dy, zc + dz),
       W(X0 + height, sign * wh * sh + dy, zc - wh * ch + dz),
       W(X0, sign * wh * sh + dy, zc - wh * ch + dz),
     ]
+    return reseatQuad(local, [0, 0, sign, sign], own, seat, stage)
   }
   return { plateL: half(1), plateR: half(-1) }
 }
@@ -376,19 +666,20 @@ export function keepStackFacadePlate(
 export function keepStackQuads(
   geom: KeepStackGeom,
   thetaL: number,
-  thetaR: number
+  thetaR: number,
+  angles?: KeepStageSolver
 ): PanelQuad[] {
   const quads: PanelQuad[] = []
-  for (const g of keepStackStoryGeoms(geom)) {
-    for (const patch of solveBoxPose(g, thetaL, thetaR)) quads.push(patch.quad)
-    const plate = keepStackFacadePlate(geom, g.key, thetaL, thetaR)
+  for (const story of keepStackStoryPoses(geom, thetaL, thetaR, angles)) {
+    for (const patch of story.patches) quads.push(patch.quad)
+    const plate = keepStackFacadePlate(geom, story.key, thetaL, thetaR, angles)
     if (plate) quads.push(plate.plateL, plate.plateR)
   }
-  const deck = keepStackBalconyDeck(geom, thetaL, thetaR)
+  const deck = keepStackBalconyDeck(geom, thetaL, thetaR, angles)
   if (deck) quads.push(deck.deckL, deck.deckR)
-  const spire = keepStackSpirePoses(geom, thetaL, thetaR)
+  const spire = keepStackSpirePoses(geom, thetaL, thetaR, angles)
   if (spire) for (const p of spire) quads.push(p.left, p.right)
-  const raven = keepStackSpireRaven(geom, thetaL, thetaR)
+  const raven = keepStackSpireRaven(geom, thetaL, thetaR, angles)
   if (raven) quads.push(raven.crestL, raven.crestR)
   return quads
 }
@@ -398,12 +689,13 @@ export function keepStackQuads(
 export function solveKeepStackPose(
   geom: KeepStackGeom,
   thetaL: number,
-  thetaR: number
+  thetaR: number,
+  angles?: KeepStageSolver
 ): ReadonlyArray<{ key: string; geom: BoxGeom & { key: string }; patches: readonly BoxPatch[] }> {
-  return keepStackStoryGeoms(geom).map((g) => ({
-    key: g.key,
-    geom: g,
-    patches: solveBoxPose(g, thetaL, thetaR),
+  return keepStackStoryPoses(geom, thetaL, thetaR, angles).map((s) => ({
+    key: s.key,
+    geom: s.geom,
+    patches: s.patches,
   }))
 }
 

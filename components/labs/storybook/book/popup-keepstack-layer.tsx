@@ -16,7 +16,7 @@ import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import type { SceneLayer } from '../content'
 import { useGuardedDispose } from './material-pool'
-import type { BoxGeom, PanelQuad } from './popup-mechanics'
+import type { BoxGeom, PanelQuad, TurnStage } from './popup-mechanics'
 import { liveSpreadRole, spreadPageAnglesTilted } from './popup-mechanics'
 import {
   keepStackBalconyDeck,
@@ -73,11 +73,14 @@ function writeQuad(geometry: THREE.BufferGeometry, quad: PanelQuad): void {
   geometry.computeBoundingSphere()
 }
 
-/** The turn-clock page angles + live role for this spread. */
+/** The turn-clock page angles + live role for this spread, read through the
+ *  keep's own stage window (E4). The per-mesh path runs the WHOLE keep on that
+ *  one window — see `KeepStackMeshedLayer`. */
 function usePageAngles(
   spreadIndex: number,
   frame: RefObject<TurnFrame | null>,
-  committedSpread: RefObject<number>
+  committedSpread: RefObject<number>,
+  stage?: TurnStage
 ): () => { role: ReturnType<typeof liveSpreadRole>; thetaL: number; thetaR: number; beta: number } {
   return () => {
     const f = frame.current
@@ -86,7 +89,8 @@ function usePageAngles(
       spreadIndex,
       committedSpread.current,
       f?.dir ?? null,
-      f ? easeTurnWeighted(f.t) : 0
+      f ? easeTurnWeighted(f.t) : 0,
+      stage
     )
     return { role, thetaL, thetaR, beta: thetaL - thetaR }
   }
@@ -103,6 +107,7 @@ function TwoQuadRide({
   spreadIndex,
   frame,
   committedSpread,
+  stage,
 }: {
   artId: string
   solve: (thetaL: number, thetaR: number) => { a: PanelQuad; b: PanelQuad } | null
@@ -112,11 +117,12 @@ function TwoQuadRide({
   spreadIndex: number
   frame: RefObject<TurnFrame | null>
   committedSpread: RefObject<number>
+  stage?: TurnStage
 }) {
   const groupRef = useRef<THREE.Group>(null)
   const art = useArtTexture(artId)
   const tint = useMemo(() => kraftTints(artId), [artId])
-  const readAngles = usePageAngles(spreadIndex, frame, committedSpread)
+  const readAngles = usePageAngles(spreadIndex, frame, committedSpread, stage)
 
   const geometries = useMemo(
     () => [makeQuadGeometry(new Float32Array(uvs[0])), makeQuadGeometry(new Float32Array(uvs[1]))],
@@ -231,7 +237,15 @@ export function KeepStackPopupLayer({
 /** The legacy per-mesh keep: one BoxPopupLayer per story plus a TwoQuadRide for
  *  each plate/balcony/spire member/raven. Kept as the fallback for a keep whose
  *  art is not atlas-packed (and as the reference the merged path is diffed
- *  against). */
+ *  against).
+ *
+ *  E4, STATED PLAINLY: this path CANNOT stage a keep per part. Each story is
+ *  drawn by the shared box renderer, which seats a story by `baseH` alone —
+ *  correct only while every story shares one dihedral. So the whole keep runs
+ *  on the LAYER's window here and the per-part windows are ignored; the keep
+ *  still erects, just all at once. A keep that wants its per-part staging on
+ *  screen must have every one of `keepAtlasIds(layer)` present in the art atlas
+ *  sidecar, which is what routes it to the merged path above. */
 function KeepStackMeshedLayer({
   layer,
   spreadIndex,
@@ -257,8 +271,10 @@ function KeepStackMeshedLayer({
         id: `${layer.id}-${storyGeom.key}`,
         kind: layer.kind,
         role: layer.role,
+        // the keep's own window, not the story's — see the header above.
+        stage: layer.stage,
       })),
-    [stories, layer.id, layer.kind, layer.role]
+    [stories, layer.id, layer.kind, layer.role, layer.stage]
   )
   return (
     <group name={`keepstack-${layer.id}`}>
@@ -289,6 +305,7 @@ function KeepStackMeshedLayer({
             spreadIndex={spreadIndex}
             frame={frame}
             committedSpread={committedSpread}
+            stage={layer.stage}
           />
         ))}
       {layer.balcony && (
@@ -305,6 +322,7 @@ function KeepStackMeshedLayer({
           spreadIndex={spreadIndex}
           frame={frame}
           committedSpread={committedSpread}
+          stage={layer.stage}
         />
       )}
       {/* THE FAN SPIRE — each M-fold member (two panels meeting at the shared
@@ -325,6 +343,7 @@ function KeepStackMeshedLayer({
           spreadIndex={spreadIndex}
           frame={frame}
           committedSpread={committedSpread}
+          stage={layer.stage}
         />
       ))}
       {layer.spire?.raven && (
@@ -339,6 +358,7 @@ function KeepStackMeshedLayer({
           spreadIndex={spreadIndex}
           frame={frame}
           committedSpread={committedSpread}
+          stage={layer.stage}
         />
       )}
     </group>

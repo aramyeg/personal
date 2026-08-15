@@ -16625,6 +16625,777 @@ function chainLink(w, h, seed, mirrored) {
   return svgPiece(w, h, g)
 }
 
+// ============================================================================
+// E4 GRAND — THE INN OF A HUNDRED KEYS, repainted for a VOLUME
+// (lane contract .superpowers/e4-candidate/CONTRACT.md §2a/2b/2c/4).
+//
+// Round 3 did not fail on brushwork. It failed on VALUE: every piece was the
+// same muddy tan printed on flat card, and the only saturated colour in frame
+// was an orange sky BEHIND the hero. The backdrop is retired; depth now comes
+// from a deliberate value ladder and from cast shadow. The ladder, brightest
+// first — nothing on this spread may jump a rung:
+//
+//   L5 ~0.93  lit pane cores        ONLY the guest facade's eleven windows
+//   L4 ~0.83  guest plaster         THE STAR: the lightest field in frame
+//   L3 ~0.62  hall plaster          one full value step down
+//   L2 ~0.40  wings / balcony /     a step down again AND desaturated, so
+//             roofs / spire         nothing behind or beside the hero competes
+//   L1 ~0.30  cold slate cobbles    the one COLD note (dissolve side A), so the
+//                                   A->B flip is a temperature change
+//   L0 ~0.10  timber, ink, the arch the darks the gold has to burn against
+//
+// ART IDS ARE DERIVED, NOT INVENTED. The keepstack resolves per-face ids as
+// `<keepId>-<key>-front|-back|-side|-top` (popup-keepstack-merged.tsx FACE_ART),
+// the facade plate prints that same `-front` id (keepStackFacadePlate / the
+// FACADE_PLATE_UVS split: art-u 0.5 at the spine crease, art-v 0 at the cap
+// BASE edge), the balcony deck is `<keepId>-balcony` (art-v 1 at the facade
+// attachment, v 0 at the reader-facing rail) and the fan sails are
+// `<keepId>-spire-m<k>` (art-v 0 at the seated apex, v 1 at the ridge tip).
+//
+// THE ONE THING THAT IS NOT FREE: a story that carries a `plate` has its own
+// front cap suppressed (keepStackStoryGeoms `capFrontArt: s.plate ? false`),
+// and the merged renderer re-points that cap at the story's `-side` art under
+// INTERIOR_SHADOW_TINT `#5f5138` (popup-keepstack-merged.tsx:151-164). The cap
+// is what sits solid behind the hall plate's die-cut arch, so `innPassage` —
+// the `-side` art — IS what a reader sees through the hole, and it is painted
+// as a lamplit passage receding into the inn. It is painted HOT because that
+// tint multiplies it down to ~0.31 luma; and the plate carries the light SPILL
+// on its own face (glowing jambs, bracket lanterns, a wash on the plinth) so
+// the arch reads lamplit from the plate side whatever the cap does. Read
+// generate-art.mjs' earlier gate note: an aperture is only worth cutting when
+// there is something behind it.
+// ============================================================================
+
+const E4 = {
+  // L4 — the guest facade: the lightest, warmest field on the spread. ROUND 2:
+  // the first bake put plaster at 0.85 and panes at 0.92 and the eleven windows
+  // vanished into the wall — "yellow rectangles", exactly the failure the brief
+  // named. A lit window is not a lighter patch of wall, it is a SATURATED one:
+  // the plaster comes down to 0.79 and desaturates, the pane goes to saturated
+  // gold with a white-hot core, and the two now differ in hue as well as value.
+  plaster: '#dcc79c',
+  plasterLit: '#f0e0bb',
+  plasterDim: '#b39c72',
+  // L3 — the hall: one full value step down (0.51), and a touch greyer
+  hall: '#9b7f57',
+  hallLit: '#b89a6d',
+  hallDim: '#6f5a3a',
+  stone: '#8a7657',
+  stoneLit: '#c1a97f',
+  stoneDim: '#5c4d38',
+  // L0 — the darks
+  timber: '#31221a',
+  timberLit: '#553d2b',
+  ink: '#150e08',
+  // the illuminants — a three-step ramp inside every pane (edge -> gold -> core)
+  paneEdge: '#e0912f',
+  pane: '#ffd882',
+  paneCore: '#fffdf2',
+  lamp: '#f2c579',
+  lampHot: '#ffcf7a',
+  lampDeep: '#a4691f',
+  // L2 — the supports, desaturated so they cannot compete
+  wing: '#87795f',
+  wingLit: '#a09075',
+  wingDim: '#5b5040',
+  roof: '#514735',
+  roofLit: '#6f6047',
+  roofDim: '#332c21',
+  // L1 — the cold note
+  slate: '#5b6470',
+  slateLit: '#7d8794',
+  slateDim: '#464e59',
+  slateDeep: '#2e343c',
+  // chapter accents
+  green: '#6a8f5f',
+  rust: '#b0603f',
+  peach: '#e8a978',
+  brass: '#c9a227',
+  brassLit: '#f0d484',
+  rim: '#f6eedb',
+}
+
+/** A lamp halo gradient. Every warm glow on this spread is one of these, so the
+ *  light has ONE colour and one falloff and the spread reads as a single hour. */
+function e4Glow(id, core = E4.lamp, peak = 0.86) {
+  return (
+    `<radialGradient id="${id}">` +
+    `<stop offset="0" stop-color="${core}" stop-opacity="${fxOp(peak)}"/>` +
+    `<stop offset="0.38" stop-color="${core}" stop-opacity="${fxOp(peak * 0.36)}"/>` +
+    `<stop offset="0.72" stop-color="${core}" stop-opacity="${fxOp(peak * 0.11)}"/>` +
+    `<stop offset="1" stop-color="${core}" stop-opacity="0"/>` +
+    `</radialGradient>`
+  )
+}
+
+/**
+ * ONE WINDOW LIT FROM WITHIN — not a yellow rectangle.
+ * Four things in order, and the order is the whole trick: (1) the BURN washed
+ * onto the plaster around the opening, which is the only evidence that the
+ * light is coming OUT; (2) the reveal, offset down-right, so the opening is a
+ * hole in a thick wall; (3) the pane, hottest LOW and inboard where a hearth
+ * would be, not evenly filled; (4) leading, frame and a sill that casts.
+ */
+function e4Window(x, y, ww, wh, glowId, o = {}) {
+  const cx = x + ww / 2
+  const dim = o.dim ?? 0
+  const arch = o.arch ?? false
+  /** The opening, optionally shrunk by `i` of its own size about its centre —
+   *  the reveal, the glass and the inner ramp are all the same shape at three
+   *  insets, which is what makes the pane read as a hole with depth. */
+  const at = (i) => {
+    const bx = x + ww * i
+    const bw = ww * (1 - 2 * i)
+    const by = y + wh * i * 0.55
+    const bh = wh * (1 - i * 1.1)
+    return arch
+      ? `M ${fx(bx)} ${fx(by + bh)} L ${fx(bx)} ${fx(by + bh * 0.34)} Q ${fx(bx + bw / 2)} ${fx(by - bh * 0.08)} ${fx(bx + bw)} ${fx(by + bh * 0.34)} L ${fx(bx + bw)} ${fx(by + bh)} Z`
+      : `M ${fx(bx)} ${fx(by)} L ${fx(bx + bw)} ${fx(by)} L ${fx(bx + bw)} ${fx(by + bh)} L ${fx(bx)} ${fx(by + bh)} Z`
+  }
+  const body = at(0)
+  let s = ''
+  // (0) the SHADE the burn burns against. A halo painted straight onto plaster
+  //     of a similar value is invisible (round-1 finding), so every opening
+  //     first darkens its own patch of wall, then lights it.
+  s += `<ellipse cx="${fx(cx)}" cy="${fx(y + wh * 0.5)}" rx="${fx(ww * 1.5)}" ry="${fx(wh * 0.86)}" fill="${E4.ink}" opacity="${fxOp(0.3 - dim * 0.12)}"/>`
+  // (1) the burn on the wall — two halos, a wide warm one and a tight hot one
+  s += `<ellipse cx="${fx(cx)}" cy="${fx(y + wh * 0.52)}" rx="${fx(ww * 3.1)}" ry="${fx(wh * 1.7)}" fill="url(#${glowId})" opacity="${fxOp(1 - dim * 0.6)}"/>`
+  s += `<ellipse cx="${fx(cx)}" cy="${fx(y + wh * 0.55)}" rx="${fx(ww * 1.35)}" ry="${fx(wh * 0.82)}" fill="url(#${glowId})" opacity="${fxOp(0.85 - dim * 0.6)}"/>`
+  // (2) the reveal: the jamb this opening is cut through
+  s += `<g transform="translate(${fx(ww * 0.1)},${fx(wh * 0.06)})"><path d="${body}" fill="${E4.ink}" opacity="0.8"/></g>`
+  // (3) the pane, as a three-step ramp: amber at the reveal, gold across the
+  //     glass, a white-hot core low and inboard where the hearth would be
+  s += `<path d="${body}" fill="${dim > 0.4 ? E4.lampDeep : E4.paneEdge}"/>`
+  s += `<path d="${at(0.09)}" fill="${dim > 0.4 ? E4.paneEdge : E4.pane}" opacity="${fxOp(1 - dim * 0.25)}"/>`
+  s += `<ellipse cx="${fx(cx - ww * 0.05)}" cy="${fx(y + wh * 0.64)}" rx="${fx(ww * 0.4)}" ry="${fx(wh * 0.29)}" fill="${E4.paneCore}" opacity="${fxOp(0.92 - dim * 0.85)}"/>`
+  // (4) leading — a coarse lattice, wide enough to survive the atlas downscale
+  const rows = 3
+  for (let i = 1; i < rows; i++) {
+    const ly = y + (wh * i) / rows
+    s += `<line x1="${fx(x)}" y1="${fx(ly)}" x2="${fx(x + ww)}" y2="${fx(ly)}" stroke="${E4.timber}" stroke-width="${fx(Math.max(1.4, ww * 0.055))}" opacity="0.8"/>`
+  }
+  s += `<line x1="${fx(cx)}" y1="${fx(y)}" x2="${fx(cx)}" y2="${fx(y + wh)}" stroke="${E4.timber}" stroke-width="${fx(Math.max(1.6, ww * 0.075))}" opacity="0.88"/>`
+  // occupants — the reason a lit window reads as a ROOM
+  if (o.figure) {
+    s += `<ellipse cx="${fx(cx + ww * 0.1)}" cy="${fx(y + wh * 0.62)}" rx="${fx(ww * 0.19)}" ry="${fx(wh * 0.24)}" fill="${E4.ink}" opacity="0.88"/>`
+    s += `<circle cx="${fx(cx + ww * 0.1)}" cy="${fx(y + wh * 0.36)}" r="${fx(ww * 0.13)}" fill="${E4.ink}" opacity="0.88"/>`
+  }
+  if (o.shutter) {
+    const sw = ww * 0.44
+    s += `<rect x="${fx(x - sw * 0.86)}" y="${fx(y - wh * 0.02)}" width="${fx(sw)}" height="${fx(wh * 1.04)}" fill="${E4.timber}"/>`
+    for (let i = 0; i < 4; i++)
+      s += `<line x1="${fx(x - sw * 0.82)}" y1="${fx(y + wh * (0.12 + i * 0.24))}" x2="${fx(x - sw * 0.06)}" y2="${fx(y + wh * (0.06 + i * 0.24))}" stroke="${E4.timberLit}" stroke-width="1.4" opacity="0.7"/>`
+  }
+  if (o.keys) {
+    for (let i = 0; i < 3; i++)
+      s += `<g transform="translate(${fx(x + ww * (0.24 + i * 0.26))},${fx(y + wh * 0.3)}) scale(${fx(ww * 0.0042)})">${keyGlyph(120, E4.ink, E4.ink)}</g>`
+  }
+  // frame + sill, and the sill's cast
+  s += `<path d="${body}" fill="none" stroke="${E4.timber}" stroke-width="${fx(Math.max(2, ww * 0.1))}"/>`
+  s += `<rect x="${fx(x - ww * 0.13)}" y="${fx(y + wh)}" width="${fx(ww * 1.26)}" height="${fx(wh * 0.075)}" fill="${E4.timberLit}"/>`
+  s += `<rect x="${fx(x - ww * 0.13)}" y="${fx(y + wh * 1.075)}" width="${fx(ww * 1.26)}" height="${fx(wh * 0.05)}" fill="${E4.ink}" opacity="0.45"/>`
+  return s
+}
+
+/**
+ * THE HUNDRED KEYS ARE THE TIMBER. Each stud between two windows is drawn as a
+ * KEY standing on end: a ring bow high on the wall, a straight shaft down to
+ * the sill band, two teeth off one flank. Twelve of them between eleven lit
+ * windows, so the chapter's motif is the half-timbering itself rather than a
+ * prop hung on it — and, being the darkest value in frame against the lightest
+ * plaster, they are what makes the facade read at a glance.
+ */
+function e4KeyStud(cx, yBow, rBow, yFoot, wStud, flip) {
+  const t = wStud
+  let s = ''
+  s += `<circle cx="${fx(cx)}" cy="${fx(yBow)}" r="${fx(rBow)}" fill="none" stroke="${E4.timber}" stroke-width="${fx(t)}"/>`
+  s += `<circle cx="${fx(cx - rBow * 0.34)}" cy="${fx(yBow - rBow * 0.34)}" r="${fx(t * 0.34)}" fill="${E4.timberLit}" opacity="0.7"/>`
+  s += `<rect x="${fx(cx - t / 2)}" y="${fx(yBow + rBow - t * 0.4)}" width="${fx(t)}" height="${fx(yFoot - yBow - rBow + t * 0.4)}" fill="${E4.timber}"/>`
+  const sgn = flip ? -1 : 1
+  // THE BIT. Round 1 cut these at 1.9t/1.25t and the studs read as lollipops;
+  // a key is only a key once the teeth are long enough to see, so they run out
+  // to ~3t on the plaster below the sills, where there is nothing to collide with.
+  for (const [dy, len] of [[0.8, 3.1], [0.92, 2.1]]) {
+    const y = lerp(yBow + rBow, yFoot, dy)
+    s += `<rect x="${fx(flip ? cx - t * len : cx)}" y="${fx(y)}" width="${fx(t * len)}" height="${fx(t * 1.05)}" fill="${E4.timber}"/>`
+    s += `<rect x="${fx(flip ? cx - t * len : cx)}" y="${fx(y)}" width="${fx(t * len)}" height="${fx(t * 0.2)}" fill="${E4.timberLit}" opacity="0.5"/>`
+  }
+  // the beam's own lit arris — one hairline, on the lamp side
+  s += `<rect x="${fx(cx + sgn * (t / 2) - (sgn > 0 ? t * 0.18 : 0))}" y="${fx(yBow + rBow)}" width="${fx(t * 0.18)}" height="${fx(yFoot - yBow - rBow)}" fill="${E4.timberLit}" opacity="0.55"/>`
+  return s
+}
+
+// ---- `ch1-inn-guest-front` — THE STAR ---------------------------------------
+// The guest storey's die-cut facade plate (plate 0.88 x 0.34 world = 2.588).
+// Heavy dark timber over warm cream plaster with ELEVEN windows lit from
+// within: the brightest, warmest, highest-contrast surface anywhere on the
+// spread, and the one thing the reader's eye is meant to land on first.
+// art-v 0 is the cap BASE (where the storey sits on the hall's lid), v 1 the
+// plate top — which is 0.02 world PROUD of the cap, so the top ~6% of this
+// canvas is free silhouette and carries the eaves lip and two chimney stacks.
+function innGuestFacade(w, h, seed) {
+  const r = mulberry32(seed)
+  const N = 11
+  const xL = w * 0.022
+  const span = w - xL * 2
+  const pitch = span / N
+  const EAVE = h * 0.055 // everything above this line is silhouette
+  const PLATE = h * 0.175 // underside of the wall-plate beam
+  const FOOT = h * 0.845 // top of the jettied bressumer
+
+  // --- the die. Only the top ~6% of this canvas stands PROUD of the cap, so
+  //     that band is the plate's whole silhouette budget: a straight tile
+  //     overhang (a ragged edge up here reads as a bad cut, not as thatch) with
+  //     two chimney stacks breaking it at unequal stations.
+  const chim = (cxx, cw, top) =>
+    `L ${fx(cxx - cw / 2)} ${fx(EAVE * 0.5)} L ${fx(cxx - cw / 2)} ${fx(top)} L ${fx(cxx + cw / 2)} ${fx(top)} L ${fx(cxx + cw / 2)} ${fx(EAVE * 0.5)} `
+  let die = `M 0 ${fx(EAVE * 0.5)} `
+  die += chim(w * 0.207, w * 0.038, h * 0.004)
+  die += chim(w * 0.741, w * 0.03, h * 0.018)
+  die += `L ${w} ${fx(EAVE * 0.5)} L ${w} ${h} L 0 ${h} Z`
+
+  let s = `<g clip-path="url(#g2cut)">`
+  // --- the plaster field, warmest at the middle of the rank -------------------
+  s += `<rect width="${w}" height="${h}" fill="${E4.plaster}"/>`
+  s += `<rect width="${w}" height="${h}" fill="url(#g2wash)"/>`
+  // limewash mottle so the field is a surface, not a swatch
+  for (let i = 0; i < 90; i++) {
+    const x = rr(r, 0, w)
+    const y = rr(r, EAVE, h)
+    s += `<ellipse cx="${fx(x)}" cy="${fx(y)}" rx="${fx(rr(r, w * 0.01, w * 0.035))}" ry="${fx(rr(r, h * 0.01, h * 0.04))}" fill="${r() < 0.5 ? E4.plasterLit : E4.plasterDim}" opacity="${fxOp(rr(r, 0.06, 0.16))}"/>`
+  }
+
+  // --- the roof lip + eaves shadow (the plate's own top edge reads as roof) ---
+  s += `<rect x="0" y="0" width="${w}" height="${fx(EAVE)}" fill="${E4.roof}"/>`
+  for (const [u, cw] of [[0.207, 0.038], [0.741, 0.03]]) {
+    s += `<rect x="${fx(w * u - (w * cw) / 2)}" y="0" width="${fx(w * cw)}" height="${fx(EAVE)}" fill="${E4.roofDim}"/>`
+    s += `<rect x="${fx(w * u - (w * cw) / 2)}" y="0" width="${fx(w * cw * 0.3)}" height="${fx(EAVE)}" fill="${E4.roofLit}" opacity="0.5"/>`
+  }
+  for (let i = 0; i < 40; i++) {
+    const x = (w * i) / 40
+    s += `<path d="M ${fx(x)} ${fx(EAVE)} a ${fx(w / 90)} ${fx(w / 90)} 0 0 1 ${fx(w / 40)} 0 Z" fill="${E4.roofLit}" opacity="0.55"/>`
+  }
+  s += `<rect x="0" y="${fx(EAVE)}" width="${w}" height="${fx(h * 0.05)}" fill="${E4.ink}" opacity="0.5"/>`
+  // the wall-plate beam and its joist ends
+  s += `<rect x="0" y="${fx(PLATE - h * 0.055)}" width="${w}" height="${fx(h * 0.055)}" fill="${E4.timber}"/>`
+  for (let k = 0; k <= N; k++) {
+    const x = xL + k * pitch
+    s += `<rect x="${fx(x - pitch * 0.07)}" y="${fx(PLATE - h * 0.085)}" width="${fx(pitch * 0.14)}" height="${fx(h * 0.032)}" fill="${E4.timberLit}" opacity="0.8"/>`
+  }
+  s += `<rect x="0" y="${fx(PLATE)}" width="${w}" height="${fx(h * 0.035)}" fill="${E4.ink}" opacity="0.38"/>`
+
+  // --- ELEVEN WINDOWS ---------------------------------------------------------
+  // The rank is deliberately uneven (an inn's floors sag) and its brightest
+  // cluster sits LEFT of the spine, so the facade is asymmetric by light.
+  const wins = []
+  for (let k = 0; k < N; k++) {
+    const cx = xL + (k + 0.5) * pitch
+    const ww = pitch * (k === 5 ? 0.7 : 0.6)
+    const wh = h * (k === 5 ? 0.42 : 0.38) * (0.94 + 0.12 * ((k * 7) % 3) * 0.5)
+    const y = h * 0.3 + Math.sin(k * 1.3) * h * 0.018
+    wins.push({ k, x: cx - ww / 2, y, ww, wh })
+  }
+  for (const win of wins) {
+    const k = win.k
+    const o = {
+      dim: k === 1 || k === 9 ? 0.55 : k === 7 ? 0.28 : 0,
+      figure: k === 3 || k === 8,
+      shutter: k === 0 || k === 10,
+      keys: k === 5,
+    }
+    s += e4Window(win.x, win.y, win.ww, win.wh, k === 1 || k === 9 ? 'g2glowDim' : 'g2glow', o)
+    // the spill DOWN the wall under each sill — light lands on things
+    if (!o.dim)
+      s += `<path d="M ${fx(win.x)} ${fx(win.y + win.wh * 1.1)} L ${fx(win.x + win.ww)} ${fx(win.y + win.wh * 1.1)} L ${fx(win.x + win.ww * 1.5)} ${fx(FOOT)} L ${fx(win.x - win.ww * 0.5)} ${fx(FOOT)} Z" fill="${E4.lamp}" opacity="0.16"/>`
+  }
+
+  // --- THE HUNDRED-KEYS TIMBER: twelve key-studs between the windows ---------
+  const t = Math.max(4, pitch * 0.105)
+  for (let k = 0; k <= N; k++) {
+    const cx = xL + k * pitch
+    s += e4KeyStud(cx, h * 0.245, h * 0.052, FOOT, t, k % 2 === 0)
+  }
+  // one long mid-rail tying the rank together, notched round each shaft
+  s += `<rect x="0" y="${fx(h * 0.735)}" width="${w}" height="${fx(t * 0.9)}" fill="${E4.timber}"/>`
+  s += `<rect x="0" y="${fx(h * 0.735 + t * 0.9)}" width="${w}" height="${fx(t * 0.4)}" fill="${E4.ink}" opacity="0.4"/>`
+
+  // --- the jetty: a bressumer beam the whole storey oversails on -------------
+  s += `<rect x="0" y="${fx(FOOT)}" width="${w}" height="${fx(h - FOOT)}" fill="${E4.timber}"/>`
+  s += `<rect x="0" y="${fx(FOOT)}" width="${w}" height="${fx(h * 0.014)}" fill="${E4.timberLit}" opacity="0.8"/>`
+  for (let k = 0; k <= N * 2; k++) {
+    const x = xL + (k * pitch) / 2
+    s += `<g transform="translate(${fx(x)},${fx(FOOT + (h - FOOT) * 0.52)}) scale(${fx(pitch * 0.0022)})">${keyGlyph(120, E4.brass, E4.brassLit)}</g>`
+  }
+  // the carved key frieze reads as brass only where the windows reach it
+  s += `<rect x="0" y="${fx(FOOT)}" width="${w}" height="${fx(h - FOOT)}" fill="${E4.ink}" opacity="0.3"/>`
+
+  // --- one hanging lantern under the jetty, off-centre ------------------------
+  const lx = w * 0.63
+  s += `<ellipse cx="${fx(lx)}" cy="${fx(h * 0.9)}" rx="${fx(w * 0.05)}" ry="${fx(h * 0.13)}" fill="url(#g2glow)"/>`
+  s += `<rect x="${fx(lx - w * 0.0035)}" y="${fx(h * 0.845)}" width="${fx(w * 0.007)}" height="${fx(h * 0.03)}" fill="${E4.ink}"/>`
+  s += `<path d="M ${fx(lx - w * 0.013)} ${fx(h * 0.875)} L ${fx(lx + w * 0.013)} ${fx(h * 0.875)} L ${fx(lx + w * 0.009)} ${fx(h * 0.955)} L ${fx(lx - w * 0.009)} ${fx(h * 0.955)} Z" fill="${E4.pane}"/>`
+  s += `<path d="M ${fx(lx - w * 0.013)} ${fx(h * 0.875)} L ${fx(lx + w * 0.013)} ${fx(h * 0.875)} L ${fx(lx + w * 0.009)} ${fx(h * 0.955)} L ${fx(lx - w * 0.009)} ${fx(h * 0.955)} Z" fill="none" stroke="${E4.ink}" stroke-width="2.4"/>`
+  s += `</g>`
+  s += rimPath(die, 4)
+
+  const defs =
+    `<clipPath id="g2cut"><path d="${die}"/></clipPath>` +
+    e4Glow('g2glow', E4.lamp, 0.8) +
+    e4Glow('g2glowDim', E4.lampDeep, 0.4) +
+    `<linearGradient id="g2wash" x1="0" y1="0" x2="1" y2="0">` +
+    `<stop offset="0" stop-color="${E4.plasterDim}" stop-opacity="0.5"/>` +
+    `<stop offset="0.38" stop-color="${E4.plasterLit}" stop-opacity="0.28"/>` +
+    `<stop offset="1" stop-color="${E4.plasterDim}" stop-opacity="0.42"/></linearGradient>`
+  return svgPiece(w, h, s, defs)
+}
+
+// ---- `ch1-inn-hall-front` — THE DIE-CUT CARRIAGE ARCH ------------------------
+// The hall's facade plate (1.04 x 0.26 world = 4.0), covering its front cap
+// edge to edge. The arch is a TRUE ALPHA HOLE (mask), half-width 0.15 world and
+// apex 0.18 world, centred at u 0.455 — a little left of the spine, so the
+// opening is off-axis and the wall keeps an unequal shoulder either side.
+// Everything warm on this plate is light LEAKING OUT of that hole.
+function innHallFacade(w, h, seed) {
+  const r = mulberry32(seed)
+  const PW = 1.04 // the plate's world width — the px/world scale for the arch
+  const ax = w * 0.455
+  const ahw = w * (0.15 / PW)
+  const aApex = h * (1 - 0.18 / 0.26)
+  const aSpring = h * 0.63
+  const x0 = ax - ahw
+  const x1 = ax + ahw
+  const arch =
+    `M ${fx(x0)} ${fx(h)} L ${fx(x0)} ${fx(aSpring)} ` +
+    `Q ${fx(x0 + ahw * 0.16)} ${fx(aApex + (aSpring - aApex) * 0.12)} ${fx(ax)} ${fx(aApex)} ` +
+    `Q ${fx(x1 - ahw * 0.16)} ${fx(aApex + (aSpring - aApex) * 0.12)} ${fx(x1)} ${fx(aSpring)} ` +
+    `L ${fx(x1)} ${fx(h)} Z`
+
+  const PLINTH = h * 0.78
+  let s = `<g mask="url(#h2arch)">`
+  s += `<rect width="${w}" height="${h}" fill="${E4.hall}"/>`
+  s += `<rect width="${w}" height="${h}" fill="url(#h2wash)"/>`
+  for (let i = 0; i < 70; i++) {
+    const x = rr(r, 0, w)
+    const y = rr(r, 0, h)
+    s += `<ellipse cx="${fx(x)}" cy="${fx(y)}" rx="${fx(rr(r, w * 0.008, w * 0.026))}" ry="${fx(rr(r, h * 0.02, h * 0.07))}" fill="${r() < 0.5 ? E4.hallLit : E4.hallDim}" opacity="${fxOp(rr(r, 0.07, 0.17))}"/>`
+  }
+  // --- the dressed-stone plinth the whole inn stands on -----------------------
+  s += `<rect x="0" y="${fx(PLINTH)}" width="${w}" height="${fx(h - PLINTH)}" fill="${E4.stoneDim}"/>`
+  s += `<rect x="0" y="${fx(PLINTH)}" width="${w}" height="${fx(h * 0.014)}" fill="${E4.stoneLit}" opacity="0.5"/>`
+  for (let i = 0; i < 3; i++) {
+    const cy = PLINTH + ((h - PLINTH) * (i + 1)) / 3
+    s += `<line x1="0" y1="${fx(cy)}" x2="${w}" y2="${fx(cy)}" stroke="${E4.ink}" stroke-width="1.6" opacity="0.35"/>`
+    for (let b = 0; b < 34; b++) {
+      const jx = ((b + (i % 2 ? 0.5 : 0)) / 34) * w
+      s += `<line x1="${fx(jx)}" y1="${fx(cy)}" x2="${fx(jx)}" y2="${fx(cy - (h - PLINTH) / 3)}" stroke="${E4.ink}" stroke-width="1.3" opacity="0.26"/>`
+    }
+  }
+  // --- heavy posts: FEWER and BIGGER than the guest storey's, so the two ------
+  //     facades read as different buildings stacked, not one wallpaper
+  const post = Math.max(6, w * 0.011)
+  for (const u of [0.03, 0.115, 0.2, 0.7, 0.79, 0.88, 0.97]) {
+    s += `<rect x="${fx(w * u - post / 2)}" y="${fx(h * 0.1)}" width="${fx(post)}" height="${fx(PLINTH - h * 0.1)}" fill="${E4.timber}"/>`
+    s += `<rect x="${fx(w * u + post * 0.32)}" y="${fx(h * 0.1)}" width="${fx(post * 0.18)}" height="${fx(PLINTH - h * 0.1)}" fill="${E4.timberLit}" opacity="0.5"/>`
+  }
+  s += `<rect x="0" y="${fx(h * 0.06)}" width="${w}" height="${fx(h * 0.075)}" fill="${E4.timber}"/>`
+  s += `<rect x="0" y="0" width="${w}" height="${fx(h * 0.06)}" fill="${E4.stoneDim}"/>`
+  s += `<rect x="0" y="0" width="${w}" height="${fx(h * 0.016)}" fill="${E4.stoneLit}" opacity="0.6"/>`
+
+  // --- FOUR SMALL DIM WINDOWS. They exist to say "the hall is inhabited too",
+  //     and they are held a full step under the guest rank on purpose.
+  //     ROUND 2: they were painted at the same recipe as the hero's and, on a
+  //     darker wall, ended up with MORE local contrast than the eleven windows
+  //     that are supposed to own the spread. They are now smaller, deep amber,
+  //     and carry no white core at all.
+  for (const [u, dim] of [[0.065, 0.75], [0.15, 0.82], [0.745, 0.72], [0.925, 0.85]]) {
+    s += e4Window(w * u - w * 0.014, h * 0.3, w * 0.028, h * 0.24, 'h2glowDim', { dim })
+  }
+
+  // --- THE SPILL. This is the whole reason the arch reads as lamplit rather
+  //     than as a hole: the cap standing behind it is multiplied down to ~0.31
+  //     luma by INTERIOR_SHADOW_TINT and cannot be bright, so the LIGHT LIVES ON
+  //     THE PLATE. A wash climbing the wall out of the mouth, a hot rim on the
+  //     jambs, and a pool running along the plinth to both sides. All of it is
+  //     inside the mask, so none of it survives across the hole.
+  s += `<ellipse cx="${fx(ax)}" cy="${fx(h * 1.02)}" rx="${fx(ahw * 2.9)}" ry="${fx(h * 1.1)}" fill="url(#h2glow)"/>`
+  s += `<ellipse cx="${fx(ax)}" cy="${fx(h)}" rx="${fx(ahw * 4.4)}" ry="${fx(h * 0.42)}" fill="url(#h2glowHot)"/>`
+  // the light that gets past the mouth and lies on the ground, left and right
+  for (const sgn of [-1, 1]) {
+    s += `<path d="M ${fx(ax + sgn * ahw)} ${fx(PLINTH)} L ${fx(ax + sgn * ahw * 3.4)} ${fx(h)} L ${fx(ax + sgn * ahw * 0.6)} ${fx(h)} Z" fill="${E4.lamp}" opacity="0.3"/>`
+  }
+
+  // --- the voussoir ring. A cut hole needs a drawn edge or it reads as a tear.
+  s += `<path d="${arch}" fill="none" stroke="${E4.stoneLit}" stroke-width="${fx(h * 0.075)}"/>`
+  s += `<path d="${arch}" fill="none" stroke="${E4.ink}" stroke-width="${fx(h * 0.014)}" opacity="0.55"/>`
+  for (let i = 0; i <= 10; i++) {
+    const a = Math.PI * (0.06 + (i / 10) * 0.88)
+    const px = ax - Math.cos(a) * ahw
+    const py = aSpring - Math.sin(a) * (aSpring - aApex)
+    const nx = (px - ax) / ahw
+    const ny = -(py - aSpring) / Math.max(1, aSpring - aApex)
+    const L = Math.hypot(nx, ny) || 1
+    s += `<line x1="${fx(px - (nx / L) * h * 0.03)}" y1="${fx(py + (ny / L) * h * 0.03)}" x2="${fx(px + (nx / L) * h * 0.045)}" y2="${fx(py - (ny / L) * h * 0.045)}" stroke="${E4.stoneDim}" stroke-width="2" opacity="0.6"/>`
+  }
+  // the keystone, carved with the chapter's key
+  s += `<path d="M ${fx(ax - h * 0.055)} ${fx(aApex + h * 0.03)} L ${fx(ax - h * 0.038)} ${fx(aApex - h * 0.085)} L ${fx(ax + h * 0.038)} ${fx(aApex - h * 0.085)} L ${fx(ax + h * 0.055)} ${fx(aApex + h * 0.03)} Z" fill="${E4.stoneLit}" stroke="${E4.ink}" stroke-width="1.8"/>`
+  s += `<g transform="translate(${fx(ax)},${fx(aApex - h * 0.026)}) scale(${fx(h * 0.00085)})">${keyGlyph(120, E4.lampDeep, E4.brassLit)}</g>`
+  // the HOT RIM, last so it survives on top of the voussoir: the innermost few
+  // pixels of the cut, lit from behind. It is the difference between an opening
+  // and a tear in the card.
+  s += `<path d="${arch}" fill="none" stroke="${E4.paneCore}" stroke-width="${fx(h * 0.022)}" opacity="0.9"/>`
+  s += `<path d="${arch}" fill="none" stroke="${E4.lampHot}" stroke-width="${fx(h * 0.05)}" opacity="0.45"/>`
+
+  // --- two bracket lanterns flanking the mouth --------------------------------
+  for (const sgn of [-1, 1]) {
+    const bx = ax + sgn * (ahw + w * 0.045)
+    const by = h * 0.34
+    // the lantern's own darkened patch of wall, then two halos on top of it —
+    // the same order every lit thing on this spread is built in
+    s += `<ellipse cx="${fx(bx)}" cy="${fx(by + h * 0.08)}" rx="${fx(w * 0.03)}" ry="${fx(h * 0.19)}" fill="${E4.ink}" opacity="0.3"/>`
+    s += `<ellipse cx="${fx(bx)}" cy="${fx(by + h * 0.07)}" rx="${fx(w * 0.075)}" ry="${fx(h * 0.46)}" fill="url(#h2glowHot)"/>`
+    s += `<ellipse cx="${fx(bx)}" cy="${fx(by + h * 0.07)}" rx="${fx(w * 0.028)}" ry="${fx(h * 0.2)}" fill="url(#h2glowHot)"/>`
+    // the cone it throws down the wall onto the plinth
+    s += `<path d="M ${fx(bx - w * 0.014)} ${fx(by)} L ${fx(bx + w * 0.014)} ${fx(by)} L ${fx(bx + w * 0.05)} ${fx(h)} L ${fx(bx - w * 0.05)} ${fx(h)} Z" fill="${E4.lamp}" opacity="0.22"/>`
+    s += `<path d="M ${fx(bx - sgn * w * 0.03)} ${fx(by - h * 0.05)} L ${fx(bx)} ${fx(by - h * 0.05)} L ${fx(bx)} ${fx(by)}" fill="none" stroke="${E4.ink}" stroke-width="3.4"/>`
+    s += `<path d="M ${fx(bx - w * 0.012)} ${fx(by)} L ${fx(bx + w * 0.012)} ${fx(by)} L ${fx(bx + w * 0.008)} ${fx(by + h * 0.15)} L ${fx(bx - w * 0.008)} ${fx(by + h * 0.15)} Z" fill="${E4.paneEdge}" stroke="${E4.ink}" stroke-width="2.4"/>`
+    s += `<ellipse cx="${fx(bx)}" cy="${fx(by + h * 0.085)}" rx="${fx(w * 0.0068)}" ry="${fx(h * 0.055)}" fill="${E4.paneCore}"/>`
+  }
+
+  // --- the hanging inn sign, out on the right shoulder ------------------------
+  const sx = w * 0.83
+  s += `<path d="M ${fx(sx - w * 0.055)} ${fx(h * 0.11)} L ${fx(sx + w * 0.012)} ${fx(h * 0.11)} L ${fx(sx + w * 0.012)} ${fx(h * 0.2)}" fill="none" stroke="${E4.ink}" stroke-width="4"/>`
+  s += `<rect x="${fx(sx - w * 0.042)} " y="${fx(h * 0.2)}" width="${fx(w * 0.108)}" height="${fx(h * 0.36)}" fill="${E4.timber}" stroke="${E4.ink}" stroke-width="2.5"/>`
+  s += `<rect x="${fx(sx - w * 0.035)}" y="${fx(h * 0.215)}" width="${fx(w * 0.094)}" height="${fx(h * 0.33)}" fill="${E4.stoneDim}"/>`
+  s += `<g transform="translate(${fx(sx + w * 0.012)},${fx(h * 0.38)}) scale(${fx(h * 0.0022)})">${keyGlyph(120, E4.brass, E4.brassLit)}</g>`
+  s += `<ellipse cx="${fx(sx + w * 0.012)}" cy="${fx(h * 0.38)}" rx="${fx(w * 0.05)}" ry="${fx(h * 0.24)}" fill="url(#h2glowDim)"/>`
+
+  // --- the shadow the guest storey's jetty throws on this wall ----------------
+  s += `<rect x="0" y="${fx(h * 0.06)}" width="${w}" height="${fx(h * 0.055)}" fill="${E4.ink}" opacity="0.34"/>`
+  s += `</g>`
+
+  const defs =
+    `<mask id="h2arch" maskUnits="userSpaceOnUse" x="0" y="0" width="${w}" height="${h}">` +
+    `<rect x="0" y="0" width="${w}" height="${h}" fill="#ffffff"/>` +
+    `<path d="${arch}" fill="#000000"/></mask>` +
+    e4Glow('h2glow', E4.lamp, 0.85) +
+    e4Glow('h2glowHot', E4.lampHot, 0.95) +
+    e4Glow('h2glowDim', E4.lampDeep, 0.5) +
+    `<linearGradient id="h2wash" x1="0" y1="0" x2="0" y2="1">` +
+    `<stop offset="0" stop-color="${E4.ink}" stop-opacity="0.3"/>` +
+    `<stop offset="0.5" stop-color="${E4.hallDim}" stop-opacity="0.1"/>` +
+    `<stop offset="1" stop-color="${E4.ink}" stop-opacity="0.22"/></linearGradient>`
+  return svgPiece(w, h, s, defs)
+}
+
+// ---- `ch1-inn-hall-side` — THE LAMPLIT PASSAGE -------------------------------
+// This one image does two jobs, because the engine gives it two (see the header
+// note): it is the hall box's two side walls AND — under INTERIOR_SHADOW_TINT —
+// the front cap standing solid behind the die-cut arch. So it is painted as the
+// inn's carriage passage seen straight down its axis: converging flags, beams
+// overhead, a great hanging lantern, the key board on the left wall, and a hot
+// doorway at the far end with the innkeeper in it. Centred at u 0.455 so the
+// vanishing point lands in the middle of the arch, and painted HOT so the
+// multiply leaves something to see.
+function innPassage(w, h, seed) {
+  const r = mulberry32(seed)
+  const vx = w * 0.455
+  const vy = h * 0.48
+  const MOUTH = w * 0.155 // the far doorway's half-width
+
+  let s = `<rect width="${w}" height="${h}" fill="${E4.timber}"/>`
+  // side and ceiling planes, converging
+  s += `<path d="M 0 0 L ${w} 0 L ${fx(vx + MOUTH * 1.5)} ${fx(vy - h * 0.16)} L ${fx(vx - MOUTH * 1.5)} ${fx(vy - h * 0.16)} Z" fill="${E4.roofDim}"/>`
+  s += `<path d="M 0 0 L ${fx(vx - MOUTH * 1.5)} ${fx(vy - h * 0.16)} L ${fx(vx - MOUTH * 1.5)} ${fx(vy + h * 0.3)} L 0 ${h} Z" fill="${E4.stoneDim}"/>`
+  s += `<path d="M ${w} 0 L ${fx(vx + MOUTH * 1.5)} ${fx(vy - h * 0.16)} L ${fx(vx + MOUTH * 1.5)} ${fx(vy + h * 0.3)} L ${w} ${h} Z" fill="${E4.stoneDim}"/>`
+  s += `<path d="M 0 ${h} L ${fx(vx - MOUTH * 1.5)} ${fx(vy + h * 0.3)} L ${fx(vx + MOUTH * 1.5)} ${fx(vy + h * 0.3)} L ${w} ${h} Z" fill="${E4.stone}"/>`
+  // flagstones running away from the reader
+  for (let i = 1; i < 14; i++) {
+    const t = i / 14
+    const y = lerp(h, vy + h * 0.3, Math.pow(t, 0.55))
+    const half = lerp(w * 0.5, MOUTH * 1.5, Math.pow(t, 0.55))
+    s += `<line x1="${fx(vx - half)}" y1="${fx(y)}" x2="${fx(vx + half)}" y2="${fx(y)}" stroke="${E4.ink}" stroke-width="${fx(Math.max(1, 4 * (1 - t)))}" opacity="0.4"/>`
+  }
+  for (let i = -4; i <= 4; i++) {
+    s += `<line x1="${fx(vx + i * w * 0.13)}" y1="${h}" x2="${fx(vx + i * MOUTH * 0.34)}" y2="${fx(vy + h * 0.3)}" stroke="${E4.ink}" stroke-width="2" opacity="0.32"/>`
+  }
+  // ceiling beams marching in
+  for (let i = 1; i <= 5; i++) {
+    const t = i / 6
+    const y = lerp(0, vy - h * 0.16, Math.pow(t, 0.7))
+    const half = lerp(w * 0.5, MOUTH * 1.5, Math.pow(t, 0.7))
+    s += `<rect x="${fx(vx - half)}" y="${fx(y)}" width="${fx(half * 2)}" height="${fx(Math.max(3, h * 0.055 * (1 - t)))}" fill="${E4.timber}"/>`
+  }
+  // the great warm wash out of the far end
+  s += `<ellipse cx="${fx(vx)}" cy="${fx(vy)}" rx="${fx(w * 0.62)}" ry="${fx(h * 0.85)}" fill="url(#p2glow)"/>`
+  // the far doorway — the hottest note, with the innkeeper standing in it
+  s += `<path d="M ${fx(vx - MOUTH)} ${fx(vy + h * 0.3)} L ${fx(vx - MOUTH)} ${fx(vy - h * 0.05)} Q ${fx(vx)} ${fx(vy - h * 0.2)} ${fx(vx + MOUTH)} ${fx(vy - h * 0.05)} L ${fx(vx + MOUTH)} ${fx(vy + h * 0.3)} Z" fill="${E4.pane}"/>`
+  s += `<ellipse cx="${fx(vx)}" cy="${fx(vy + h * 0.12)}" rx="${fx(MOUTH * 0.82)}" ry="${fx(h * 0.2)}" fill="${E4.paneCore}"/>`
+  s += `<ellipse cx="${fx(vx - MOUTH * 0.3)}" cy="${fx(vy + h * 0.1)}" rx="${fx(MOUTH * 0.2)}" ry="${fx(h * 0.11)}" fill="${E4.ink}" opacity="0.82"/>`
+  s += `<circle cx="${fx(vx - MOUTH * 0.3)}" cy="${fx(vy - h * 0.03)}" r="${fx(MOUTH * 0.12)}" fill="${E4.ink}" opacity="0.82"/>`
+  // the doorway's own frame
+  s += `<path d="M ${fx(vx - MOUTH)} ${fx(vy + h * 0.3)} L ${fx(vx - MOUTH)} ${fx(vy - h * 0.05)} Q ${fx(vx)} ${fx(vy - h * 0.2)} ${fx(vx + MOUTH)} ${fx(vy - h * 0.05)} L ${fx(vx + MOUTH)} ${fx(vy + h * 0.3)}" fill="none" stroke="${E4.timber}" stroke-width="${fx(h * 0.03)}"/>`
+  // THE KEY BOARD on the left wall, catching the light — a hundred keys
+  for (let row = 0; row < 5; row++) {
+    for (let col = 0; col < 8; col++) {
+      const t = 0.16 + col * 0.075
+      const x = lerp(w * 0.02, vx - MOUTH * 1.5, t)
+      const y = lerp(h * 0.3 + row * h * 0.1, vy - h * 0.02 + row * h * 0.05, t)
+      const sc = lerp(0.0055, 0.0022, t) * h
+      s += `<g transform="translate(${fx(x)},${fx(y)}) scale(${fx(sc)})">${keyGlyph(120, E4.brass, E4.brassLit)}</g>`
+    }
+  }
+  s += `<path d="M ${fx(w * 0.0)} ${fx(h * 0.24)} L ${fx(vx - MOUTH * 1.5)} ${fx(vy - h * 0.06)} L ${fx(vx - MOUTH * 1.5)} ${fx(vy + h * 0.2)} L 0 ${fx(h * 0.86)} Z" fill="${E4.timberLit}" opacity="0.18"/>`
+  // barrels + a bench stacked against the right wall
+  for (let i = 0; i < 3; i++) {
+    const t = 0.12 + i * 0.19
+    const x = lerp(w * 0.95, vx + MOUTH * 1.55, t)
+    const y = lerp(h * 0.86, vy + h * 0.26, t)
+    const rad = lerp(h * 0.15, h * 0.06, t)
+    s += `<ellipse cx="${fx(x)}" cy="${fx(y)}" rx="${fx(rad * 0.72)}" ry="${fx(rad)}" fill="${E4.timber}"/>`
+    s += `<ellipse cx="${fx(x - rad * 0.2)}" cy="${fx(y)}" rx="${fx(rad * 0.3)}" ry="${fx(rad * 0.8)}" fill="${E4.timberLit}" opacity="0.45"/>`
+  }
+  // the great hanging lantern, over the passage's mouth
+  const lx = vx + w * 0.09
+  const ly = h * 0.2
+  s += `<ellipse cx="${fx(lx)}" cy="${fx(ly)}" rx="${fx(w * 0.2)}" ry="${fx(h * 0.34)}" fill="url(#p2glow)"/>`
+  s += `<line x1="${fx(lx)}" y1="0" x2="${fx(lx)}" y2="${fx(ly - h * 0.09)}" stroke="${E4.ink}" stroke-width="3"/>`
+  s += `<path d="M ${fx(lx - w * 0.045)} ${fx(ly - h * 0.06)} L ${fx(lx + w * 0.045)} ${fx(ly - h * 0.06)} L ${fx(lx + w * 0.032)} ${fx(ly + h * 0.13)} L ${fx(lx - w * 0.032)} ${fx(ly + h * 0.13)} Z" fill="${E4.paneCore}" stroke="${E4.ink}" stroke-width="3.5"/>`
+  s += `<line x1="${fx(lx)}" y1="${fx(ly - h * 0.06)}" x2="${fx(lx)}" y2="${fx(ly + h * 0.13)}" stroke="${E4.ink}" stroke-width="2.4"/>`
+  // vignette: the jambs the reader looks past, so the eye is pulled down the axis
+  s += `<rect width="${w}" height="${h}" fill="url(#p2vig)"/>`
+  const defs =
+    e4Glow('p2glow', E4.lamp, 0.9) +
+    `<radialGradient id="p2vig" cx="0.455" cy="0.48" r="0.72">` +
+    `<stop offset="0" stop-color="${E4.ink}" stop-opacity="0"/>` +
+    `<stop offset="0.62" stop-color="${E4.ink}" stop-opacity="0.12"/>` +
+    `<stop offset="1" stop-color="${E4.ink}" stop-opacity="0.6"/></radialGradient>`
+  return svgPiece(w, h, s, defs)
+}
+
+/** The plank/lead field every hidden keep face shares: a graded board run with
+ *  seeded knots, one lit arris, and a deep shade at the far end. `along` 'u'
+ *  runs the boards across the image, 'v' down it. */
+function e4Boards(w, h, seed, base, lit, dim, n, along = 'u') {
+  const r = mulberry32(seed)
+  let s = `<rect width="${w}" height="${h}" fill="${base}"/>`
+  for (let i = 0; i < n; i++) {
+    const t0 = i / n
+    const t1 = (i + 1) / n
+    const shade = 0.5 + 0.5 * Math.sin(i * 2.3 + seed * 0.01)
+    const col = shade > 0.6 ? lit : shade < 0.3 ? dim : base
+    if (along === 'u') {
+      s += `<rect x="${fx(w * t0)}" y="0" width="${fx(w * (t1 - t0))}" height="${h}" fill="${col}" opacity="${fxOp(0.25 + shade * 0.3)}"/>`
+      s += `<line x1="${fx(w * t1)}" y1="0" x2="${fx(w * t1)}" y2="${h}" stroke="${E4.ink}" stroke-width="1.8" opacity="0.42"/>`
+    } else {
+      s += `<rect x="0" y="${fx(h * t0)}" width="${w}" height="${fx(h * (t1 - t0))}" fill="${col}" opacity="${fxOp(0.25 + shade * 0.3)}"/>`
+      s += `<line x1="0" y1="${fx(h * t1)}" x2="${w}" y2="${fx(h * t1)}" stroke="${E4.ink}" stroke-width="1.8" opacity="0.42"/>`
+    }
+  }
+  for (let k = 0; k < Math.round(n * 1.4); k++) {
+    const x = rr(r, 0, w)
+    const y = rr(r, 0, h)
+    s += `<ellipse cx="${fx(x)}" cy="${fx(y)}" rx="${fx(rr(r, 2, 5))}" ry="${fx(rr(r, 3, 7))}" fill="${E4.ink}" opacity="${fxOp(rr(r, 0.16, 0.34))}"/>`
+  }
+  return s
+}
+
+/** `ch1-inn-{hall,guest}-back` and `-side` for the guest: hidden bracing paper,
+ *  painted as real boarded walls so a grazing sliver never reads as kraft. */
+function innBoardedFace(w, h, seed, variant) {
+  let s = e4Boards(w, h, seed, E4.wingDim, E4.wing, E4.roofDim, variant === 'back' ? 16 : 12, 'u')
+  if (variant === 'side') {
+    // two small dim lights, so the flank sliver still says "inhabited"
+    for (const u of [0.3, 0.66]) s += e4Window(w * u - w * 0.045, h * 0.3, w * 0.09, h * 0.3, 's2sideGlow', { dim: 0.6 })
+    s += `<rect x="0" y="0" width="${w}" height="${fx(h * 0.12)}" fill="${E4.timber}"/>`
+    s += `<rect x="0" y="${fx(h * 0.88)}" width="${w}" height="${fx(h * 0.12)}" fill="${E4.timber}"/>`
+  }
+  s += `<rect width="${w}" height="${h}" fill="url(#s2bgrad)"/>`
+  return svgPiece(w, h, s, e4Glow('s2sideGlow', E4.lampDeep, 0.5) +
+    `<linearGradient id="s2bgrad" x1="0" y1="0" x2="0" y2="1">` +
+    `<stop offset="0" stop-color="${E4.ink}" stop-opacity="0.3"/>` +
+    `<stop offset="1" stop-color="${E4.ink}" stop-opacity="0.05"/></linearGradient>`)
+}
+
+/** `ch1-inn-{hall,guest}-top` — the flat lids. The hall's is the narrow ledge
+ *  that shows around the guest box and under the balcony; the guest's is the
+ *  roof the fan spire stands on, and IS seen. Both are pantile fields with the
+ *  ridge on the spine crease (art-u 0.5), a full value step under the facade. */
+function innLidTiles(w, h, seed, opts = {}) {
+  const r = mulberry32(seed)
+  const courses = opts.courses ?? 9
+  let s = `<rect width="${w}" height="${h}" fill="${E4.roof}"/>`
+  for (let c = 0; c < courses; c++) {
+    const y0 = (h * c) / courses
+    const ch = h / courses
+    const tone = c % 2 ? E4.roofLit : E4.roofDim
+    s += `<rect x="0" y="${fx(y0)}" width="${w}" height="${fx(ch)}" fill="${tone}" opacity="0.4"/>`
+    const nT = Math.max(10, Math.round(w / (h / courses) / 1.1))
+    for (let i = 0; i < nT; i++) {
+      const x = (w * i) / nT
+      s += `<path d="M ${fx(x)} ${fx(y0 + ch)} a ${fx(w / nT / 2)} ${fx(ch * 0.4)} 0 0 1 ${fx(w / nT)} 0 Z" fill="${E4.roofLit}" opacity="${fxOp(0.2 + 0.2 * r())}"/>`
+    }
+    s += `<line x1="0" y1="${fx(y0 + ch)}" x2="${w}" y2="${fx(y0 + ch)}" stroke="${E4.ink}" stroke-width="1.6" opacity="0.4"/>`
+  }
+  // the ridge sits ON the crease, so the fold reads as the roof's own ridge
+  s += `<rect x="${fx(w * 0.5 - w * 0.012)}" y="0" width="${fx(w * 0.024)}" height="${h}" fill="${E4.roofLit}"/>`
+  s += `<rect x="${fx(w * 0.5 - w * 0.012)}" y="0" width="${fx(w * 0.008)}" height="${h}" fill="${E4.wingLit}" opacity="0.7"/>`
+  if (opts.lamps) {
+    for (const [u, v] of [[0.24, 0.32], [0.78, 0.66]]) {
+      s += `<ellipse cx="${fx(w * u)}" cy="${fx(h * v)}" rx="${fx(w * 0.07)}" ry="${fx(h * 0.14)}" fill="url(#l2glow)"/>`
+      s += `<rect x="${fx(w * u - w * 0.016)}" y="${fx(h * v - h * 0.05)}" width="${fx(w * 0.032)}" height="${fx(h * 0.1)}" fill="${E4.timber}"/>`
+      s += `<rect x="${fx(w * u - w * 0.009)}" y="${fx(h * v - h * 0.032)}" width="${fx(w * 0.018)}" height="${fx(h * 0.062)}" fill="${E4.pane}"/>`
+    }
+  }
+  // gutter shade down both fore/aft edges so the lid reads as a plane with sides
+  s += `<rect width="${w}" height="${h}" fill="url(#l2edge)"/>`
+  const defs =
+    e4Glow('l2glow', E4.lamp, 0.6) +
+    `<linearGradient id="l2edge" x1="0" y1="0" x2="0" y2="1">` +
+    `<stop offset="0" stop-color="${E4.ink}" stop-opacity="0.42"/>` +
+    `<stop offset="0.35" stop-color="${E4.ink}" stop-opacity="0.04"/>` +
+    `<stop offset="0.68" stop-color="${E4.ink}" stop-opacity="0.04"/>` +
+    `<stop offset="1" stop-color="${E4.ink}" stop-opacity="0.42"/></linearGradient>`
+  return svgPiece(w, h, s, defs)
+}
+
+// ---- `ch1-inn-balcony` — THE GALLERY THAT SWINGS OUT OVER THE ARCH -----------
+// The deck rides the hall lid and juts toward the reader (0.60 x 0.26 world).
+// art-v 1 (image TOP) is the attachment edge against the guest wall; art-v 0
+// (image BOTTOM) is the reader-facing rail — and the rail is DIE-CUT, so the
+// balusters are real gaps in the paper and the piece cannot read as a slab.
+function innGalleryDeck(w, h, seed) {
+  const r = mulberry32(seed)
+  const RAIL = h * 0.74 // top of the balustrade band
+  const nBal = 26
+  const bw = (w * 0.94) / (nBal * 2 - 1)
+  const x0 = w * 0.03
+  // --- the die: deck + top rail + balusters + bottom rail, gaps between ------
+  let die = `M ${fx(w * 0.015)} 0 L ${fx(w * 0.985)} 0 L ${fx(w * 0.985)} ${fx(RAIL)} `
+  die += `L ${fx(w * 0.99)} ${fx(RAIL)} L ${fx(w * 0.99)} ${fx(RAIL + h * 0.075)} `
+  for (let i = nBal - 1; i >= 0; i--) {
+    const bx = x0 + i * bw * 2
+    die += `L ${fx(bx + bw)} ${fx(RAIL + h * 0.075)} L ${fx(bx + bw)} ${fx(h * 0.9)} L ${fx(bx + bw * 1.9)} ${fx(h * 0.9)} L ${fx(bx + bw * 1.9)} ${fx(RAIL + h * 0.075)} `
+  }
+  die += `L ${fx(w * 0.01)} ${fx(RAIL + h * 0.075)} L ${fx(w * 0.01)} ${fx(RAIL)} L ${fx(w * 0.015)} ${fx(RAIL)} Z`
+  // the balusters hang off a bottom rail that runs the full width
+  const foot = `M ${fx(w * 0.01)} ${fx(h * 0.9)} L ${fx(w * 0.99)} ${fx(h * 0.9)} L ${fx(w * 0.99)} ${fx(h * 0.985)} L ${fx(w * 0.01)} ${fx(h * 0.985)} Z`
+
+  let s = `<g clip-path="url(#b2cut)">`
+  s += `<rect width="${w}" height="${h}" fill="${E4.wingDim}"/>`
+  // deck boards running front-to-back (image top to bottom)
+  for (let i = 0; i < 22; i++) {
+    const bx = (w * i) / 22
+    const tone = i % 3 === 0 ? E4.wing : i % 3 === 1 ? E4.wingDim : E4.roofDim
+    s += `<rect x="${fx(bx)}" y="0" width="${fx(w / 22)}" height="${fx(RAIL)}" fill="${tone}" opacity="0.6"/>`
+    s += `<line x1="${fx(bx)}" y1="0" x2="${fx(bx)}" y2="${fx(RAIL)}" stroke="${E4.ink}" stroke-width="1.8" opacity="0.45"/>`
+  }
+  // lamplight lands on the deck from the wall side (image top), in pools
+  s += `<rect x="0" y="0" width="${w}" height="${fx(RAIL)}" fill="url(#b2wall)"/>`
+  for (const [u, rad] of [[0.22, 0.16], [0.5, 0.2], [0.79, 0.15]]) {
+    s += `<ellipse cx="${fx(w * u)}" cy="${fx(h * 0.24)}" rx="${fx(w * rad)}" ry="${fx(h * 0.3)}" fill="url(#b2glow)"/>`
+  }
+  // the arch head the gallery is attached over, painted along the top edge
+  s += `<rect x="0" y="0" width="${w}" height="${fx(h * 0.1)}" fill="${E4.timber}"/>`
+  s += `<rect x="0" y="${fx(h * 0.1)}" width="${w}" height="${fx(h * 0.035)}" fill="${E4.ink}" opacity="0.4"/>`
+  // three hanging lanterns along the rail + the keys strung between them
+  for (const u of [0.22, 0.5, 0.79]) {
+    s += `<rect x="${fx(w * u - w * 0.011)}" y="${fx(h * 0.3)}" width="${fx(w * 0.022)}" height="${fx(h * 0.3)}" fill="${E4.timber}"/>`
+    s += `<rect x="${fx(w * u - w * 0.007)}" y="${fx(h * 0.34)}" width="${fx(w * 0.014)}" height="${fx(h * 0.2)}" fill="${E4.pane}"/>`
+  }
+  for (let i = 0; i < 14; i++) {
+    const u = 0.06 + i * 0.065
+    s += `<g transform="translate(${fx(w * u)},${fx(h * 0.66)}) scale(${fx(h * 0.0011)})">${keyGlyph(120, E4.brass, E4.brassLit)}</g>`
+  }
+  // two blankets aired over the rail — the only saturated notes up here
+  for (const [u, wd, col] of [[0.13, 0.09, E4.rust], [0.63, 0.07, E4.green]]) {
+    s += `<rect x="${fx(w * u)}" y="${fx(h * 0.5)}" width="${fx(w * wd)}" height="${fx(h * 0.36)}" fill="${col}" opacity="0.8"/>`
+    s += `<rect x="${fx(w * u)}" y="${fx(h * 0.5)}" width="${fx(w * wd)}" height="${fx(h * 0.05)}" fill="${E4.ink}" opacity="0.4"/>`
+  }
+  // the rails themselves
+  s += `<rect x="0" y="${fx(RAIL)}" width="${w}" height="${fx(h * 0.075)}" fill="${E4.timber}"/>`
+  s += `<rect x="0" y="${fx(RAIL)}" width="${w}" height="${fx(h * 0.018)}" fill="${E4.wingLit}" opacity="0.7"/>`
+  s += `</g>`
+  s += `<g clip-path="url(#b2foot)"><rect width="${w}" height="${h}" fill="${E4.timber}"/>` +
+    `<rect x="0" y="${fx(h * 0.9)}" width="${w}" height="${fx(h * 0.016)}" fill="${E4.wingLit}" opacity="0.6"/></g>`
+  for (let i = 0; i < nBal; i++) {
+    const bx = x0 + i * bw * 2
+    s += `<rect x="${fx(bx + bw)}" y="${fx(RAIL + h * 0.075)}" width="${fx(bw * 0.9)}" height="${fx(h * 0.9 - RAIL - h * 0.075)}" fill="${E4.timber}"/>`
+    s += `<rect x="${fx(bx + bw)}" y="${fx(RAIL + h * 0.075)}" width="${fx(bw * 0.28)}" height="${fx(h * 0.9 - RAIL - h * 0.075)}" fill="${E4.wingLit}" opacity="${fxOp(0.3 + 0.3 * r())}"/>`
+  }
+  s += rimPath(die, 3.5) + rimPath(foot, 3)
+  const defs =
+    `<clipPath id="b2cut"><path d="${die}"/></clipPath>` +
+    `<clipPath id="b2foot"><path d="${foot}"/></clipPath>` +
+    e4Glow('b2glow', E4.lamp, 0.5) +
+    `<linearGradient id="b2wall" x1="0" y1="0" x2="0" y2="1">` +
+    `<stop offset="0" stop-color="${E4.lamp}" stop-opacity="0.26"/>` +
+    `<stop offset="0.55" stop-color="${E4.ink}" stop-opacity="0.1"/>` +
+    `<stop offset="1" stop-color="${E4.ink}" stop-opacity="0.38"/></linearGradient>`
+  return svgPiece(w, h, s, defs)
+}
+
+// ---- `ch1-inn-spire-m<k>` — the fan sails ------------------------------------
+// Each M-fold member is ONE painting split at the ridge crease: art-u 0.5 is
+// the ridge, art-v 0 the seated apex, art-v 1 the tip. Painted as steep shingled
+// roof planes a full value step under the facade, because the spire's whole job
+// is to be a dark silhouette breaking the skyline — not a second bright thing.
+function innSpireSail(w, h, seed, k) {
+  const r = mulberry32(seed)
+  const flare = [0.98, 0.92, 0.86][k] ?? 0.9
+  const waist = [0.5, 0.42, 0.34][k] ?? 0.42
+  const tipW = [0.2, 0.15, 0.1][k] ?? 0.14
+  const halfAt = (v) => {
+    if (v < 0.18) return lerp(flare, waist, v / 0.18) * 0.5
+    return lerp(waist, tipW, (v - 0.18) / 0.82) * 0.5
+  }
+  const pts = []
+  for (let i = 0; i <= 24; i++) {
+    const v = i / 24
+    pts.push([0.5 - halfAt(v), v])
+  }
+  for (let i = 24; i >= 0; i--) {
+    const v = i / 24
+    pts.push([0.5 + halfAt(v), v])
+  }
+  const die = pts.map(([u, v], i) => `${i ? 'L' : 'M'}${fx(u * w)} ${fx((1 - v) * h)}`).join(' ') + ' Z'
+
+  let s = `<g clip-path="url(#sp2cut${k})">`
+  s += `<rect width="${w}" height="${h}" fill="${E4.roof}"/>`
+  // shingle courses, the two planes lit differently either side of the ridge
+  const courses = 16 + k * 3
+  for (let c = 0; c < courses; c++) {
+    const y = (h * c) / courses
+    const ch = h / courses
+    const n = Math.max(4, Math.round(w / (ch * 0.9)))
+    for (let i = 0; i < n; i++) {
+      const x = (w * (i + (c % 2 ? 0.5 : 0))) / n
+      const left = x + w / n / 2 < w * 0.5
+      s += `<path d="M ${fx(x)} ${fx(y)} L ${fx(x + w / n)} ${fx(y)} L ${fx(x + w / n)} ${fx(y + ch * 0.9)} a ${fx(w / n / 2)} ${fx(ch * 0.4)} 0 0 1 ${fx(-w / n)} 0 Z" ` +
+        `fill="${left ? E4.roofLit : E4.roofDim}" opacity="${fxOp(0.28 + 0.26 * r())}"/>`
+    }
+    s += `<line x1="0" y1="${fx(y + ch * 0.9)}" x2="${w}" y2="${fx(y + ch * 0.9)}" stroke="${E4.ink}" stroke-width="1.4" opacity="0.36"/>`
+  }
+  // the ridge board on the crease, catching the last of the lamplight
+  s += `<rect x="${fx(w * 0.5 - w * 0.02)}" y="0" width="${fx(w * 0.04)}" height="${h}" fill="${E4.timber}"/>`
+  s += `<rect x="${fx(w * 0.5 - w * 0.02)}" y="0" width="${fx(w * 0.013)}" height="${h}" fill="${E4.wingLit}" opacity="0.6"/>`
+  // one dormer light per sail, so the roof has a room in it — small and dim
+  if (k < 2) {
+    const dy = h * (0.5 + k * 0.1)
+    s += `<ellipse cx="${fx(w * (0.32 + k * 0.06))}" cy="${fx(dy)}" rx="${fx(w * 0.13)}" ry="${fx(h * 0.05)}" fill="url(#sp2glow)"/>`
+    s += `<rect x="${fx(w * (0.32 + k * 0.06) - w * 0.035)}" y="${fx(dy - h * 0.018)}" width="${fx(w * 0.07)}" height="${fx(h * 0.036)}" fill="${E4.lamp}" stroke="${E4.ink}" stroke-width="2"/>`
+  }
+  s += `<rect width="${w}" height="${h}" fill="url(#sp2sky)"/>`
+  s += `</g>`
+  s += rimPath(die, 3.4)
+  const defs =
+    `<clipPath id="sp2cut${k}"><path d="${die}"/></clipPath>` +
+    e4Glow('sp2glow', E4.lamp, 0.5) +
+    `<linearGradient id="sp2sky" x1="0" y1="0" x2="0" y2="1">` +
+    `<stop offset="0" stop-color="${E4.ink}" stop-opacity="0.34"/>` +
+    `<stop offset="1" stop-color="${E4.ink}" stop-opacity="0.02"/></linearGradient>`
+  return svgPiece(w, h, s, defs)
+}
+
 async function bakePieceTexture(piece, outDir) {
   const svg = piece.paint()
   const flat = await sharp(Buffer.from(svg)).png().toBuffer()
@@ -16809,6 +17580,31 @@ const PIECES = [
   { id: 'ch1-dormer', seed: 20266, w: 256, h: 224, grain: 10, paint() { return dormerLit(this.w, this.h, this.seed) } },
   { id: 'ch1-key', seed: 20263, w: 264, h: 216, grain: 8, paint() { return brassKeyStandee(this.w, this.h, this.seed) } },
   { id: 'ch1-wall', seed: 20267, w: 1024, h: 164, grain: 12, paint() { return friezeKeys(this.w, this.h, this.seed) } },
+  // ---- E4 GRAND — spread 2 rebuilt as ONE VOLUMETRIC INN (`ch1-inn`, keepstack).
+  // Every canvas below is cut at its MESH aspect, derived from the contract's
+  // story numbers, not chosen: a plate is `plate.width : plate.height`, a box
+  // side is `(z1-z0) : height`, a lid is `2a : (z1-z0)`, a back cap is
+  // `2a : height`, the balcony deck is `2*halfW : (z1-z0)` and a fan sail is its
+  // member's own `width : height`. Get one of these wrong and the print
+  // stretches, which is the flat-card look this whole lane exists to kill.
+  //   hall   a 0.52 h 0.26 z -0.30..0.34   plate 1.04 x 0.26  -> 4.000
+  //   guest  a 0.44 h 0.32 z -0.24..0.28   plate 0.88 x 0.34  -> 2.588
+  //   balcony halfW 0.30 z 0.30..0.56                          -> 2.308
+  //   spire   m0 0.28x0.26  m1 0.21x0.33  m2 0.15x0.40
+  { id: 'ch1-inn-guest-front', seed: 20410, w: 1024, h: 396, grain: 10, paint() { return innGuestFacade(this.w, this.h, this.seed) } },
+  { id: 'ch1-inn-hall-front', seed: 20411, w: 1024, h: 256, grain: 10, paint() { return innHallFacade(this.w, this.h, this.seed) } },
+  // The hall's `-side`: BOTH flank walls AND (under INTERIOR_SHADOW_TINT) the
+  // suppressed front cap standing behind the die-cut arch. See the section header.
+  { id: 'ch1-inn-hall-side', seed: 20412, w: 1024, h: 416, grain: 10, paint() { return innPassage(this.w, this.h, this.seed) } },
+  { id: 'ch1-inn-hall-back', seed: 20413, w: 512, h: 128, grain: 12, paint() { return innBoardedFace(this.w, this.h, this.seed, 'back') } },
+  { id: 'ch1-inn-hall-top', seed: 20414, w: 512, h: 315, grain: 12, paint() { return innLidTiles(this.w, this.h, this.seed, { courses: 7 }) } },
+  { id: 'ch1-inn-guest-side', seed: 20415, w: 416, h: 256, grain: 12, paint() { return innBoardedFace(this.w, this.h, this.seed, 'side') } },
+  { id: 'ch1-inn-guest-back', seed: 20416, w: 512, h: 186, grain: 12, paint() { return innBoardedFace(this.w, this.h, this.seed, 'back') } },
+  { id: 'ch1-inn-guest-top', seed: 20417, w: 768, h: 454, grain: 12, paint() { return innLidTiles(this.w, this.h, this.seed, { courses: 11, lamps: true }) } },
+  { id: 'ch1-inn-balcony', seed: 20418, w: 1024, h: 444, grain: 10, paint() { return innGalleryDeck(this.w, this.h, this.seed) } },
+  { id: 'ch1-inn-spire-m0', seed: 20420, w: 552, h: 512, grain: 12, paint() { return innSpireSail(this.w, this.h, this.seed, 0) } },
+  { id: 'ch1-inn-spire-m1', seed: 20421, w: 407, h: 640, grain: 12, paint() { return innSpireSail(this.w, this.h, this.seed, 1) } },
+  { id: 'ch1-inn-spire-m2', seed: 20422, w: 240, h: 640, grain: 12, paint() { return innSpireSail(this.w, this.h, this.seed, 2) } },
   // the T-FLOOR flagship: the s2 spread print (same uv contract as page-4)
   { id: 'page-2', seed: 20270, w: 1024, h: 683, grain: 10, paint() { return innCourtyardSpread(this.w, this.h, this.seed) } },
   { id: 'ch1-stable-side', seed: 20210, w: 512, h: 512, grain: 12, paint() { return boxFace(this.w, this.h, this.seed, 'side', 'barn') } },
@@ -17196,20 +17992,30 @@ const ATLASES = [
     // leaves stay loose: popup-liftflap-layer.tsx has no sprite path yet, so
     // packing them would cost page area and still fetch five webps.
     id: 'inn-atlas-s2',
+    // E4 GRAND: the twelve retired billboard ids (inn-row / wall / mountain /
+    // gate / rank / stable-* / key / sign / dormer) come OFF this page with their
+    // layers, and the page becomes the MERGED KEEP'S page. The keepstack draws as
+    // one mesh with one material only if EVERY id `keepAtlasIds` asks for lives
+    // here — a single gap silently drops it back to ~30 per-face draws — so all
+    // eleven `ch1-inn-*` ids are listed, sized by how much of the reading frame
+    // each one actually owns. The two facade plates take the texels because they
+    // are the picture; `ch1-inn-hall-side` gets a fat share for a hidden face
+    // because ~29% of it is what the reader sees THROUGH the die-cut arch.
+    // No `dusk: true` anywhere: these are painted at the lamplit hour already,
+    // and grading them again would only mud the one bright thing in frame.
     regions: [
-      { id: 'ch1-inn-row', w: 620, opaque: false },
-      { id: 'ch1-wall', w: 620, opaque: false },
-      { id: 'ch1-mountain', w: 400, opaque: false },
-      { id: 'ch1-gate', w: 380, opaque: false },
-      { id: 'ch1-rank', w: 300, opaque: false },
-      { id: 'ch1-stable-side', w: 200, opaque: false },
-      { id: 'ch1-stable-back', w: 200, opaque: false },
-      { id: 'ch1-stable-top', w: 200, opaque: false },
-      { id: 'ch1-stable-hay', w: 200, opaque: false },
-      { id: 'ch1-stable-vane', h: 200, opaque: false },
-      { id: 'ch1-key', w: 160, opaque: false },
-      { id: 'ch1-sign', w: 150, opaque: false },
-      { id: 'ch1-dormer', w: 140, opaque: false },
+      { id: 'ch1-inn-guest-front', w: 820, opaque: false },
+      { id: 'ch1-inn-hall-front', w: 780, opaque: false },
+      { id: 'ch1-inn-hall-side', w: 440, opaque: true },
+      { id: 'ch1-inn-balcony', w: 380, opaque: false },
+      { id: 'ch1-inn-guest-top', w: 280, opaque: true },
+      { id: 'ch1-inn-spire-m0', h: 210, opaque: false },
+      { id: 'ch1-inn-spire-m1', h: 210, opaque: false },
+      { id: 'ch1-inn-spire-m2', h: 210, opaque: false },
+      { id: 'ch1-inn-guest-side', w: 110, opaque: true },
+      { id: 'ch1-inn-hall-top', w: 110, opaque: true },
+      { id: 'ch1-inn-guest-back', w: 80, opaque: true },
+      { id: 'ch1-inn-hall-back', w: 80, opaque: true },
     ],
   },
   {
