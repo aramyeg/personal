@@ -283,6 +283,19 @@ export function TheKey() {
     const hit = hitAt(clientX, clientY)
     const nearPage = hit !== null && hit.r <= KEY_FEEL.grabRPage
     const nearScreen = screenDistance(clientX, clientY) <= KEY_FEEL.grabRPx
+    // A refused press is the hardest thing to diagnose from a video, and E4's grab gate was
+    // refused ON THE VISIBLE HANDLE for a week. Both gates, and the verdict, in one object.
+    if (debugRef.current) {
+      ;(window as unknown as { __wildDown?: unknown }).__wildDown = {
+        pageR: hit ? hit.r : null,
+        pageGate: KEY_FEEL.grabRPage,
+        screenPx: screenDistance(clientX, clientY),
+        screenGate: KEY_FEEL.grabRPx,
+        nearPage,
+        nearScreen,
+        took: nearPage || nearScreen,
+      }
+    }
     if (!nearPage && !nearScreen) return false
     touchedRef.current = true
     pointerIdRef.current = pointerId
@@ -448,7 +461,7 @@ export function TheKey() {
     if (discRef.current) discRef.current.rotation.z = f.thetaR
 
     keyTick(physics, dt)
-    for (const click of physics.events) fireFeedback(click)
+    for (let i = 0; i < physics.events.length; i++) fireFeedback(physics.events[i])
 
     const turn = keyWake(physics)
     ctx.wake.current = turn
