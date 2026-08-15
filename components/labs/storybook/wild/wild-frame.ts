@@ -17,8 +17,6 @@ import { SETTLE_MS, TURN_MS, turnPublishedT, type TurnFrame } from '../book/use-
 
 export type WildRole = ReturnType<typeof liveSpreadRole>
 
-/** Dihedral of a fully open spread. The page bulge keeps it just under PI. */
-export const BETA_OPEN = 3.07
 /** Below this the spread is a closed sliver; the diorama hides entirely. */
 export const BETA_HIDDEN = 0.02
 
