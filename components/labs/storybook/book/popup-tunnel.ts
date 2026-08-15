@@ -75,10 +75,14 @@ export const TUNNEL_PLANE_ORDER: readonly PlaneKey[] = [
 export const DEPLOY_BETA_SPAN = Math.PI * 0.92
 /** Fraction of the deploy the deck spends raking up, before any plane rises. */
 export const DECK_WINDOW = 0.3
-/** Where plane k's rise window opens, and how long each window is. */
-export const PLANE_DELAY0 = 0.12
-export const PLANE_STEP = 0.09
-export const PLANE_SPAN = 0.34
+/** Where plane k's rise window opens, and how long each window is. The step
+ *  is deliberately SHORT relative to the span: a plane that lies inert waiting
+ *  for a late window reads as a grey slab floating over the scene mid-turn,
+ *  so every plane must already be in visible motion while the reader can see
+ *  it — the cascade survives in the overlap, not in dead time. */
+export const PLANE_DELAY0 = 0.1
+export const PLANE_STEP = 0.045
+export const PLANE_SPAN = 0.42
 /** Laid-back angle of a plane at rise 0: ~78 deg back onto the deck. */
 export const PLANE_LAID_BACK = -1.36
 /** The deck's rake as an angle. `deckRake` runs 0 -> this. */

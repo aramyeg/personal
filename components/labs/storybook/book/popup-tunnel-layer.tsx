@@ -756,6 +756,15 @@ export function TunnelPopupLayer({
       if (!g) continue
       g.rotation.x = pose.planes[key].hinge
     }
+    // Scrims fade in with their own plane's rise: a laid-back plane's veil at
+    // full strength reads as a hard grey rectangle floating over the scene
+    // mid-turn — the haze only exists once there is standing paper to haze.
+    for (const plane of built.planes) {
+      if (plane.scrim) {
+        plane.scrim.material.opacity =
+          SCRIM_OPACITY[plane.rank - 1] * pose.planes[plane.key].rise
+      }
+    }
 
     const gateShift = cfg.gateSlide * pose.gateOpen
     for (const [id, g] of Object.entries(gateRefs.current)) {
