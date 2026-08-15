@@ -1218,8 +1218,9 @@ void main() {
   p.x += uWind * ${LIFE.pennant.push.toFixed(4)} * k;
   p.y -= (1.0 - gust) * ${LIFE.pennant.sag.toFixed(4)} * k * k;
   vCrest = 0.5 + 0.5 * s;
-  vec4 mv = modelViewMatrix * vec4(p, 1.0);
-  gl_Position = projectionMatrix * mv;
+  // Named mvPosition because three's clipping_planes_vertex chunk reads exactly that name.
+  vec4 mvPosition = modelViewMatrix * vec4(p, 1.0);
+  gl_Position = projectionMatrix * mvPosition;
   #include <clipping_planes_vertex>
 }
 `

@@ -20,6 +20,7 @@ import { useEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
 
 import { CAMERA_LOOKAT, CAMERA_POSITION } from '../book/reading-stage'
+import { FOLD_EVENTS, stageU } from './fold-birth'
 import {
   ARCH,
   ARCH_SHAFT,
@@ -779,7 +780,11 @@ export function AtmosphereFx() {
     {
       const flicker =
         1 + 0.09 * Math.sin(f.time * 9.3) + 0.05 * Math.sin(f.time * 15.7 + 2.1)
-      const level = stage * (0.2 + 0.8 * passage) * flicker
+      // The flame waits for its lamp. The lantern is the last piece of the fold-birth (`dressing`)
+      // and this glow is pinned to its rest position, so without the gate the ember burns in mid
+      // air from halfway through the turn — light arriving before the thing that carries it.
+      const dressed = stageU(f.open, FOLD_EVENTS.dressing)
+      const level = stage * dressed * (0.2 + 0.8 * passage) * flicker
       lanternMat.opacity = Math.min(1, level * 0.5)
       const sprite = lanternRef.current
       if (sprite) {
@@ -789,12 +794,14 @@ export function AtmosphereFx() {
       }
       // Intensity only — flipping a light's visibility re-links every program in the scene.
       const light = lanternLightRef.current
-      if (light) light.intensity = (0.16 + 1.15 * passage) * stage * flicker
+      if (light) light.intensity = (0.16 + 1.15 * passage) * stage * dressed * flicker
 
       // THE MOTHS answer the flame that drew them, so they brighten on the same flicker; the
       // colony thins as the rest of the inn lights and the lamp stops being the only game in town.
+      // They also wait for the lamp to ARRIVE: both colonies are pinned to a rest-space landmark,
+      // and a landmark that is still folded flat is a swarm hovering over empty air.
       motes.mat.uniforms.uLamp.value =
-        stage * flicker * (LAMP.rest + (LAMP.woken - LAMP.rest) * f.wake)
+        stage * flicker * dressed * (LAMP.rest + (LAMP.woken - LAMP.rest) * f.wake)
     }
 
     // THE MOTES. Fireflies wake over the well with the inn; the moths were already there.
@@ -802,7 +809,9 @@ export function AtmosphereFx() {
       motes.mat.uniforms.uTime.value = f.time
       motes.mat.uniforms.uScale.value = pointScale
       motes.mat.uniforms.uWell.value =
-        stage * ramp(f.wake, WELL_MOTES.wake[0], WELL_MOTES.wake[1])
+        stage *
+        stageU(f.open, FOLD_EVENTS.yard) *
+        ramp(f.wake, WELL_MOTES.wake[0], WELL_MOTES.wake[1])
       const pts = motesRef.current
       if (pts) pts.visible = stage > 0.004
     }
@@ -853,7 +862,10 @@ export function AtmosphereFx() {
       smoke.mat.uniforms.uTime.value = f.time
       // The lean is authored in plume-widths and applied in world units at the top of the column.
       smoke.mat.uniforms.uWind.value = wind * STAGE_LIFE.smoke.lean * SMOKE_W
-      const level = (0.1 + 0.62 * kitchen + 0.28 * f.wake) * stage
+      // Same rule as the lantern's flame: the plume waits for the stack, which hinges up out of
+      // the slates in the `crest` event. Smoke from a chimney that is still lying flat is smoke
+      // from nothing.
+      const level = (0.1 + 0.62 * kitchen + 0.28 * f.wake) * stage * stageU(f.open, FOLD_EVENTS.crest)
       smoke.mat.uniforms.uOpacity.value = level
       const group = smokeGroupRef.current
       if (group) group.visible = level > 0.006
