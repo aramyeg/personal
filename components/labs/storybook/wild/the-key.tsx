@@ -297,9 +297,13 @@ export function TheKey() {
       }
     }
     if (!nearPage && !nearScreen) return false
+    // The store's beginGrab silently no-ops before boot and mid-turn (law H2), so it is asked
+    // FIRST and its answer is checked. A local drag with no store grab is the exact state §7.5
+    // exists to forbid: the page-swipe rule comes back and the reader loses the spread mid-turn.
+    useStorybookStore.getState().beginGrab('wild-key', 'knob')
+    if (useStorybookStore.getState().grab?.id !== 'wild-key') return false
     touchedRef.current = true
     pointerIdRef.current = pointerId
-    useStorybookStore.getState().beginGrab('wild-key', 'knob')
     keyGrabBegin(physics, hit, performance.now() / 1000)
     setCursor('grabbing')
     return true
