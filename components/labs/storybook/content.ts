@@ -220,8 +220,12 @@ const CH1_LAYERS: readonly SceneLayer[] = [
       // in z, which is the seating condition. capFront:true here: this tier is
       // solid, and its plate is TALLER than its cap (0.34 against 0.24) so the
       // timbered gable silhouette rises 0.10 past the cap top edge as the
-      // building's roofline. Aspect locked at 2.000.
-      { key: 'guest', a: 0.28, height: 0.24, z0: -0.22, z1: 0.22, roof: 'flat', capFront: true, capBack: true, plate: { width: 0.68, height: 0.34 } },
+      // building's roofline. Aspect 2.294, matched to the delivered painting
+      // (E4: the hand art would not come in at 2.0 without squashing; widening
+      // the plate is free — width is lateral and coplanar with the cap, the
+      // same zero-reach bailey overhang the hall plate already uses, so the
+      // fold-flat reach term sum(H below) + a + plate.height is unchanged).
+      { key: 'guest', a: 0.28, height: 0.24, z0: -0.22, z1: 0.22, roof: 'flat', capFront: true, capBack: true, plate: { width: 0.78, height: 0.34 } },
     ],
     // THE OVERHANG THAT PROVES VOLUME. A two-panel deck riding the HALL lid,
     // creased at x=0 exactly as the lid is, so it folds dead flat with the lid
