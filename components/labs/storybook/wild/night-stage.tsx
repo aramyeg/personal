@@ -36,6 +36,7 @@ import {
   TOWER,
   type Vec3,
 } from './inn-model'
+import { STAGE_LIFE as LIFE, windDriftAt } from './stage-life'
 import { ramp, readWildFrame, useWild } from './wild-frame'
 
 // ---------------------------------------------------------------------------------------------
@@ -306,6 +307,63 @@ function paintMist(seed: number): THREE.CanvasTexture {
   return texture
 }
 
+/**
+ * THE VEIL — thin cloud crossing in front of the moon.
+ *
+ * The moon is the brightest object in the frame and it was the stillest: a disc, a halo breathing
+ * in opacity, and nothing else for as long as the reader looks at it. This card is the one thing
+ * on the stage allowed to touch it — high cloud drifting past, dimming the disc a little and
+ * catching its light along the way, so the sky reads as weather rather than as a backdrop.
+ *
+ * It is painted as long horizontal streaks rather than round blobs, because cloud at altitude is
+ * sheared by the wind it is riding, and a field of circles reads as smoke.
+ */
+function paintVeil(): THREE.CanvasTexture {
+  const W = 1024
+  const H = 256
+  const [canvas, g] = surface(W, H)
+  const r = rng(0x2c7f)
+
+  g.globalCompositeOperation = 'lighter'
+  for (let i = 0; i < 34; i += 1) {
+    const x = r() * W
+    const y = H * (0.18 + r() * 0.64)
+    const rx = W * (0.06 + r() * 0.13)
+    const ry = H * (0.05 + r() * 0.12)
+    const alpha = 0.05 + r() * 0.09
+    // Three copies so a streak straddling the seam comes back on the other side. The gradient is
+    // built INSIDE the transform: a gradient is resolved in user space, so one created before the
+    // scale would be stretched away from the ellipse it is supposed to fill.
+    for (const dx of [-W, 0, W]) {
+      g.save()
+      g.translate(x + dx, y)
+      g.scale(rx, ry)
+      const blob = g.createRadialGradient(0, 0, 0, 0, 0, 1)
+      blob.addColorStop(0, `rgba(150,178,220,${alpha.toFixed(3)})`)
+      blob.addColorStop(1, 'rgba(150,178,220,0)')
+      g.fillStyle = blob
+      g.beginPath()
+      g.arc(0, 0, 1, 0, Math.PI * 2)
+      g.fill()
+      g.restore()
+    }
+  }
+
+  // Gone at the top and bottom edges, so the band never shows a hem against the sky.
+  g.globalCompositeOperation = 'destination-in'
+  const fade = g.createLinearGradient(0, 0, 0, H)
+  fade.addColorStop(0, 'rgba(0,0,0,0)')
+  fade.addColorStop(0.3, 'rgba(0,0,0,1)')
+  fade.addColorStop(0.72, 'rgba(0,0,0,1)')
+  fade.addColorStop(1, 'rgba(0,0,0,0)')
+  g.fillStyle = fade
+  g.fillRect(0, 0, W, H)
+
+  const texture = toTexture(canvas)
+  texture.wrapS = THREE.RepeatWrapping
+  return texture
+}
+
 /** Cobbles: staggered courses of worn stones with dark joints. Tiles in both axes. */
 function paintCobbles(): HTMLCanvasElement {
   const S = 512
@@ -516,6 +574,7 @@ type NightArt = {
   halo: THREE.CanvasTexture
   haze: THREE.CanvasTexture
   skyline: THREE.CanvasTexture
+  veil: THREE.CanvasTexture
   mist: THREE.CanvasTexture[]
   cobbles: THREE.CanvasTexture[]
 }
@@ -532,6 +591,7 @@ export function nightArt(): NightArt {
       halo: paintRadialGlow('rgba(196,218,255,0.85)', 'rgba(120,158,214,0.22)'),
       haze: paintHaze(),
       skyline: paintSkyline(),
+      veil: paintVeil(),
       mist: STAGE.mist.map((_, i) => paintMist(0x4d15 + i * 977)),
       cobbles: HALVES.map((half) => cobbleTexture(paving, half.offset)),
     }
@@ -559,6 +619,7 @@ export function NightStage() {
   const moonGroupRef = useRef<THREE.Group>(null)
   const haloRef = useRef<THREE.Mesh>(null)
   const skylineRef = useRef<THREE.Mesh>(null)
+  const veilRef = useRef<THREE.Mesh>(null)
   const hazeRef = useRef<THREE.Mesh>(null)
   const farGroundRef = useRef<THREE.Mesh>(null)
   /** One hinge group and one paving mesh per page half. */
@@ -640,7 +701,24 @@ export function NightStage() {
       // title page. A mesh-group flip is safe; only LIGHT visibility re-links programs.
       moonGroup.visible = arrived > 0.004
     }
-    opacityOf(haloRef.current, arrived * (0.82 + 0.06 * Math.sin(time * 0.31)))
+    // The halo breathes in SIZE as well as in brightness, on a period long enough (STAGE_LIFE)
+    // that a reader never catches it moving — they only notice, two looks apart, that it has.
+    const halo = haloRef.current
+    if (halo) {
+      const breath = 1 + LIFE.moon.haloBreath * Math.sin((Math.PI * 2 * time) / LIFE.moon.haloPeriod)
+      halo.scale.setScalar(breath)
+    }
+    opacityOf(halo, arrived * (0.82 + 0.06 * Math.sin(time * 0.31)))
+
+    // THE VEIL crosses the disc: a slow crawl plus a slower swell, so the moon is sometimes bare
+    // and sometimes behind cloud. It fades with the night like everything else on this card.
+    const veil = veilRef.current
+    if (veil) {
+      const material = veil.material as THREE.MeshBasicMaterial
+      if (material.map) material.map.offset.x = (time * LIFE.moon.veilDrift) % 1
+      const swell = 1 - LIFE.moon.veilBreath * (0.5 + 0.5 * Math.sin((Math.PI * 2 * time) / LIFE.moon.veilPeriod))
+      opacityOf(veil, arrived * LIFE.moon.veilOpacity * swell)
+    }
 
     // The distant roofline rises the last few millimetres into place as it fades up, so the
     // horizon reads as something coming into focus instead of a decal turning on.
@@ -676,7 +754,10 @@ export function NightStage() {
       if (!mesh) return
       const material = mesh.material as THREE.MeshBasicMaterial
       const map = material.map
-      if (map) map.offset.x = (time * band.speed) % 1
+      // Carried by the gusts as well as by its own authored drift: `windDriftAt` is the breeze's
+      // bounded running displacement, so a swell shoves the mist along and the lull lets it back
+      // without anything ever integrating a delta.
+      if (map) map.offset.x = (time * band.speed + LIFE.mist.carry * windDriftAt(time)) % 1
       opacityOf(mesh, band.opacity * weather)
     })
   })
@@ -742,6 +823,20 @@ export function NightStage() {
           <meshBasicMaterial color={new THREE.Color().setRGB(2.4, 2.6, 2.95)} depthWrite={false} />
         </mesh>
       </group>
+
+      {/* THE VEIL — high cloud crossing the moon. It stands between the disc (z -2.1) and the
+          horizon haze (z -1.34), and its renderOrder puts it there in the transparent stack too:
+          after the moon it dims, before the haze that stands in front of both. */}
+      <mesh
+        ref={veilRef}
+        position={[0, (LIFE.moon.veilTop + LIFE.moon.veilBottom) / 2, LIFE.moon.veilZ]}
+        renderOrder={-27.5}
+      >
+        <planeGeometry
+          args={[LIFE.moon.veilHalfW * 2, LIFE.moon.veilTop - LIFE.moon.veilBottom]}
+        />
+        <meshBasicMaterial map={art.veil} transparent opacity={0} depthWrite={false} />
+      </mesh>
 
       {/* HORIZON HAZE — the band the distant town is silhouetted against. */}
       <mesh
