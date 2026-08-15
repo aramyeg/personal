@@ -3,42 +3,68 @@
 /**
  * WILD lane — the brass key toy at the fore edge. Owned by the WAKING implementer.
  *
- * The one thing the reader touches all night, so the whole file is about how it feels in the
- * hand. Three separate things make the weight:
+ * The one thing the reader touches all night. E5 rebuilt how it feels, on the owner's verdict:
+ * *"I am not a fond of the key turn mechanism as it is not reliable … the valve should be turning
+ * maybe with clicks … right now the interaction looks very clanky if I am not super careful with
+ * the handling."* The acceptance is not "it works" — it is that a CARELESS, fast, sloppy drag
+ * feels good.
  *
- *   1. LAG — the drawn angle `damp()`s toward the angle the pointer is asking for, so the key
- *      trails the hand the way something heavy does. The hand never moves the key directly.
- *   2. MAGNETISM — inside a detent's capture radius a spring pulls the key the rest of the way
- *      in, so the notches suck the ball home instead of merely snapping on release.
- *   3. THE CLICK — crossing a detent kicks a small underdamped wobble spring that lives only in
- *      the drawn angle. The bit springing in the wards; three degrees, gone in a third of a
- *      second, and it never touches `wake` (a wobbling wake would strobe thirty windows).
+ * THE MECHANISM ITSELF NOW LIVES IN `key-physics.ts`, which imports nothing: no three, no react.
+ * That is the point. Three of the four defects behind "clanky" were invisible to careful hands and
+ * only appear under bad input, so the mechanism has to be drivable by a script — twelve named
+ * bad-input traces at 60 fps, in `scripts/storybook/bench/e5-keyfeel.mjs`. Read that file's header
+ * before changing a constant.
  *
- * `wake` is written from the settled turn, not the wobble, and this component is its only
- * author. No rise clip: the key lies ON the page, it does not grow out of it, so it fades up
- * across REVEAL.dressing with the rest of the courtyard furniture instead.
+ * WHAT THIS FILE IS: the shell. Projection, grab, geometry, feedback. Four things it does that the
+ * E4 version did not, each of them a fix for a specific way the key went dead in the hand:
+ *
+ *   1. THE CLUTCH. `pointermove`/`pointerup` are on WINDOW, and the ray is built from
+ *      `clientX/clientY`. r3f re-injects the CAPTURE-TIME intersection whenever a captured pointer
+ *      misses the mesh (`@react-three/fiber` events, the `if (!hit) ... capturedEvent` branch), so
+ *      a mesh-mounted move handler is guaranteed to freeze the instant the hand leaves the disc,
+ *      and then jump when it comes back. That is the prime suspect for "unless I am super
+ *      careful". Nothing but pointerup, pointercancel, blur, Escape, or the spread closing may end
+ *      a grab: no radius gate, no re-hit test, no hover check.
+ *   2. TANGENTIAL MAPPING. `projectHubAngle` onto the page plane, then the physics core measures
+ *      how far the hand dragged AROUND the hub over a fixed reference radius — the argument in
+ *      `book/handle-projection.ts` CLASS B2-T, which this repo already adopted for the keep winch
+ *      after a blind reader found the same defect there.
+ *   3. A GENEROUS GRAB. Page-radius OR screen-radius, whichever is kinder, on a hit disc strictly
+ *      larger than either. Amnesia's rewrite of Penumbra's crank: *"it is possible to interact
+ *      wherever you like."*
+ *   4. FEEDBACK ON THE CLICK. One event drives wobble, dip, emissive pulse, halo and a thump, all
+ *      on the same frame. No new lights — the pulse is emissive only.
+ *
+ * `wake` is written from the settled turn, never from the wobble (a wobbling wake would strobe
+ * thirty windows), and this component is its only author. No rise clip: the key lies ON the page,
+ * so it fades up across REVEAL.dressing with the rest of the courtyard furniture.
  */
 
 import { useFrame, useThree, type ThreeEvent } from '@react-three/fiber'
 import { useEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
 
+import { projectHubAngle, type HubHit } from '../book/handle-projection'
+import { idleClockPinned } from '../book/idle-life'
+import { sbSound } from '../sound'
 import { useStorybookStore } from '../store'
 import { KEY_TOY, PALETTE, REVEAL, STAGE } from './inn-model'
+import {
+  KEY_FEEL,
+  createKeyPhysics,
+  keyGrabBegin,
+  keyGrabEnd,
+  keyNoteDroppedGrab,
+  keySample,
+  keySeed,
+  keyStepDetent,
+  keyTick,
+  keyWake,
+  type KeyClick,
+} from './key-physics'
 import { damp, ramp, readWildFrame, useWild } from './wild-frame'
 
-const TURN_RAD = (KEY_TOY.turnDeg * Math.PI) / 180
-
-/** How closely the drawn angle chases the pointer. Low enough to feel like brass. */
-const FOLLOW_LAMBDA = 13
-/** Turn fractions within which a detent starts to pull. The detents sit 0.34 apart, so this
- *  leaves most of the sweep free — the notches are punctuation, not a quantiser. */
-const DETENT_R = 0.075
-const MAGNET = 7.5
-/** Wobble spring: omega ~ 22.8 rad/s, zeta ~ 0.58 — one visible bounce, then gone. */
-const WOBBLE_K = 520
-const WOBBLE_C = 27
-const WOBBLE_KICK = 1.25
+const TURN_RAD = KEY_FEEL.turnRad
 
 /** The beckon: a glint and a rock every four seconds until the reader takes hold, then never
  *  again. It leads with a hair of ANTICIPATION (a small counter-rock) so the eye catches the
@@ -50,40 +76,20 @@ const BECKON_AMP = 0.075
 const HOVER_LIFT = 0.005
 const KEY_Y = 0.019
 
+/** The event the audio layer may adopt. `sbSound.thump()` is the stand-in fired here today; a
+ *  dedicated tick in sound.ts is deliberately out of scope. */
+export const KEY_CLICK_EVENT = 'wild-key-click'
+
 const clamp01 = (v: number): number => (v < 0 ? 0 : v > 1 ? 1 : v)
 
-/** Shortest signed way round from one angle to another. */
-function wrapDelta(d: number): number {
-  let x = d
-  while (x > Math.PI) x -= Math.PI * 2
-  while (x < -Math.PI) x += Math.PI * 2
-  return x
-}
-
-function nearestDetent(turn: number): number {
-  let best = KEY_TOY.detents[0]
-  let bestD = Infinity
-  for (const d of KEY_TOY.detents) {
-    const dist = Math.abs(d - turn)
-    if (dist < bestD) {
-      bestD = dist
-      best = d
-    }
-  }
-  return best
-}
-
-function detentCell(turn: number): number {
-  let best = 0
-  let bestD = Infinity
-  KEY_TOY.detents.forEach((d, i) => {
-    const dist = Math.abs(d - turn)
-    if (dist < bestD) {
-      bestD = dist
-      best = i
-    }
-  })
-  return best
+/**
+ * IS POINTER INPUT SUPPRESSED? A pinned pose (`?sbpose=`) is how every golden capture and every
+ * blind reviewer is sent to a spread, and a capture whose key can be nudged by a stray pointer is
+ * not a golden. Same predicate as the idle clock's, and the same escape hatch: `?sbidle=1` hands
+ * the book back to a human reading a pinned URL.
+ */
+function pointerPinned(): boolean {
+  return idleClockPinned()
 }
 
 /** Soft radial glow for the beckon halo — a hand-painted falloff beats an alpha-mapped ring. */
@@ -108,25 +114,43 @@ function makeHaloTexture(): THREE.CanvasTexture {
 export function TheKey() {
   const ctx = useWild()
   const gl = useThree((s) => s.gl)
+  const camera = useThree((s) => s.camera)
 
   const rootRef = useRef<THREE.Group>(null)
   const keyRef = useRef<THREE.Group>(null)
   const haloRef = useRef<THREE.Mesh>(null)
+  const discRef = useRef<THREE.Group>(null)
 
-  /** Where the pointer says the key should be. */
-  const targetRef = useRef(0)
-  /** Where the key actually is — what `wake` is written from. */
-  const turnRef = useRef(0)
-  const wobbleRef = useRef(0)
-  const wobbleVRef = useRef(0)
-  const cellRef = useRef(0)
-  const dragRef = useRef<{ last: number } | null>(null)
+  const physics = useMemo(() => createKeyPhysics(), [])
   const touchedRef = useRef(false)
   const hoverRef = useRef(false)
   const hoverGlowRef = useRef(0)
   const armedRef = useRef(false)
+  /** Live page tilt, republished every frame so the window handlers can build the page basis
+   *  without reaching back into the wild frame. */
+  const thetaRef = useRef(0)
+  const pointerIdRef = useRef<number | null>(null)
 
   const halo = useMemo(() => makeHaloTexture(), [])
+
+  /** One scratch set for the whole component. Pointer events are strictly one at a time and the
+   *  frame loop consumes each value before the next tick, so nothing here may be allocated per
+   *  frame — this is a hot path inside the render loop. */
+  const scratch = useMemo(
+    () => ({
+      ndc: new THREE.Vector2(),
+      caster: new THREE.Raycaster(),
+      ray: new THREE.Ray(),
+      inv: new THREE.Matrix4(),
+      normal: new THREE.Vector3(),
+      world: new THREE.Vector3(),
+      center: [0, 0, 0] as [number, number, number],
+      e1: [1, 0, 0] as [number, number, number],
+      e2: [0, 0, 1] as [number, number, number],
+      n: [0, 1, 0] as [number, number, number],
+    }),
+    [],
+  )
 
   // Posing hook for captures: `?wildwake=` seeds the key itself, not just the wake channel —
   // this component re-stamps `wake` from its own turn every frame, so seeding anything else
@@ -134,13 +158,11 @@ export function TheKey() {
   useEffect(() => {
     const raw = new URLSearchParams(window.location.search).get('wildwake')
     if (raw === null) return
-    const v = clamp01(Number(raw) || 0)
-    targetRef.current = v
-    turnRef.current = v
-    cellRef.current = detentCell(v)
-  }, [])
+    keySeed(physics, clamp01(Number(raw) || 0))
+  }, [physics])
 
-  /** Dev-only telemetry, off unless `?wilddebug=1` — the capture harness reads the turn. */
+  /** Dev-only telemetry, off unless `?wilddebug=1` — the capture harness and the supervisor's
+   *  real-drag review both read the key through this and nothing else. */
   const debugRef = useRef(false)
   useEffect(() => {
     debugRef.current = new URLSearchParams(window.location.search).get('wilddebug') === '1'
@@ -194,95 +216,181 @@ export function TheKey() {
   )
 
   // ---------------------------------------------------------------------------------------
-  // POINTER
+  // PROJECTION — window pixels to a point on the escutcheon
   // ---------------------------------------------------------------------------------------
 
-  const tmp = useMemo(() => new THREE.Vector3(), [])
-
-  /** Pointer position on the page, as an angle about the escutcheon. 0 points at the reader. */
-  const angleAt = (e: ThreeEvent<PointerEvent>): number | null => {
+  /**
+   * The pointer, in the plate's own polar coordinates. Built from CLIENT PIXELS and the camera,
+   * never from an r3f intersection, so it keeps answering when the hand is nowhere near the disc.
+   *
+   * Returns null only when the ray is too nearly parallel to the page for the intersection to
+   * mean anything — a real possibility on the leaned reading camera. The caller must HOLD, not
+   * drop: an ill-conditioned frame is not the reader letting go.
+   */
+  const hitAt = (clientX: number, clientY: number): HubHit | null => {
     const root = rootRef.current
     if (!root || !root.parent) return null
-    const p = root.parent.worldToLocal(tmp.copy(e.point))
-    const dx = p.x - KEY_TOY.center[0]
-    const dz = p.z - KEY_TOY.center[2]
-    if (dx * dx + dz * dz < 1e-6) return null
-    return Math.atan2(dx, dz)
+    const rect = gl.domElement.getBoundingClientRect()
+    if (rect.width < 1 || rect.height < 1) return null
+    scratch.ndc.set(
+      ((clientX - rect.left) / rect.width) * 2 - 1,
+      -(((clientY - rect.top) / rect.height) * 2 - 1),
+    )
+    scratch.caster.setFromCamera(scratch.ndc, camera)
+    scratch.inv.copy(root.parent.matrixWorld).invert()
+    scratch.ray.copy(scratch.caster.ray).applyMatrix4(scratch.inv)
+
+    // The page basis at this instant. The escutcheon is set into the COURTYARD, which rides the
+    // tilted right page, so the plane the hand is touching is the page plane and not a flat y.
+    const th = thetaRef.current
+    const sin = Math.sin(th)
+    const cos = Math.cos(th)
+    scratch.n[0] = -sin
+    scratch.n[1] = cos
+    scratch.n[2] = 0
+    scratch.e1[0] = cos
+    scratch.e1[1] = sin
+    scratch.e1[2] = 0
+    scratch.normal.set(-sin, cos, 0)
+    if (Math.abs(scratch.ray.direction.dot(scratch.normal)) < KEY_FEEL.rayMinDot) return null
+    return projectHubAngle(scratch.ray, scratch.center, scratch.e1, scratch.e2, scratch.n)
+  }
+
+  /** Distance in CSS pixels from a press to the escutcheon's projected centre. The lean makes the
+   *  page test noisy along the shallow axis; this one never is, so a press passes on either. */
+  const screenDistance = (clientX: number, clientY: number): number => {
+    const root = rootRef.current
+    if (!root) return Infinity
+    const rect = gl.domElement.getBoundingClientRect()
+    if (rect.width < 1 || rect.height < 1) return Infinity
+    root.getWorldPosition(scratch.world).project(camera)
+    const cx = rect.left + ((scratch.world.x + 1) / 2) * rect.width
+    const cy = rect.top + ((1 - scratch.world.y) / 2) * rect.height
+    return Math.hypot(clientX - cx, clientY - cy)
   }
 
   const setCursor = (v: string): void => {
     gl.domElement.style.cursor = v
   }
 
-  const release = (e?: ThreeEvent<PointerEvent> | null): void => {
-    if (!dragRef.current) return
-    dragRef.current = null
-    useStorybookStore.getState().endGrab()
+  // ---------------------------------------------------------------------------------------
+  // GRAB
+  // ---------------------------------------------------------------------------------------
+
+  const beginGrab = (clientX: number, clientY: number, pointerId: number): boolean => {
+    if (!armedRef.current || physics.held || pointerPinned()) return false
+    if (useStorybookStore.getState().grab) return false
+    const hit = hitAt(clientX, clientY)
+    const nearPage = hit !== null && hit.r <= KEY_FEEL.grabRPage
+    const nearScreen = screenDistance(clientX, clientY) <= KEY_FEEL.grabRPx
+    if (!nearPage && !nearScreen) return false
+    touchedRef.current = true
+    pointerIdRef.current = pointerId
+    useStorybookStore.getState().beginGrab('wild-key', 'knob')
+    keyGrabBegin(physics, hit, performance.now() / 1000)
+    setCursor('grabbing')
+    return true
+  }
+
+  const endGrab = (): void => {
+    if (!physics.held) return
+    keyGrabEnd(physics, performance.now() / 1000)
+    pointerIdRef.current = null
+    if (useStorybookStore.getState().grab?.id === 'wild-key') useStorybookStore.getState().endGrab()
     setCursor(hoverRef.current ? 'grab' : '')
-    // The hand lets go inside a notch: finish the job rather than leaving it half-seated.
-    const near = nearestDetent(targetRef.current)
-    if (Math.abs(near - targetRef.current) < DETENT_R * 1.5) targetRef.current = near
-    try {
-      if (e) (e.target as Element).releasePointerCapture(e.pointerId)
-    } catch {
-      // capture already gone — nothing to release
-    }
   }
 
   const onPointerDown = (e: ThreeEvent<PointerEvent>): void => {
-    if (!armedRef.current) return
-    const root = rootRef.current
-    if (!root || !root.parent) return
-    const p = root.parent.worldToLocal(tmp.copy(e.point))
-    const dx = p.x - KEY_TOY.center[0]
-    const dz = p.z - KEY_TOY.center[2]
-    if (debugRef.current) {
-      ;(window as unknown as { __wildDown?: unknown }).__wildDown = {
-        point: e.point.toArray(),
-        local: [p.x, p.y, p.z],
-        dist: Math.hypot(dx, dz),
-        gate: KEY_TOY.grabRadius + KEY_TOY.bowRadius,
-      }
-    }
-    // The grab disc is deliberately wider than the hit floor so a drag that swings the bow out
-    // past the escutcheon keeps producing intersections; the GRAB itself is gated tight.
-    if (Math.hypot(dx, dz) > KEY_TOY.grabRadius + KEY_TOY.bowRadius) return
-    const a = angleAt(e)
-    if (a === null) return
-    touchedRef.current = true
-    useStorybookStore.getState().beginGrab('wild-key', 'knob')
-    dragRef.current = { last: a }
-    setCursor('grabbing')
-    try {
-      ;(e.target as Element).setPointerCapture(e.pointerId)
-    } catch {
-      // no capture available (synthetic pointer) — the drag still tracks via move events
-    }
-    e.stopPropagation()
-  }
-
-  const onPointerMove = (e: ThreeEvent<PointerEvent>): void => {
-    const drag = dragRef.current
-    if (!drag) return
-    const a = angleAt(e)
-    if (a === null) return
-    // The key turns CLOCKWISE to the reader, which is negative rotation about +y, so a
-    // decreasing pointer angle is an increasing turn.
-    const d = wrapDelta(a - drag.last)
-    drag.last = a
-    targetRef.current = clamp01(targetRef.current - d / TURN_RAD)
-    e.stopPropagation()
+    if (beginGrab(e.clientX, e.clientY, e.pointerId)) e.stopPropagation()
   }
 
   const onPointerOver = (): void => {
     hoverRef.current = true
-    if (armedRef.current && !dragRef.current) setCursor('grab')
+    if (armedRef.current && !physics.held && !pointerPinned()) setCursor('grab')
   }
 
   const onPointerOut = (): void => {
     hoverRef.current = false
-    if (!dragRef.current) setCursor('')
+    if (!physics.held) setCursor('')
   }
+
+  // ---------------------------------------------------------------------------------------
+  // THE CLUTCH — window-level, and the only thing that ends a drag
+  // ---------------------------------------------------------------------------------------
+
+  useEffect(() => {
+    const onMove = (e: PointerEvent): void => {
+      if (!physics.held) return
+      if (pointerIdRef.current !== null && e.pointerId !== pointerIdRef.current) return
+      // Backstop for an up we never heard (the pointer left the browser window and came back
+      // with the button released). Without pointer capture this is the only signal.
+      if (e.buttons === 0) {
+        endGrab()
+        return
+      }
+      keySample(physics, hitAt(e.clientX, e.clientY), performance.now() / 1000)
+    }
+    const onUp = (e: PointerEvent): void => {
+      if (pointerIdRef.current !== null && e.pointerId !== pointerIdRef.current) return
+      endGrab()
+    }
+    const onBlur = (): void => endGrab()
+    const onKey = (e: KeyboardEvent): void => {
+      if (e.key === 'Escape') {
+        endGrab()
+        return
+      }
+      // THE KEYBOARD CLUTCH — the one path that needs no pixel precision at all. `use-book-input`
+      // deliberately leaves the vertical arrows unbound (SP-3a), so this cannot fight a page turn.
+      if (!armedRef.current || pointerPinned()) return
+      if (!hoverRef.current && !physics.held) return
+      if (e.key === 'ArrowUp') keyStepDetent(physics, 1)
+      else if (e.key === 'ArrowDown') keyStepDetent(physics, -1)
+      else return
+      e.preventDefault()
+    }
+    // §1(b): a press that misses the invisible disc but lands within GRAB_R_PX of the projected
+    // escutcheon still takes the key. Bubble phase, so the mesh handler above has already run and
+    // `physics.held` short-circuits the duplicate.
+    const onDown = (e: PointerEvent): void => {
+      if (physics.held) return
+      if (screenDistance(e.clientX, e.clientY) > KEY_FEEL.grabRPx) return
+      beginGrab(e.clientX, e.clientY, e.pointerId)
+    }
+    window.addEventListener('pointerdown', onDown)
+    window.addEventListener('pointermove', onMove)
+    window.addEventListener('pointerup', onUp)
+    window.addEventListener('pointercancel', onUp)
+    window.addEventListener('blur', onBlur)
+    window.addEventListener('keydown', onKey)
+    return () => {
+      window.removeEventListener('pointerdown', onDown)
+      window.removeEventListener('pointermove', onMove)
+      window.removeEventListener('pointerup', onUp)
+      window.removeEventListener('pointercancel', onUp)
+      window.removeEventListener('blur', onBlur)
+      window.removeEventListener('keydown', onKey)
+    }
+    // The handlers close over refs and the stable physics object only.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [physics])
+
+  /**
+   * SINGLE SOURCE OF TRUTH. `use-book-input`'s window backstop can clear the store's grab without
+   * this component hearing, and a live local drag against a cleared store grab re-enables the
+   * page-swipe rule — i.e. the reader loses the whole spread mid-turn. Follow the store down.
+   */
+  useEffect(() => {
+    const unsub = useStorybookStore.subscribe((st) => {
+      if (physics.held && st.grab?.id !== 'wild-key') {
+        keyNoteDroppedGrab(physics, performance.now() / 1000)
+        pointerIdRef.current = null
+        setCursor(hoverRef.current ? 'grab' : '')
+      }
+    })
+    return unsub
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [physics])
 
   useEffect(
     () => () => {
@@ -296,49 +404,70 @@ export function TheKey() {
   // FRAME
   // ---------------------------------------------------------------------------------------
 
+  /**
+   * ONE CLICK, ALL CHANNELS, SAME FRAME. The physics core has already kicked the wobble, the dip,
+   * the emissive and the halo (they are its state, so the bench can gate them); what is left here
+   * is everything that needs the page: the sound, and an event the rest of the lab can adopt.
+   */
+  const fireFeedback = (click: KeyClick): void => {
+    sbSound.thump()
+    window.dispatchEvent(new CustomEvent<KeyClick>(KEY_CLICK_EVENT, { detail: click }))
+  }
+
   useFrame((_, rawDelta) => {
     const root = rootRef.current
     const key = keyRef.current
     if (!root || !key) return
     const dt = Math.min(rawDelta, 1 / 30)
     const f = readWildFrame(ctx)
+    thetaRef.current = f.thetaR
 
     const fade = ramp(f.open, REVEAL.dressing[0], REVEAL.dressing[1])
     const shown = !f.hidden && fade > 0.01
     root.visible = shown
     armedRef.current = shown && f.open > 0.9
-    if (!armedRef.current && dragRef.current) release(null)
+    if (!armedRef.current && physics.held) endGrab()
     if (!shown) return
 
-    // 1 — LAG. The hand asks; the brass follows.
-    let turn = damp(turnRef.current, targetRef.current, FOLLOW_LAMBDA, dt)
+    // The escutcheon is set into the COURTYARD, not the page: the cobble halves ride the tilted
+    // page planes, so at this x the paving stands sin(thetaR)*x above flat — a key seated at
+    // page height is a key buried under the stones. Position FIRST, because the pointer plane is
+    // built through this point and a frame-late centre is a frame-late grab.
+    const pavingY = Math.sin(f.thetaR) * KEY_TOY.center[0] + STAGE.cobbleY + 0.002
+    hoverGlowRef.current = damp(hoverGlowRef.current, hoverRef.current || physics.held ? 1 : 0, 11, dt)
+    root.position.set(
+      KEY_TOY.center[0],
+      KEY_TOY.center[1] + pavingY + HOVER_LIFT * hoverGlowRef.current,
+      KEY_TOY.center[2],
+    )
+    scratch.center[0] = root.position.x
+    scratch.center[1] = root.position.y
+    scratch.center[2] = root.position.z
+    // The hit disc lies IN the page plane, not flat: the paving is tilted, so a horizontal disc
+    // puts the hit point somewhere the reader is not looking.
+    if (discRef.current) discRef.current.rotation.z = f.thetaR
 
-    // 2 — MAGNETISM. Inside the capture radius a detent pulls, hardest at its lip and easing
-    // to nothing at dead centre so the key seats rather than buzzing in the notch.
-    const near = nearestDetent(turn)
-    const gap = near - turn
-    const inside = 1 - Math.min(1, Math.abs(gap) / DETENT_R)
-    if (inside > 0) turn += gap * Math.min(1, MAGNET * inside * dt)
-    turn = clamp01(turn)
+    keyTick(physics, dt)
+    for (const click of physics.events) fireFeedback(click)
 
-    // 3 — THE CLICK. A crossing kicks the wobble spring in the direction of travel.
-    const cell = detentCell(turn)
-    if (cell !== cellRef.current) {
-      wobbleVRef.current += Math.sign(turn - turnRef.current || 1) * WOBBLE_KICK
-      cellRef.current = cell
-    }
-    wobbleVRef.current += (-WOBBLE_K * wobbleRef.current - WOBBLE_C * wobbleVRef.current) * dt
-    wobbleRef.current += wobbleVRef.current * dt
-
-    turnRef.current = turn
+    const turn = keyWake(physics)
     ctx.wake.current = turn
 
     if (debugRef.current) {
       ;(window as unknown as { __wildKey?: unknown }).__wildKey = {
         turn,
-        target: targetRef.current,
-        dragging: !!dragRef.current,
+        target: physics.target,
+        vel: physics.vel,
+        seatedIndex: physics.seatedIndex,
+        clicks: physics.clicks,
+        dragging: physics.held,
         armed: armedRef.current,
+        droppedGrabs: physics.droppedGrabs,
+        samplesDiscarded: physics.samplesDiscarded,
+        samplesDegenerate: physics.samplesDegenerate,
+        samplesRateCapped: physics.samplesRateCapped,
+        /** Camera roll impulse, radians. Nothing consumes it yet — the rig owner has to opt in. */
+        roll: physics.roll,
       }
     }
 
@@ -356,27 +485,11 @@ export function TheKey() {
       }
     }
 
-    key.rotation.y = -turn * TURN_RAD + wobbleRef.current + beckonRock
+    key.rotation.y = -turn * TURN_RAD + physics.wobble + beckonRock
+    // The click's dip: the bit dropping a hair into the wards. Page units, gone in 70 ms.
+    key.position.y = KEY_Y - physics.dip
 
-    // HOVER: brighter and a whisker off the page. Light and lift, both damped, neither
-    // large enough to be mistaken for the turn itself.
-    hoverGlowRef.current = damp(
-      hoverGlowRef.current,
-      hoverRef.current || dragRef.current ? 1 : 0,
-      11,
-      dt,
-    )
-    // The escutcheon is set into the COURTYARD, not the page: the cobble halves ride the tilted
-    // page planes, so at this x the paving stands sin(thetaR)*x above flat — a key seated at
-    // page height is a key buried under the stones.
-    const pavingY = Math.sin(f.thetaR) * KEY_TOY.center[0] + STAGE.cobbleY + 0.002
-    root.position.set(
-      KEY_TOY.center[0],
-      KEY_TOY.center[1] + pavingY + HOVER_LIFT * hoverGlowRef.current,
-      KEY_TOY.center[2],
-    )
-
-    const lit = 0.52 + 0.55 * hoverGlowRef.current + 0.95 * glint + 0.45 * turn
+    const lit = 0.52 + 0.55 * hoverGlowRef.current + 0.95 * glint + 0.45 * turn + physics.pulse
     materials.brass.emissiveIntensity = lit
     materials.plate.emissiveIntensity = lit * 0.42
     materials.brass.opacity = fade
@@ -385,10 +498,11 @@ export function TheKey() {
 
     const haloMesh = haloRef.current
     if (haloMesh) {
-      const strength = 0.30 * glint + 0.22 * hoverGlowRef.current + 0.30 * turn
+      const strength =
+        0.3 * glint + 0.22 * hoverGlowRef.current + 0.3 * turn + KEY_FEEL.haloOpacity * physics.halo
       materials.glow.opacity = strength * fade
       haloMesh.visible = strength > 0.004
-      const s = 1 + 0.16 * glint
+      const s = 1 + 0.16 * glint + KEY_FEEL.haloScale * physics.halo
       haloMesh.scale.set(s, s, 1)
     }
   })
@@ -402,23 +516,23 @@ export function TheKey() {
 
   return (
     <group ref={rootRef} name="wild-key" visible={false}>
-      {/* The reader's grab surface. Wide enough that a bow swung right out past the plate is
-          still over it, invisible because it writes neither colour nor depth. */}
-      <mesh
-        rotation={[-Math.PI / 2, 0, 0]}
-        position={[0, 0.02, 0]}
-        renderOrder={-5}
-        onPointerDown={onPointerDown}
-        onPointerMove={onPointerMove}
-        onPointerUp={release}
-        onPointerCancel={release}
-        onLostPointerCapture={release}
-        onPointerOver={onPointerOver}
-        onPointerOut={onPointerOut}
-      >
-        <circleGeometry args={[R + KEY_TOY.shaftLength + KEY_TOY.bowRadius * 2.4, 24]} />
-        <meshBasicMaterial colorWrite={false} depthWrite={false} transparent opacity={0} />
-      </mesh>
+      {/* The reader's grab surface, lying IN the page plane. Strictly larger than either grab
+          gate, so a press that qualifies always has a surface under it — and because the press
+          is the only thing this mesh does now (move and up are on window), an oversized disc
+          costs nothing: a press that does not qualify never stops propagating. */}
+      <group ref={discRef}>
+        <mesh
+          rotation={[-Math.PI / 2, 0, 0]}
+          position={[0, 0.02, 0]}
+          renderOrder={-5}
+          onPointerDown={onPointerDown}
+          onPointerOver={onPointerOver}
+          onPointerOut={onPointerOut}
+        >
+          <circleGeometry args={[KEY_FEEL.hitDiscR, 28]} />
+          <meshBasicMaterial colorWrite={false} depthWrite={false} transparent opacity={0} />
+        </mesh>
+      </group>
 
       {/* Beckon halo, flat on the page under the plate. */}
       <mesh ref={haloRef} rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.0015, 0]} renderOrder={2} material={materials.glow} visible={false}>

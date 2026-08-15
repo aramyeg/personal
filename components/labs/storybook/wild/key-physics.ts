@@ -458,6 +458,17 @@ export function keyGrabEnd(s: KeyPhysicsState, time: number): void {
   s.flickN = 0
 }
 
+/**
+ * The shell noticing that something OUTSIDE it took the grab away (the book's own window backstop
+ * clearing the store). Counted, because "the key went dead in my hand" is exactly the complaint
+ * this whole rebuild answers and the number has to be visible in telemetry.
+ */
+export function keyNoteDroppedGrab(s: KeyPhysicsState, time: number): void {
+  if (!s.held) return
+  s.droppedGrabs++
+  keyGrabEnd(s, time)
+}
+
 /** The keyboard clutch: step one notch, the one path that needs no pixel precision at all. */
 export function keyStepDetent(s: KeyPhysicsState, dir: 1 | -1): void {
   const d = KEY_FEEL.detents
