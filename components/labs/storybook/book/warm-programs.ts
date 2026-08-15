@@ -37,6 +37,18 @@
  * `book.tsx` keeps the open-book subtree — crucially the pop-up group and its
  * lights — mounted from load, because a light-count change re-links EVERY
  * program in the scene (the E4 wild-lane law).
+ *
+ * A WARNING THIS MODULE LEARNED THE HARD WAY. Draining is worthless unless the
+ * warm pass builds the SAME programs the renderer will ask for. The second E5
+ * measurement round found `gl.compile()` running with `shadowMap.enabled` true
+ * and every real draw running with it false — so all ~66 warmed programs were
+ * cache-key orphans and 77 fresh ones were compiled during the turns anyway
+ * (see the fix and its evidence in book-scene.tsx's `shadows` prop). If this
+ * stall ever comes back, check FIRST that the two states agree; every field of
+ * `WebGLPrograms.getParameters` (light counts, shadow enable/type, clipping
+ * plane count, tone mapping, render target) is part of that key, and any of
+ * them differing between warm and draw silently doubles the compile work
+ * instead of removing it.
  */
 
 import type * as THREE from 'three'
@@ -45,10 +57,18 @@ import type * as THREE from 'three'
  *  releases (its material's cache key changed) can still be collected. */
 const drainedPrograms = new WeakSet<object>()
 
-/** Programs per idle slice. The FIRST program of a batch carries the driver's
- *  whole queued link work; the rest cost one GPU-process round trip each, so a
- *  small budget keeps any single slice short on a throttled main thread. */
-const SLICE_BUDGET = 8
+/**
+ * Wall-clock budget for one idle slice, in ms.
+ *
+ * This was a COUNT (8 programs) and that was wrong. Measured on the live E5
+ * build at 4x throttle, absorbing one program's link costs ~120ms — the wait is
+ * a synchronous round trip to the GPU process, so it barely scales with shader
+ * size. Eight of them per slice is a ~1s frame: the drain would have become the
+ * stall it exists to prevent. A time budget self-tunes to the device instead,
+ * and the `spent === 0` floor guarantees forward progress even when a single
+ * program overruns the whole budget on its own.
+ */
+const SLICE_MS = 12
 
 /** How long to wait before re-testing a turn that was in flight. Short enough
  *  that a drain lands in the dwell after a single turn, long enough that a
@@ -105,17 +125,21 @@ export function runWhenRested(fn: () => void, isBusy: () => boolean): Cancel {
 }
 
 /**
- * Absorb the deferred link check of up to `budget` not-yet-drained programs.
- * Returns how many still remain, so a caller can slice the work.
+ * Absorb the deferred link check of not-yet-drained programs for up to
+ * `budgetMs` of wall clock (at least one, always). Returns how many still
+ * remain, so a caller can slice the work.
  */
-export function drainProgramLinks(gl: THREE.WebGLRenderer, budget = Number.POSITIVE_INFINITY): number {
+export function drainProgramLinks(gl: THREE.WebGLRenderer, budgetMs = Number.POSITIVE_INFINITY): number {
   const programs = gl.info.programs
   if (!programs) return 0
+  const started = performance.now()
   let spent = 0
   let remaining = 0
   for (const program of programs) {
     if (drainedPrograms.has(program)) continue
-    if (spent >= budget) {
+    // Always absorb at least one, or a device slower than the budget would
+    // never make progress at all.
+    if (spent > 0 && performance.now() - started >= budgetMs) {
       remaining++
       continue
     }
@@ -151,7 +175,7 @@ export function drainProgramLinksWhenIdle(
       cancelSlice = laterSlice(step, BUSY_RETRY_MS)
       return
     }
-    const remaining = drainProgramLinks(gl, SLICE_BUDGET)
+    const remaining = drainProgramLinks(gl, SLICE_MS)
     if (remaining > 0) cancelSlice = warmSlice(step)
   }
 

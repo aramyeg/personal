@@ -334,6 +334,34 @@ export default function BookScene() {
       // shadows, which are rebalanced (ambient/directional/candle) to hold the
       // dark-theatre look now that the film curve no longer dims the whole frame.
       gl={{ antialias: true, alpha: false, toneMapping: THREE.NoToneMapping }}
+      // E5 perf ROOT CAUSE — the shadow flag had two owners and they fought.
+      // r3f's `configure()` runs on EVERY <Canvas> render and unconditionally
+      // assigns `gl.shadowMap.enabled = !!shadows`; with no prop that is FALSE.
+      // ch1-diorama.tsx sets it true imperatively in a mount effect. The loader
+      // re-renders <Canvas> on every store change — including every turn — so
+      // r3f kept switching shadows back off underneath the diorama.
+      //
+      // The damage was total, not cosmetic: `shadowMapEnabled` is part of a
+      // material's PROGRAM CACHE KEY. book.tsx's warm `gl.compile()` pass ran
+      // just after the diorama's effect and built all ~66 scene programs with
+      // USE_SHADOWMAP; every real draw then computed the key with shadows off
+      // and compiled a SECOND, different program — measured live on the E5
+      // build: 84 programs linked during four turns, 77 of them shaders never
+      // emitted at load, each costing ~120ms of blocking getProgramParameter.
+      // That is the whole remaining turn stall. It also explains the
+      // GL_INVALID_OPERATION sampler spam: the few shadow-compiled programs
+      // that did get drawn sample a sampler2DShadow that no shadow pass had
+      // ever filled (zero depth programs were linked in an entire session —
+      // proof the moon's shadow was never actually rendering).
+      //
+      // Declaring it here gives the flag ONE owner. "percentage" (PCFShadowMap)
+      // and not "soft": three deprecates PCFSoftShadowMap and REWRITES
+      // `shadowMap.type` to PCFShadowMap on its first shadow render
+      // (WebGLShadowMap.js:99-104), so asking for soft would have r3f and three
+      // trade the value back and forth every turn — the same cache-key churn in
+      // a different field. The diorama's own one-shot `type = PCFSoftShadowMap`
+      // is normalised to this on the first shadow pass and then stays put.
+      shadows="percentage"
       camera={{ position: [...CAMERA_POSITION], fov: CAMERA_FOV }}
       onCreated={(state) => {
         state.camera.lookAt(...CAMERA_LOOKAT)
