@@ -45,6 +45,7 @@ import { CoverDecals } from './cover-decals'
 import { useSpreadPrints } from './use-page-print'
 import { plyLift } from './lift-ladder'
 import { useGuardedDispose } from './material-pool'
+import { drainProgramLinks, drainProgramLinksWhenIdle, runWhenRested } from './warm-programs'
 
 export const BOOK = {
   coverW: 1.22,
@@ -259,11 +260,16 @@ export function Book() {
   const rightBlockCache = useRef({ spineH: -1, foreH: -1 })
   const leftBlockCache = useRef({ spineH: -1, foreH: -1 })
   const spineRef = useRef<THREE.Mesh>(null)
+  const creaseRef = useRef<THREE.Mesh>(null)
   const popupsRef = useRef<THREE.Group>(null)
   const coverPadRef = useRef<THREE.Group>(null)
   // Boot sentinel counters (see the markBooted block in the useFrame below).
   const bootFrames = useRef(0)
   const bootElapsedMs = useRef(0)
+  // False until the load-time shader warm pass has run (see the compile/drain
+  // effect below): the first pass is synchronous behind the loader veil, every
+  // later one waits for an idle slice with no turn in flight.
+  const warmedOnce = useRef(false)
 
   const leatherMaterial = useMemo(
     () => new THREE.MeshStandardMaterial({ map: leather, roughness: 0.55 }),
@@ -478,16 +484,26 @@ export function Book() {
 
   // Committed open/closed state — drives the cover's *rest* pose and the
   // spine's standing-vs-flat shape. Deliberately NOT blended with `turning`
-  // (unlike `isOpen` below): the cover's rotation during a turn is owned
+  // (unlike the driver-clock gates below): the cover's rotation during a turn is owned
   // entirely by the useFrame below, and a rest-pose prop that also flipped
   // mid-turn would fight it every render.
   const spreadOpen = spread > 0
-  // Content-reveal state: open while resting past the cover, or while the
-  // cover itself is turning (spread is still 0 the whole time a spread-0
-  // "next" turn is in flight — the block/pages must already be visible so
-  // the lifting cover reveals them, rather than popping in only once the
-  // turn commits).
-  const isOpen = spreadOpen || turning !== null
+  // THE OPEN-BOOK SUBTREE IS RESIDENT (E5 perf). It used to be gated on an
+  // `isOpen = spreadOpen || turning !== null` render flag, so the crease, both
+  // static pages, the left stack AND the whole pop-up group — lights included
+  // — MOUNTED at the instant the cover turn armed. Two costs landed in that
+  // one frame: every one of those materials needed a program built and its
+  // link drained on first draw, and adding the chapter-1 diorama's three
+  // lights changed the scene's light count, which re-links EVERY program in
+  // the scene (the E4 wild-lane law). Measured on the production build at 4x
+  // throttle: a 1743ms dead frame on the cover-open turn. Everything is
+  // mounted from load instead and hidden the way the rest of this component
+  // already hides things — per frame, off the driver refs, in the useFrame
+  // below (`coverFlight || sp >= 1` for the page cards and the crease,
+  // `leftShown` for the left statics). The pop-up group is deliberately NOT
+  // visibility-gated: its lights are authored at intensity 0 and ride their
+  // own reveal ramps, and every piece self-hides on `liveSpreadRole`, so a
+  // group flip would only re-link the scene again for nothing.
   // NOTE: cover-turn hiding/revealing of the left statics, the traveling
   // endpaper, the spine wall's height, and the block morph are ALL driven
   // per frame in the useFrame below off the driver refs — a React-clock
@@ -580,12 +596,60 @@ export function Book() {
   // mesh only ever renders once its texture resolves (`visible` is gated on
   // `texture !== null` in every popup layer), so an EARLY-only compile
   // would just cache the map=null variant that never actually gets drawn.
+  //
+  // ...AND THE DRAIN (E5 perf, the measured root cause of the turn lag).
+  // `gl.compile` only QUEUES the links. three defers each program's link
+  // check into `onFirstUse`, which fires from getUniforms/getAttributes on
+  // the first frame that actually DRAWS the program — and `getProgramInfoLog`
+  // there is a synchronous wait on the driver. Profiled on the production
+  // build at 4x throttle, that landed as 1.6-1.7s dead frames on the first
+  // two turns (2256ms / 1949ms of pure getProgramInfoLog). So every compile
+  // pass is followed by an idle-sliced drain that absorbs the wait while the
+  // reader is resting — never while a turn is in flight (see warm-programs.ts).
+  // Both passes are now IDLE-SCHEDULED and rest-gated, except the very first
+  // (which runs behind the loader veil, where there is no turn to protect and
+  // the boot gate below is waiting on the result anyway). `gl.compile` itself
+  // costs 340-410ms of getParameters per window change at 4x throttle, and it
+  // used to run synchronously in the commit effect — a cluster of ~150ms
+  // frames landing on the page's landing thump.
   useEffect(() => {
     const DELAY_MS = 350
-    gl.compile(scene, camera)
-    const settle = setTimeout(() => gl.compile(scene, camera), DELAY_MS)
-    return () => clearTimeout(settle)
+    const isBusy = () => useStorybookStore.getState().turning !== null
+    const cancels: (() => void)[] = []
+    const pass = () => {
+      gl.compile(scene, camera)
+      cancels.push(drainProgramLinksWhenIdle(gl, isBusy))
+    }
+    if (warmedOnce.current) {
+      cancels.push(runWhenRested(pass, isBusy))
+    } else {
+      warmedOnce.current = true
+      pass()
+    }
+    const settle = setTimeout(() => cancels.push(runWhenRested(pass, isBusy)), DELAY_MS)
+    return () => {
+      clearTimeout(settle)
+      for (const cancel of cancels) cancel()
+    }
   }, [gl, scene, camera, popupSpreadIndices])
+
+  // Safety net for programs born OUTSIDE a window change: a layer's art can
+  // resolve long after the 350ms settle pass above, and attaching its map
+  // changes the material's program cache key — a brand new, undrained program
+  // whose link wait would otherwise land on the next turn. Watching the cache
+  // SIZE costs one integer compare per tick and drains only when it actually
+  // grew; the drain itself is skipped while a turn is in flight.
+  useEffect(() => {
+    let seen = -1
+    const id = window.setInterval(() => {
+      const count = gl.info.programs?.length ?? 0
+      if (count === seen) return
+      if (useStorybookStore.getState().turning !== null) return
+      seen = count
+      drainProgramLinks(gl)
+    }, 900)
+    return () => window.clearInterval(id)
+  }, [gl])
 
   useFrame((_, delta) => {
     // Boot detection, on the same clock as everything else the eye sees:
@@ -710,6 +774,10 @@ export function Book() {
       // cover for exactly those frames (caught by flash-hunt cover-close).
       rightPageRef.current.visible = coverFlight || sp >= 1
     }
+    // The gutter crease belongs to the OPEN book: same driver-clock gate as
+    // the right page card (it was a React `isOpen &&` mount before E5 — see
+    // the resident-subtree note above).
+    if (creaseRef.current) creaseRef.current.visible = coverFlight || sp >= 1
     if (popupsRef.current) popupsRef.current.position.y = pageHingeY + plyLift(1)
     // Left statics: hidden for the whole cover flight (the traveling
     // endpaper below plays their part), shown the instant the commit lands
@@ -799,16 +867,16 @@ export function Book() {
           instead of under it. Pinning the order guarantees the layers'
           alpha-tested cutouts always composite on top, wherever they cover
           the strip, while bare page still shows the crease beneath them. */}
-      {isOpen && (
-        <mesh
-          position={[0, CREASE_Y, 0]}
-          rotation={[-Math.PI / 2, 0, 0]}
-          material={creaseMaterial}
-          renderOrder={-1}
-        >
-          <planeGeometry args={[CREASE_WIDTH, BOOK.coverH]} />
-        </mesh>
-      )}
+      <mesh
+        ref={creaseRef}
+        visible={false}
+        position={[0, CREASE_Y, 0]}
+        rotation={[-Math.PI / 2, 0, 0]}
+        material={creaseMaterial}
+        renderOrder={-1}
+      >
+        <planeGeometry args={[CREASE_WIDTH, BOOK.coverH]} />
+      </mesh>
 
       {/* Back cover: fixed support board, always under the right-hand stack. */}
       <mesh position={[BOOK.coverW / 2, BACK_COVER_Y, 0]} material={leatherMaterial}>
@@ -837,51 +905,47 @@ export function Book() {
           driven per frame (the useFrame above): hidden for the whole cover
           flight — the traveling endpaper under the cover plays their part
           — and shown in the same rAF the commit lands. */}
-      {isOpen && (
-        <>
-          <mesh
-            ref={leftPedestalRef}
-            visible={false}
-            position={[-BLOCK_WIDTH / 2, BACK_COVER_TOP + STACK_PEDESTAL / 2, 0]}
-            material={pedestalMaterial}
-          >
-            <boxGeometry args={[BLOCK_WIDTH, STACK_PEDESTAL, BLOCK_DEPTH]} />
-          </mesh>
-          <mesh
-            ref={leftBlockRef}
-            visible={false}
-            position={[0, BACK_COVER_TOP + STACK_PEDESTAL, 0]}
-            scale={[-1, 1, 1]}
-            geometry={leftBlockGeometry}
-            material={leftStackMaterial}
-          />
-        </>
-      )}
+      <mesh
+        ref={leftPedestalRef}
+        visible={false}
+        position={[-BLOCK_WIDTH / 2, BACK_COVER_TOP + STACK_PEDESTAL / 2, 0]}
+        material={pedestalMaterial}
+      >
+        <boxGeometry args={[BLOCK_WIDTH, STACK_PEDESTAL, BLOCK_DEPTH]} />
+      </mesh>
+      <mesh
+        ref={leftBlockRef}
+        visible={false}
+        position={[0, BACK_COVER_TOP + STACK_PEDESTAL, 0]}
+        scale={[-1, 1, 1]}
+        geometry={leftBlockGeometry}
+        material={leftStackMaterial}
+      />
 
-      {/* Static pages only exist once the book is open: closed, the mirrored
-          left page's footprint (x in [-PAGE_W, 0]) sits outside the front
-          cover entirely and would otherwise poke out past the spine. Both
-          PLANES pass through the shared hinge line (PAGE_SURFACE_Y) and
-          tilt up from it by their rest angles, set per frame in the
-          useFrame above (rotation about the spine z axis; the mirrored
-          left mesh takes -aL so its fore-edge rises on the -X side). */}
-      {isOpen && (
-        <group ref={rightPageRef} position={[0, PAGE_SURFACE_Y, 0]}>
-          <mesh geometry={pageGeometry} material={rightPageMaterial} />
-          {/* 1mm card body: rim ribbons hanging under the print surface
-              (they fit inside the pageLift gap over the wedge), tinted per
-              the page this card currently is (rim materials above). */}
-          <mesh material={rightRimMaterial} position={[PAGE_W, -RIM_T / 2, 0]} rotation={[0, Math.PI / 2, 0]}>
-            <planeGeometry args={[PAGE_H, RIM_T]} />
-          </mesh>
-          <mesh material={rightRimMaterial} position={[PAGE_W / 2, -RIM_T / 2, PAGE_H / 2]}>
-            <planeGeometry args={[PAGE_W, RIM_T]} />
-          </mesh>
-          <mesh material={rightRimMaterial} position={[PAGE_W / 2, -RIM_T / 2, -PAGE_H / 2]} rotation={[0, Math.PI, 0]}>
-            <planeGeometry args={[PAGE_W, RIM_T]} />
-          </mesh>
-        </group>
-      )}
+      {/* Static pages. Closed, the mirrored left page's footprint (x in
+          [-PAGE_W, 0]) sits outside the front cover entirely and would poke
+          out past the spine — so both cards are HIDDEN while the book is
+          shut, per frame off the driver refs (the useFrame above), rather
+          than unmounted: mounting them mid-turn built their programs in the
+          turn's own frame. Both PLANES pass through the shared hinge line
+          (PAGE_SURFACE_Y) and tilt up from it by their rest angles (rotation
+          about the spine z axis; the mirrored left mesh takes -aL so its
+          fore-edge rises on the -X side). */}
+      <group ref={rightPageRef} visible={false} position={[0, PAGE_SURFACE_Y, 0]}>
+        <mesh geometry={pageGeometry} material={rightPageMaterial} />
+        {/* 1mm card body: rim ribbons hanging under the print surface
+            (they fit inside the pageLift gap over the wedge), tinted per
+            the page this card currently is (rim materials above). */}
+        <mesh material={rightRimMaterial} position={[PAGE_W, -RIM_T / 2, 0]} rotation={[0, Math.PI / 2, 0]}>
+          <planeGeometry args={[PAGE_H, RIM_T]} />
+        </mesh>
+        <mesh material={rightRimMaterial} position={[PAGE_W / 2, -RIM_T / 2, PAGE_H / 2]}>
+          <planeGeometry args={[PAGE_W, RIM_T]} />
+        </mesh>
+        <mesh material={rightRimMaterial} position={[PAGE_W / 2, -RIM_T / 2, -PAGE_H / 2]} rotation={[0, Math.PI, 0]}>
+          <planeGeometry args={[PAGE_W, RIM_T]} />
+        </mesh>
+      </group>
 
       {/* Static left page card, mirrored across the spine (the group's
           x-mirror flips the print mesh AND the rims together; rims are
@@ -889,20 +953,18 @@ export function Book() {
           driven per frame with the other left statics (see the useFrame
           above): hidden through a cover flight, shown the rAF the commit
           lands — exactly where the traveling endpaper card stops. */}
-      {isOpen && (
-        <group ref={leftPageRef} visible={false} position={[0, PAGE_SURFACE_Y, 0]} scale={[-1, 1, 1]}>
-          <mesh geometry={pageGeometry} material={leftPageMaterial} />
-          <mesh material={leftRimMaterial} position={[PAGE_W, -RIM_T / 2, 0]} rotation={[0, Math.PI / 2, 0]}>
-            <planeGeometry args={[PAGE_H, RIM_T]} />
-          </mesh>
-          <mesh material={leftRimMaterial} position={[PAGE_W / 2, -RIM_T / 2, PAGE_H / 2]}>
-            <planeGeometry args={[PAGE_W, RIM_T]} />
-          </mesh>
-          <mesh material={leftRimMaterial} position={[PAGE_W / 2, -RIM_T / 2, -PAGE_H / 2]} rotation={[0, Math.PI, 0]}>
-            <planeGeometry args={[PAGE_W, RIM_T]} />
-          </mesh>
-        </group>
-      )}
+      <group ref={leftPageRef} visible={false} position={[0, PAGE_SURFACE_Y, 0]} scale={[-1, 1, 1]}>
+        <mesh geometry={pageGeometry} material={leftPageMaterial} />
+        <mesh material={leftRimMaterial} position={[PAGE_W, -RIM_T / 2, 0]} rotation={[0, Math.PI / 2, 0]}>
+          <planeGeometry args={[PAGE_H, RIM_T]} />
+        </mesh>
+        <mesh material={leftRimMaterial} position={[PAGE_W / 2, -RIM_T / 2, PAGE_H / 2]}>
+          <planeGeometry args={[PAGE_W, RIM_T]} />
+        </mesh>
+        <mesh material={leftRimMaterial} position={[PAGE_W / 2, -RIM_T / 2, -PAGE_H / 2]} rotation={[0, Math.PI, 0]}>
+          <planeGeometry args={[PAGE_W, RIM_T]} />
+        </mesh>
+      </group>
 
       {/* The page currently mid-turn; hidden except during a non-cover turn.
           Its two face materials live in this component (see sheetFront/
@@ -919,36 +981,41 @@ export function Book() {
       {/* Pop-up layers for the open spread: folded paper cutouts that spring
           up from the page. Mounted for spread ± 1 (see popupSpreadIndices
           above) to keep neighboring textures warm, but each PopupSpread
-          only renders visibly while it's the current spread. */}
-      {isOpen && (
-        <group ref={popupsRef} position={[0, POPUP_Y, 0]}>
-          {popupSpreadIndices.map((i) => {
-            const content = popupContentForSpread(i)
-            if (!content) return null
-            const role: PopupRole =
-              turning === null
-                ? i === spread
-                  ? 'current'
+          only renders visibly while it's the current spread.
+          RESIDENT FROM LOAD, shut book included (E5 perf — see the comment on
+          the removed `isOpen` flag above): this group carries the chapter-1
+          diorama's LIGHTS, and mounting them at cover-open changed the scene's
+          light count mid-turn, re-linking every program in the scene. Nothing
+          here is visibility-gated as a group either, for the same reason —
+          the pieces self-hide on `liveSpreadRole` and the stage lights are
+          authored at intensity 0. */}
+      <group ref={popupsRef} position={[0, POPUP_Y, 0]}>
+        {popupSpreadIndices.map((i) => {
+          const content = popupContentForSpread(i)
+          if (!content) return null
+          const role: PopupRole =
+            turning === null
+              ? i === spread
+                ? 'current'
+                : 'hidden'
+              : i === spread
+                ? 'outgoing'
+                : i === incomingSpreadIndex
+                  ? 'incoming'
                   : 'hidden'
-                : i === spread
-                  ? 'outgoing'
-                  : i === incomingSpreadIndex
-                    ? 'incoming'
-                    : 'hidden'
-            return (
-              <PopupSpread
-                key={i}
-                layers={content.layers}
-                accents={content.accents}
-                spreadIndex={i}
-                role={role}
-                frame={frame}
-                committedSpread={committedSpread}
-              />
-            )
-          })}
-        </group>
-      )}
+          return (
+            <PopupSpread
+              key={i}
+              layers={content.layers}
+              accents={content.accents}
+              spreadIndex={i}
+              role={role}
+              frame={frame}
+              committedSpread={committedSpread}
+            />
+          )
+        })}
+      </group>
 
       {/* Front cover pivot: rotation.z rests at 0 (closed, on top) / PI
           (open, flat left); the turn driver takes over continuously

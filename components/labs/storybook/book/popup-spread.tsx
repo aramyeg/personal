@@ -22,7 +22,7 @@
  * so a layer's local y=0 is the page plane and the spine runs along z at x=0.
  */
 
-import { useEffect, useMemo, useRef, type RefObject } from 'react'
+import { memo, useEffect, useMemo, useRef, type RefObject } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import type { SceneLayer } from '../content'
@@ -524,10 +524,7 @@ function PopupLayer({
   )
 }
 
-/** One spread's worth of pop-up layers. Always mounted (for the current
- *  spread ± 1) but only visible while `role !== 'hidden'`. Children find
- *  their parent in the same spread's layer list. */
-export function PopupSpread({ layers, accents, spreadIndex, role, frame, committedSpread }: PopupSpreadProps) {
+function PopupSpreadInner({ layers, accents, spreadIndex, role, frame, committedSpread }: PopupSpreadProps) {
   // WILD lane, standing decision D1: chapter 1 is not a paper mechanism. Spread 2 bypasses the
   // solver entirely and hands the page to a lit diorama, which supplies its own
   // `popup-spread-2` group with the same visibility semantics every other spread has.
@@ -840,3 +837,19 @@ export function PopupSpread({ layers, accents, spreadIndex, role, frame, committ
     </group>
   )
 }
+
+/**
+ * One spread's worth of pop-up layers. Always mounted (for the current spread
+ * ± 1) but only visible while `role !== 'hidden'`. Children find their parent
+ * in the same spread's layer list.
+ *
+ * MEMOIZED (E5 perf). book.tsx re-renders on every `setPrints` — three times
+ * around each commit, as the warm window's page prints resolve one by one —
+ * and without this each of those re-rendered the ENTIRE mounted pop-up tree
+ * (three spreads' worth, up to ~40 layers each) for nothing. Every prop here
+ * is identity-stable across those renders: `layers`/`accents` are module
+ * constants out of content.ts, `frame`/`committedSpread` are refs, and
+ * `spreadIndex`/`role` are primitives that change only on a real turn — so
+ * the default shallow compare is exactly the right gate.
+ */
+export const PopupSpread = memo(PopupSpreadInner)

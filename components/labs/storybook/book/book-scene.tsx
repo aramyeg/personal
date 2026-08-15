@@ -335,7 +335,20 @@ export default function BookScene() {
       // dark-theatre look now that the film curve no longer dims the whole frame.
       gl={{ antialias: true, alpha: false, toneMapping: THREE.NoToneMapping }}
       camera={{ position: [...CAMERA_POSITION], fov: CAMERA_FOV }}
-      onCreated={(state) => state.camera.lookAt(...CAMERA_LOOKAT)}
+      onCreated={(state) => {
+        state.camera.lookAt(...CAMERA_LOOKAT)
+        // E5 perf. three checks every program's link result on its FIRST USE
+        // (WebGLProgram's deferred `onFirstUse`), and that check costs three
+        // synchronous `getShaderInfoLog`/`getProgramInfoLog` round trips to
+        // the GPU process per program — the single largest line in the turn
+        // profile (2256ms on the cover-open turn at 4x throttle). The shaders
+        // here are three's own, from a build that already compiled; there is
+        // no author to report a shader error TO in production. Dev keeps the
+        // check, so a broken material still shouts during development.
+        // book/warm-programs.ts handles the other half: absorbing the link
+        // WAIT at an idle moment instead of on the first frame of a turn.
+        if (process.env.NODE_ENV === 'production') state.gl.debug.checkShaderErrors = false
+      }}
     >
       <color attach="background" args={[DESK_COLOR]} />
       {/* v2 pivot: the book reads like a bright printed object — childhood
