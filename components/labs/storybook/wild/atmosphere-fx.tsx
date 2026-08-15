@@ -30,6 +30,9 @@ import {
   STAGE,
   WINDOWS,
 } from './inn-model'
+import { KEY_FEEL, type KeyClick } from './key-physics'
+import { STAGE_LIFE, windAt } from './stage-life'
+import { KEY_CLICK_EVENT } from './the-key'
 import { ramp, readWildFrame, useWild, damp } from './wild-frame'
 import { roomLevel } from './windows'
 
@@ -238,6 +241,7 @@ const SMOKE_W = 0.15
 
 const SMOKE_VERT = /* glsl */ `
 uniform float uTime;
+uniform float uWind;
 varying vec2 vUv;
 void main() {
   vUv = uv;
@@ -248,6 +252,11 @@ void main() {
   p.x *= mix(0.30, 1.0, pow(t, 0.7));
   p.x += (sin(t * 2.4 + uTime * 0.42) * 0.055 + sin(t * 5.3 - uTime * 0.29) * 0.022) * t;
   p.z += cos(t * 1.9 - uTime * 0.35) * 0.030 * t;
+  // THE PLUME ANSWERS THE WIND (wild/stage-life.ts). Smoke leaving a pot has the flue's own push
+  // for the first few centimetres and only then belongs to the weather, so the lean grows faster
+  // than the height does — and it is the SAME signal the sign swings on, so the reader can see
+  // one wind blowing across the whole stage instead of three private ones.
+  p.x += uWind * pow(t, 1.3);
   gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0);
 }
 `
@@ -324,6 +333,87 @@ void main() {
 `
 
 // -----------------------------------------------------------------------------------------
+// THE MOTES — moths at the lantern, fireflies over the well. ONE draw call, two colonies.
+// -----------------------------------------------------------------------------------------
+
+const LAMP = STAGE_LIFE.motes.lamp
+const WELL_MOTES = STAGE_LIFE.motes.well
+const MOTE_COUNT = LAMP.count + WELL_MOTES.count
+
+/**
+ * Both colonies live in one `THREE.Points` because two would be two draw calls for nineteen
+ * pixels. `aSeed.w` is the role and every constant is spliced in from STAGE_LIFE at module load,
+ * so the branch is uniform-free and the table stays the only place a number is written.
+ *
+ * The moth's law is an orbit that never closes: three incommensurate rates plus a fast jitter, so
+ * it circles the lamp the way a moth does — committed to the light, bad at flying. The firefly's
+ * is a slow lissajous drift with a hard blink on top: a sharp catch and a long fade, each mote on
+ * its own phase, so the colony pulses without any two of them agreeing.
+ */
+const MOTE_VERT = /* glsl */ `
+attribute vec4 aSeed;   // x,y,z: per-mote randoms · w: role (0 moth, 1 firefly)
+uniform float uTime;
+uniform float uLamp;
+uniform float uWell;
+uniform float uScale;
+varying float vAlpha;
+varying float vRole;
+
+const float TAU = 6.2831853;
+
+void main() {
+  vec3 p = position;
+  float alpha = 0.0;
+  float size = 0.0;
+
+  if (aSeed.w < 0.5) {
+    float ang = TAU * uTime / ${LAMP.period.toFixed(3)} * (0.85 + 0.30 * aSeed.x) + aSeed.x * TAU;
+    p.x += ${LAMP.radius[0].toFixed(4)} * cos(ang);
+    p.y += ${LAMP.radius[1].toFixed(4)} * sin(ang * 1.73 + aSeed.y * TAU);
+    p.z += ${LAMP.radius[2].toFixed(4)} * sin(ang);
+    p += ${LAMP.jitter.toFixed(4)} * vec3(
+      sin(uTime * 7.3 + aSeed.y * 13.0),
+      sin(uTime * 9.1 + aSeed.z * 11.0),
+      sin(uTime * 6.2 + aSeed.x * 17.0)
+    );
+    // A moth is only bright when it turns its wing to the lamp.
+    alpha = uLamp * (0.45 + 0.55 * abs(sin(uTime * 5.1 + aSeed.z * TAU)));
+    size = ${LAMP.size.toFixed(4)} * (0.7 + 0.6 * aSeed.z);
+  } else {
+    float w = TAU * uTime / (${WELL_MOTES.period.toFixed(3)} * (0.7 + 0.6 * aSeed.x));
+    p.x += ${WELL_MOTES.spread[0].toFixed(4)} * sin(w + aSeed.x * TAU);
+    p.y += ${WELL_MOTES.spread[1].toFixed(4)} * sin(w * 0.61 + aSeed.y * TAU);
+    p.z += ${WELL_MOTES.spread[2].toFixed(4)} * cos(w * 0.83 + aSeed.z * TAU);
+    float b = fract(uTime / ${WELL_MOTES.blink.toFixed(3)} + aSeed.y);
+    // Catch fast, fade slow — a firefly's own envelope, not a sine.
+    float lit = smoothstep(0.0, 0.06, b) * (1.0 - smoothstep(0.10, ${WELL_MOTES.duty.toFixed(3)}, b));
+    alpha = uWell * lit * (0.45 + 0.55 * aSeed.z);
+    size = ${WELL_MOTES.size.toFixed(4)} * (0.7 + 0.6 * aSeed.x);
+  }
+
+  vAlpha = alpha;
+  vRole = aSeed.w;
+  vec4 mv = modelViewMatrix * vec4(p, 1.0);
+  gl_PointSize = size * uScale / max(0.05, -mv.z);
+  gl_Position = projectionMatrix * mv;
+}
+`
+
+const MOTE_FRAG = /* glsl */ `
+uniform vec3 uMoth;
+uniform vec3 uFly;
+varying float vAlpha;
+varying float vRole;
+void main() {
+  if (vAlpha <= 0.004) discard;
+  float d = length(gl_PointCoord - 0.5) * 2.0;
+  float a = pow(1.0 - clamp(d, 0.0, 1.0), 2.1) * vAlpha;
+  if (a <= 0.004) discard;
+  gl_FragColor = vec4(mix(uMoth, uFly, step(0.5, vRole)), a);
+}
+`
+
+// -----------------------------------------------------------------------------------------
 // CAMERA LEAN
 // -----------------------------------------------------------------------------------------
 
@@ -337,6 +427,18 @@ const LEAN_AIM = 0.22
 const LEAN_LAMBDA = 2.6
 /** Below this the lean is over: the camera is put back on its constants exactly and left. */
 const LEAN_EPS = 1e-4
+
+/**
+ * THE CLICK KICK. The key's detents fire `KEY_CLICK_EVENT` with the click's own strength and
+ * direction, and the physics core carries an unread `roll` channel for exactly this — the frame
+ * twitching when the rotor seats. The rig lives here, so the consumption does too.
+ *
+ * The amplitude and the decay are the TOY's numbers (`KEY_FEEL.camRoll` / `camHalflife`), read
+ * rather than restated, so the kick can never drift out of step with the click that caused it —
+ * and the event is used rather than `window.__wildKey.roll` because that channel only exists
+ * under `?wilddebug=1` and the kick has to be there for the reader, not for the harness.
+ */
+const KICK_EPS = 1e-6
 
 /** <PopupSpread> sits at this world height, so the arch's local y has to be lifted to aim at. */
 const POPUP_Y = 0.062
@@ -510,8 +612,49 @@ export function AtmosphereFx() {
     return { geo, mat }
   }, [])
 
+  // --- motes: moths at the lamp, fireflies over the well -------------------------------------
+  const motes = useMemo(() => {
+    const pos = new Float32Array(MOTE_COUNT * 3)
+    const seed = new Float32Array(MOTE_COUNT * 4)
+    for (let i = 0; i < MOTE_COUNT; i += 1) {
+      const moth = i < LAMP.count
+      const home = moth ? LAMP.center : WELL_MOTES.center
+      pos[i * 3 + 0] = home[0]
+      pos[i * 3 + 1] = home[1]
+      pos[i * 3 + 2] = home[2]
+      // Hashed, never Math.random: two loads have to hang the same motes in the same air.
+      for (let k = 0; k < 3; k += 1) {
+        const s = Math.sin(i * 53.17 + k * 19.73 + 7.1) * 43758.5453
+        seed[i * 4 + k] = s - Math.floor(s)
+      }
+      seed[i * 4 + 3] = moth ? 0 : 1
+    }
+    const geo = new THREE.BufferGeometry()
+    geo.setAttribute('position', new THREE.BufferAttribute(pos, 3))
+    geo.setAttribute('aSeed', new THREE.BufferAttribute(seed, 4))
+    const mat = new THREE.ShaderMaterial({
+      vertexShader: MOTE_VERT,
+      fragmentShader: MOTE_FRAG,
+      uniforms: {
+        uTime: { value: 0 },
+        uLamp: { value: 0 },
+        uWell: { value: 0 },
+        uScale: { value: 1000 },
+        uMoth: { value: new THREE.Color(LAMP.color) },
+        uFly: { value: new THREE.Color(WELL_MOTES.color) },
+      },
+      transparent: true,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+    })
+    return { geo, mat }
+  }, [])
+  const motesRef = useRef<THREE.Points>(null)
+
   // --- camera lean bookkeeping ---------------------------------------------------------------
   const leanRef = useRef(0)
+  /** Live roll impulse, radians, decaying on the toy's own halflife. */
+  const kickRef = useRef(0)
   const leanActiveRef = useRef(false)
   const base = useMemo(
     () => ({
@@ -548,6 +691,18 @@ export function AtmosphereFx() {
     }
   }, [camera, base])
 
+  // The detent click, straight off the toy. Set rather than accumulated, exactly as the physics
+  // core sets its own `roll`: two clicks inside one frame are one seating, not two.
+  useEffect(() => {
+    const onClick = (event: Event): void => {
+      const click = (event as CustomEvent<KeyClick>).detail
+      if (!click) return
+      kickRef.current = KEY_FEEL.camRoll * click.strength * click.dir * STAGE_LIFE.kick.roll
+    }
+    window.addEventListener(KEY_CLICK_EVENT, onClick)
+    return () => window.removeEventListener(KEY_CLICK_EVENT, onClick)
+  }, [])
+
   // --- disposal -------------------------------------------------------------------------------
   useEffect(
     () => () => {
@@ -564,8 +719,10 @@ export function AtmosphereFx() {
       smoke.mat.dispose()
       embers.geo.dispose()
       embers.mat.dispose()
+      motes.geo.dispose()
+      motes.mat.dispose()
     },
-    [glowTex, flareMat, arch, gallery, pools, smoke, embers],
+    [glowTex, flareMat, arch, gallery, pools, smoke, embers, motes],
   )
 
   const archGroupRef = useRef<THREE.Group>(null)
@@ -583,6 +740,16 @@ export function AtmosphereFx() {
     const passage = roomLevel(f.wake, 'passage')
     const galleryLevel = roomLevel(f.wake, 'gallery')
     const kitchen = roomLevel(f.wake, 'kitchen')
+
+    // ONE WIND for the whole stage (wild/stage-life.ts). The sign swings on it, the plume leans
+    // into it and the mist is carried by it; read once, here, off the shared clock.
+    const wind = windAt(f.time)
+
+    // Points are sized in world units, so the pixel scale is the projection's own: half the
+    // viewport height over the tangent of the half-fov. Computed once and shared by both systems.
+    const pointScale =
+      (size.height * dpr) /
+      (2 * Math.tan(((camera as THREE.PerspectiveCamera).fov * Math.PI) / 360))
 
     // ARCH SHAFT — the money shot. Its two shells breathe against each other so the beam
     // never sits still, and the flare in the mouth carries the actual blow-out.
@@ -623,6 +790,21 @@ export function AtmosphereFx() {
       // Intensity only — flipping a light's visibility re-links every program in the scene.
       const light = lanternLightRef.current
       if (light) light.intensity = (0.16 + 1.15 * passage) * stage * flicker
+
+      // THE MOTHS answer the flame that drew them, so they brighten on the same flicker; the
+      // colony thins as the rest of the inn lights and the lamp stops being the only game in town.
+      motes.mat.uniforms.uLamp.value =
+        stage * flicker * (LAMP.rest + (LAMP.woken - LAMP.rest) * f.wake)
+    }
+
+    // THE MOTES. Fireflies wake over the well with the inn; the moths were already there.
+    {
+      motes.mat.uniforms.uTime.value = f.time
+      motes.mat.uniforms.uScale.value = pointScale
+      motes.mat.uniforms.uWell.value =
+        stage * ramp(f.wake, WELL_MOTES.wake[0], WELL_MOTES.wake[1])
+      const pts = motesRef.current
+      if (pts) pts.visible = stage > 0.004
     }
 
     // GALLERY SHAFTS — thin, late, and only ever a supporting voice.
@@ -669,6 +851,8 @@ export function AtmosphereFx() {
     // plume once the kitchen is lit, and thicker again as the whole inn comes up.
     {
       smoke.mat.uniforms.uTime.value = f.time
+      // The lean is authored in plume-widths and applied in world units at the top of the column.
+      smoke.mat.uniforms.uWind.value = wind * STAGE_LIFE.smoke.lean * SMOKE_W
       const level = (0.1 + 0.62 * kitchen + 0.28 * f.wake) * stage
       smoke.mat.uniforms.uOpacity.value = level
       const group = smokeGroupRef.current
@@ -681,8 +865,7 @@ export function AtmosphereFx() {
       const level = ramp(f.wake, 0.5, 0.72) * stage
       embers.mat.uniforms.uTime.value = f.time
       embers.mat.uniforms.uLevel.value = level
-      embers.mat.uniforms.uScale.value =
-        (size.height * dpr) / (2 * Math.tan(((camera as THREE.PerspectiveCamera).fov * Math.PI) / 360))
+      embers.mat.uniforms.uScale.value = pointScale
       const pts = embersRef.current
       if (pts) pts.visible = level > 0.004
     }
@@ -692,7 +875,16 @@ export function AtmosphereFx() {
     if (base.captured) {
       const want = f.hidden ? 0 : ramp(f.wake, LEAN_FROM, LEAN_TO)
       leanRef.current = damp(leanRef.current, want, LEAN_LAMBDA, dt)
-      if (leanRef.current < LEAN_EPS) {
+
+      // The detent kick decays on the toy's own halflife, so the frame settles exactly as the
+      // rotor does. A hidden spread drops it outright — a click cannot be owed across a page turn.
+      kickRef.current = f.hidden
+        ? 0
+        : kickRef.current * Math.exp((-Math.LN2 * dt) / KEY_FEEL.camHalflife)
+      const kick = Math.abs(kickRef.current) < KICK_EPS ? 0 : kickRef.current
+
+      const leaning = leanRef.current >= LEAN_EPS
+      if (!leaning && kick === 0) {
         if (leanActiveRef.current) {
           camera.position.copy(base.pos)
           camera.quaternion.copy(base.quat)
@@ -701,16 +893,28 @@ export function AtmosphereFx() {
         }
       } else {
         leanActiveRef.current = true
-        const k = leanRef.current
-        const { pos, look, targetPos, targetLook } = leanScratch
-        targetPos.copy(base.look).sub(base.pos).multiplyScalar(LEAN_IN).add(base.pos)
-        targetPos.y -= LEAN_DROP
-        targetLook.set(ARCH.cx, POPUP_Y + (ARCH.springY + ARCH.apexY) / 2, ARCH.frontZ)
-        targetLook.sub(base.look).multiplyScalar(LEAN_AIM).add(base.look)
-        pos.copy(base.pos).lerp(targetPos, k)
-        look.copy(base.look).lerp(targetLook, k)
-        camera.position.copy(pos)
-        camera.lookAt(look)
+        if (leaning) {
+          const k = leanRef.current
+          const { pos, look, targetPos, targetLook } = leanScratch
+          targetPos.copy(base.look).sub(base.pos).multiplyScalar(LEAN_IN).add(base.pos)
+          targetPos.y -= LEAN_DROP
+          targetLook.set(ARCH.cx, POPUP_Y + (ARCH.springY + ARCH.apexY) / 2, ARCH.frontZ)
+          targetLook.sub(base.look).multiplyScalar(LEAN_AIM).add(base.look)
+          pos.copy(base.pos).lerp(targetPos, k)
+          look.copy(base.look).lerp(targetLook, k)
+          camera.position.copy(pos)
+          camera.lookAt(look)
+        } else {
+          // No lean yet: the kick still has to be able to move the frame, so start from home.
+          camera.position.copy(base.pos)
+          camera.quaternion.copy(base.quat)
+        }
+        if (kick !== 0) {
+          // A roll about the VIEW axis plus a hair of sag: the frame flinches with the rotor
+          // rather than the scene moving, which is what makes a click land in the hand.
+          camera.rotateZ(kick)
+          camera.position.y -= (Math.abs(kick) / KEY_FEEL.camRoll) * STAGE_LIFE.kick.drop
+        }
         camera.updateMatrixWorld()
       }
     }
@@ -791,6 +995,17 @@ export function AtmosphereFx() {
         <mesh geometry={smoke.geo} material={smoke.mat} renderOrder={3} />
         <mesh geometry={smoke.geo} material={smoke.mat} rotation={[0, Math.PI / 2.6, 0]} renderOrder={3} />
       </group>
+
+      {/* Moths at the lantern, fireflies over the well — one draw, two colonies. */}
+      <points
+        ref={motesRef}
+        geometry={motes.geo}
+        material={motes.mat}
+        renderOrder={6}
+        frustumCulled={false}
+        name="wild-motes"
+        visible={false}
+      />
 
       {/* Embers. */}
       <points
