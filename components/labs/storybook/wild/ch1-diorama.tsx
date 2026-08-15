@@ -45,7 +45,7 @@ import { writeFoldPoses } from './fold-uniforms'
 import { InnBuilding } from './inn-building'
 import { innMaterials, skinTextures } from './inn-materials'
 import { NightStage, nightArt } from './night-stage'
-import { setRiseClipHeight } from './rise-clip'
+import { setLeafClipAngle, setRiseClipHeight } from './rise-clip'
 import { TheKey } from './the-key'
 import { InnWindows, windowAtlases } from './windows'
 import { readWildFrame, WildContext, type WildContextValue } from './wild-frame'
@@ -166,7 +166,14 @@ export function Ch1Diorama({ spreadIndex, role, frame, committedSpread }: Ch1Dio
     if (!root) return
     setRiseClipHeight(worldY(root))
 
-    const { open } = readWildFrame(context)
+    const { open, thetaL } = readWildFrame(context)
+
+    // THE LEAF PLANE. The diorama may only occupy the half of the table the flying leaf has
+    // already swept past — the other half still belongs to the spread the reader is looking at.
+    // Re-read from the root's world matrix every frame for the same reason the rise clip is:
+    // the desk's parallax rig moves the whole book under us.
+    root.updateWorldMatrix(true, false)
+    setLeafClipAngle(thetaL, root.matrixWorld)
 
     // The stage is NEVER hidden by visibility: flipping it would change the renderer's
     // visible-light set, and a light-count change re-links every program in the scene — the

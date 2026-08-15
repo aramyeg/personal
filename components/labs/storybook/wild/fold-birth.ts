@@ -67,53 +67,57 @@ import {
 // THE EVENT TABLE — the tuning surface. One table, named events, nothing else to hunt for.
 // ---------------------------------------------------------------------------------------------
 
-export type FoldEventName =
-  | 'walls'
-  | 'tower'
-  | 'jetty'
-  | 'yard'
-  | 'roof'
-  | 'crest'
-  | 'dressing'
+export type FoldEventName = 'yard' | 'walls' | 'jetty' | 'roof' | 'crest' | 'dressing'
 
 /** A piece's own slice of the curtain-up, as fractions of the WILD frame's `open`. */
 export type FoldWindow = { readonly t0: number; readonly t1: number }
 
 /**
- * Seven separated erection events, filling the curtain END TO END.
+ * Six separated erection events, ordered by WHERE THE LEAF IS.
  *
- * THE UNITS MATTER, AND THEY CHANGED. `open` is no longer a smoothstep of the dihedral; it is
- * the curtain clock, which is 0 until the spread is legible and then LINEAR IN WALL TIME to the
- * turn's commit (see wild-frame.ts for the measurement that forced it). So a window of width w
- * is now worth w * ~978 ms of the reader's actual time, and these windows are sized in exactly
- * that currency.
+ * THE UNITS. `open` is the curtain clock: 0 until the spread is legible, then linear in wall time
+ * to the turn's commit (see wild-frame.ts). A window of width w is worth w * ~978 ms of the
+ * reader's actual time, and these are sized in that currency — 0.215 wide is ~151 ms of base
+ * travel, which is the floor an event needs to read as motion rather than as a cut.
  *
- * Spans are equal (0.215) and step by ~0.131, so every adjacent pair overlaps by ~0.084 — 39%
- * of the window, just inside the donor's 40% ceiling. That is the tightest legal packing, and it
- * is what buys each event its ~151 ms of base travel: seven events at 40% overlap need about
- * 4.6 window-widths of clock, and the clock is only as long as the turn.
+ * THE ORDER IS NOT STRUCTURAL ANY MORE, IT IS GEOGRAPHIC — and that is the whole lesson of the
+ * first sweep. A next-turn exposes the incoming spread's RIGHT half almost immediately, but the
+ * LEFT half stays the outgoing spread's until the leaf lands on it late in the turn (thetaL only
+ * passes 150 deg at ~750 ms of 1500). The leaf plane now clips the diorama to the swept side
+ * (rise-clip.ts), so anything scheduled to erect on the left before the leaf gets there erects
+ * INSIDE THE CLIP and the reader never sees it. Measured, with the old table: the walls showed
+ * 26% of their travel and the tower 28%. Both were dead.
  *
- * The first window opens at 0 — the ground floor creases up in the same breath the night starts
- * arriving — and the last closes at 1, landing the sign as the page commits.
+ * So the build now follows the leaf outward:
+ *   yard      the courtyard furniture, wholly RIGHT of the spine — visible from the first frame
+ *             the curtain is up, and the only piece that can open the show.
+ *   (a beat)  0.215..0.262 is deliberately empty. It is where the leaf is sweeping down across
+ *             the left half, and the stage holding still under it is the point.
+ *   walls     the ground floor, once the leaf has cleared its crease.
+ *   jetty ... in the leaf's wake, each on its own beat.
+ *   crest     dormers, chimney AND the stair tower — the far-left mass whose ground crease is
+ *             the very last thing the leaf uncovers, so it completes the silhouette rather than
+ *             opening the build.
+ *   dressing  the sign drops onto its bracket as the page commits. Still the last beat, exactly
+ *             as the original curtain-up had it.
  *
- * The order is structural, not arbitrary: nothing may erect before what it stands on.
+ * Adjacent windows overlap by 0.084 — 39% of the window, just inside the donor's 40% ceiling.
+ * The structural law still holds inside that order: nothing erects before what it stands on.
  */
 export const FOLD_EVENTS: Record<FoldEventName, FoldWindow> = {
-  walls: { t0: 0.0, t1: 0.215 },
-  tower: { t0: 0.131, t1: 0.346 },
-  jetty: { t0: 0.262, t1: 0.477 },
-  yard: { t0: 0.392, t1: 0.607 },
-  roof: { t0: 0.523, t1: 0.738 },
-  crest: { t0: 0.654, t1: 0.869 },
+  yard: { t0: 0.0, t1: 0.215 },
+  walls: { t0: 0.262, t1: 0.477 },
+  jetty: { t0: 0.393, t1: 0.608 },
+  roof: { t0: 0.524, t1: 0.739 },
+  crest: { t0: 0.655, t1: 0.87 },
   dressing: { t0: 0.785, t1: 1.0 },
 }
 
 /** Events in start order — the order the window-overlap law is checked in. */
 export const FOLD_EVENT_ORDER: readonly FoldEventName[] = [
-  'walls',
-  'tower',
-  'jetty',
   'yard',
+  'walls',
+  'jetty',
   'roof',
   'crest',
   'dressing',
@@ -302,7 +306,9 @@ export const FOLD_CHUNKS: readonly FoldChunk[] = [
   },
   {
     name: 'tower',
-    event: 'tower',
+    // The tallest mass, and the furthest LEFT — so its base crease is the last ground the leaf
+    // uncovers. It joins the crest rather than opening the build; see FOLD_EVENTS.
+    event: 'crest',
     parent: null,
     origin: [0, 0, TOWER.max[2]],
     rise: UP,

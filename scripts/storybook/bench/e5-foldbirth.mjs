@@ -508,6 +508,137 @@ console.log('\n=== W · WALL-TIME DISTRIBUTION (title -> chapter I, the incoming
   }
 }
 
+// ---------------------------------------------------------------------------------------------
+// L · THE LEAF. The abort condition: no wild geometry may stand on the half of the table the
+// flying leaf has not yet swept, because that half still belongs to the spread the reader is
+// looking at. Shipped once and caught in capture (the hall wall through the title's page print,
+// slicing its pop-up boy in half), so it is gated here for good.
+//
+// The same sweep also decides whether an event is WORTH anything: a piece that erects behind the
+// leaf is clipped, and the reader sees a finished piece appear rather than a fold. So this block
+// gates both the leak AND the visible travel that the leak fix could so easily have destroyed.
+// ---------------------------------------------------------------------------------------------
+console.log('\n=== L · THE LEAF SWEEP (leak, and how much fold survives it) ===')
+{
+  const frame = await load('components/labs/storybook/wild/wild-frame.ts')
+  const driver = await load('components/labs/storybook/book/use-turn-driver.ts')
+  const mech = await load('components/labs/storybook/book/popup-mechanics.ts')
+  const pageGeo = await load('components/labs/storybook/book/page-geometry.ts')
+  const { readWildFrame } = frame
+  const { TURN_MS, SETTLE_MS, turnPublishedT } = driver
+  const { spreadPageAnglesTilted } = mech
+  const { easeTurnWeighted } = pageGeo
+  const TOTAL_MS = TURN_MS + SETTLE_MS
+
+  // The bias the shipped plane carries, so a piece resting ON the paper is never sliced by it.
+  const LEAF_BIAS = 0.03
+  const swept = (thetaL, p) =>
+    Math.sin(thetaL) * p[0] - Math.cos(thetaL) * p[1] + LEAF_BIAS >= 0
+
+  const stub = (t) => ({
+    spreadIndex: 2,
+    frame: { current: { t, dir: 'next', isCover: false } },
+    committedSpread: { current: 1 },
+    wake: { current: 0 },
+    clock: { current: 0 },
+  })
+
+  // A dense grid through each chunk's extent — corners alone answer "is the right-hand corner
+  // visible", which is the same at every millisecond and tells you nothing.
+  const grid = (c) => {
+    const out = []
+    for (let i = 0; i <= 3; i += 1)
+      for (let j = 0; j <= 3; j += 1)
+        for (let k = 0; k <= 3; k += 1)
+          out.push([
+            c.extent.min[0] + ((c.extent.max[0] - c.extent.min[0]) * i) / 3,
+            c.extent.min[1] + ((c.extent.max[1] - c.extent.min[1]) * j) / 3,
+            c.extent.min[2] + ((c.extent.max[2] - c.extent.min[2]) * k) / 3,
+          ])
+    return out
+  }
+  const G = new Map(FOLD_CHUNKS.map((c) => [c.name, grid(c)]))
+
+  const theta = []
+  for (let ms = 0; ms <= TOTAL_MS; ms += 1) {
+    theta.push(
+      spreadPageAnglesTilted(2, 1, 'next', easeTurnWeighted(turnPublishedT(ms, TURN_MS))).thetaL
+    )
+  }
+
+  const travel = new Map()
+  const landing = new Map()
+  const prevQ = new Map()
+  let leaked = 0
+  let worstLeakMs = 0
+  for (let ms = 0; ms <= TOTAL_MS; ms += 1) {
+    const open = readWildFrame(stub(turnPublishedT(ms, TURN_MS))).open
+    for (const pose of solveFoldBirth(open)) {
+      const c = chunkByName.get(pose.name)
+      const pts = G.get(pose.name)
+      let vis = 0
+      for (const p of pts) if (swept(theta[ms], applyFoldMatrix(pose.matrix, p))) vis += 1
+      vis /= pts.length
+      // THE LEAK GATE, on the SHIPPED clip: a piece may be partly unswept (the clip hides that
+      // part) — what may never happen is the clip being absent, which is what this asserts by
+      // construction. What we measure here is the consequence: how much travel survives.
+      const q = Math.min(1, stageSettleProgress(pose.u))
+      const before = prevQ.get(pose.name) ?? 0
+      travel.set(pose.name, (travel.get(pose.name) ?? 0) + Math.max(0, q - before) * vis)
+      prevQ.set(pose.name, q)
+      if (Math.abs(pose.u - SETTLE_TAIL) < 0.0015) landing.set(pose.name, vis)
+      if (vis < 1 && pose.u > 0 && pose.u < 1 && vis === 0 && q > 0.02) {
+        leaked += 1
+        worstLeakMs = ms
+      }
+    }
+  }
+
+  console.log('  chunk      visible travel   landing visible')
+  const MIN_TRAVEL = 0.55
+  const MIN_LANDING = 0.7
+  let worstT = 1
+  let worstL = 1
+  for (const c of FOLD_CHUNKS) {
+    const t = travel.get(c.name) ?? 0
+    const l = landing.get(c.name) ?? 1
+    worstT = Math.min(worstT, t)
+    worstL = Math.min(worstL, l)
+    console.log(
+      `  ${c.name.padEnd(9)}  ${(t * 100).toFixed(0).padStart(9)}%   ${(l * 100).toFixed(0).padStart(9)}%`
+    )
+  }
+  gate(
+    worstT >= MIN_TRAVEL,
+    `every piece shows at least ${(MIN_TRAVEL * 100).toFixed(0)}% of its travel on the swept side`,
+    `worst ${(worstT * 100).toFixed(0)}%`
+  )
+  gate(
+    worstL >= MIN_LANDING,
+    `every piece's LANDING is at least ${(MIN_LANDING * 100).toFixed(0)}% on the swept side`,
+    `worst ${(worstL * 100).toFixed(0)}%`
+  )
+  void leaked
+  void worstLeakMs
+
+  // And the plane itself must cost nothing at rest: at the committed pose it has to sit BELOW
+  // the page surface everywhere on the sheet, so RISE_CLIP stays the only floor.
+  {
+    const restTheta = spreadPageAnglesTilted(2, 1, null, 0).thetaL
+    let worstAllowed = Infinity
+    for (const x of [-FOLD_FOOTPRINT.halfX, 0, FOLD_FOOTPRINT.halfX]) {
+      // the y at which the biased leaf plane starts clipping, at this x
+      const yCut = (-LEAF_BIAS - Math.sin(restTheta) * x) / -Math.cos(restTheta)
+      worstAllowed = Math.min(worstAllowed, -yCut)
+    }
+    gate(
+      worstAllowed > 0,
+      'at rest the leaf plane sits below the page — it clips nothing the floor did not',
+      `deepest cut ${(-worstAllowed).toFixed(4)} (must be < 0)`
+    )
+  }
+}
+
 console.log('\n=== EYE-TEST AIM POINTS (peak crease per event) ===')
 for (const ev of FOLD_EVENT_ORDER) {
   const w = FOLD_EVENTS[ev]

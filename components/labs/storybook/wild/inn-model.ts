@@ -561,6 +561,10 @@ export const MASS_APEX_Y = TOWER.cap.apexY
  */
 export const REVEAL = {
   night: [0.0, 0.34] as const,
-  courtyard: [0.2, 0.52] as const,
+  // The paving leads the build, because the courtyard furniture is now the FIRST hinge event
+  // (it is the only piece wholly right of the spine, so it is the only one the leaf has already
+  // uncovered when the curtain goes up). Cobbles down, then the well and the barrels stand up on
+  // them, then the inn creases up off them.
+  courtyard: [0.0, 0.26] as const,
   dressing: [0.72, 1.0] as const,
 } as const
