@@ -60,13 +60,20 @@ function breezeAt(t: number): number {
 }
 
 /**
- * Signed wind, about -1.3 .. 1.3. The gust envelope swells the whole breeze every ~18 s rather
- * than adding a fourth sine, so a gust reads as the SAME wind blowing harder — which is what a
- * gust is — instead of as a new motion appearing on top.
+ * Signed wind, about -1.3 .. 1.3 asleep and half again as strong at full wake. The gust envelope
+ * swells the whole breeze every ~18 s rather than adding a fourth sine, so a gust reads as the
+ * SAME wind blowing harder — which is what a gust is — instead of as a new motion on top.
+ *
+ * THE WAKE TERM is the cheapest life-density lever on the stage: one multiplier lifts the sign,
+ * the plume, the mist and the pennant together as the reader turns the key, so the woken frame is
+ * a windier night as well as a warmer one and the sleeping frame stays as still as it has to be.
+ * It is not physics — lighting a taproom does not raise a breeze — it is the night stirring, and
+ * it costs nothing because every consumer already reads this one function.
  */
-export function windAt(t: number): number {
+export function windAt(t: number, wake = 0): number {
   const gust = 0.5 + 0.5 * Math.sin((TAU * t) / 17.9 + 0.7)
-  return breezeAt(t) * (STAGE_LIFE.wind.calm + STAGE_LIFE.wind.gust * gust)
+  const swell = STAGE_LIFE.wind.calm + STAGE_LIFE.wind.gust * gust
+  return breezeAt(t) * swell * (1 + STAGE_LIFE.wind.wake * wake)
 }
 
 /**
@@ -122,8 +129,11 @@ export function catCrossingAt(t: number): CatCrossing {
 // ---------------------------------------------------------------------------------------------
 
 export const STAGE_LIFE = {
-  /** The one weather signal. `calm` is the still-air scale, `gust` how much a swell adds. */
-  wind: { calm: 0.55, gust: 0.75 },
+  /**
+   * The one weather signal. `calm` is the still-air scale, `gust` how much a swell adds, and
+   * `wake` how much harder it blows once every room is lit.
+   */
+  wind: { calm: 0.55, gust: 0.75, wake: 0.35 },
 
   /**
    * THE SIGN. It already swung; it now swings on the wind instead of on its own clock, and it

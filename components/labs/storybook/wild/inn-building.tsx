@@ -1089,13 +1089,14 @@ function TheSign({ materials }: { materials: InnMaterials }) {
   // One shared wall clock, never an integrated delta: the sign, the mist and the flames all
   // have to agree about what time it is or the spread develops two different winds.
   useFrame(() => {
+    const frame = readWildFrame(ctx)
     const g = swayRef.current
     if (g) {
       // THE SIGN SWINGS ON THE WEATHER, not on a private sine. `windAt` is the one signal the
       // plume, the mist and the tower pennant also answer, so a gust crosses the whole stage; the
       // faster whip on top is the board snatching at the end of a swing, which is the difference
       // between a hanging sign and a metronome. Amplitude is still SIGN.sway.amp (D8).
-      const wind = windAt(clock.current)
+      const wind = windAt(clock.current, frame.wake)
       const whip =
         LIFE.sign.whip *
         Math.sin((clock.current * Math.PI * 2) / LIFE.sign.whipPeriod) *
@@ -1105,7 +1106,7 @@ function TheSign({ materials }: { materials: InnMaterials }) {
     // THE LAST BEAT OF THE CURTAIN-UP. The board rides the bracket out folded up against the arm
     // and then DROPS onto its shackle — the same event the clip-rise staged, now crease-born.
     const d = dropRef.current
-    if (d) d.rotation.x = signBoardAngle(readWildFrame(ctx).open)
+    if (d) d.rotation.x = signBoardAngle(frame.open)
   })
 
   return (
@@ -1287,7 +1288,7 @@ function buildPennant(): THREE.BufferGeometry {
 }
 
 function ThePennant() {
-  const { clock } = useWild()
+  const ctx = useWild()
   // It stands on the tower cap, so it rides the tower's crease — including flat and sunk under
   // the page while the tower is still lying on the paper.
   const foldRef = useFoldGroup(SLOT.tower)
@@ -1319,8 +1320,9 @@ function ThePennant() {
   )
 
   useFrame(() => {
-    parts.material.uniforms.uTime.value = clock.current
-    parts.material.uniforms.uWind.value = windAt(clock.current)
+    const f = readWildFrame(ctx)
+    parts.material.uniforms.uTime.value = f.time
+    parts.material.uniforms.uWind.value = windAt(f.time, f.wake)
   })
 
   return (

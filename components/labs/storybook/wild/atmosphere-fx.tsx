@@ -744,7 +744,7 @@ export function AtmosphereFx() {
 
     // ONE WIND for the whole stage (wild/stage-life.ts). The sign swings on it, the plume leans
     // into it and the mist is carried by it; read once, here, off the shared clock.
-    const wind = windAt(f.time)
+    const wind = windAt(f.time, f.wake)
 
     // Points are sized in world units, so the pixel scale is the projection's own: half the
     // viewport height over the tangent of the half-fov. Computed once and shared by both systems.
