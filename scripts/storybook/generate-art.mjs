@@ -16680,6 +16680,88 @@ function chainLink(w, h, seed, mirrored) {
   return svgPiece(w, h, g)
 }
 
+// ---- E4 PAINTED — THE INN KEEPSTACK'S NEVER-SEEN FACES -------------------
+// The reading camera is lid-dominant: a keepstack tier's `-back`, `-side` and
+// `-top` are grazing-angle slivers behind or under the facade plate the reader
+// actually looks at. They load at SLIVER_TIER (512px, no mips) and are worth
+// zero hand-painted minutes — but they are NOT worth nothing, because a face
+// left on the wrong palette reads as a mis-coloured strip leaking out from
+// behind the building, which is louder than any amount of missing detail.
+//
+// So: three flat, cheap, correctly-coloured surfaces in the lane palette, with
+// the piece grain doing the rest. Bands and courses only, no motifs — at a few
+// dozen screen pixels edge-on, detail is indistinguishable from noise.
+//   -side  warm plaster cream with oxblood half-timber banding
+//   -back  the same plaster carried into shadow on storm slate
+//   -top   weathered burnt-sienna tile courses
+// Deliberately NOT in HAND_PAINTED: these stay procedural forever.
+const INN_SLIVER = {
+  plaster: '#f0e2c4',
+  plasterLit: '#f9f0dc',
+  plasterDim: '#d5c39c',
+  timber: '#7d3f32',
+  timberLit: '#96543f',
+  slate: '#40566b',
+  tile: '#b0603f',
+  tileLit: '#c67d59',
+  tileDim: '#8b4a2f',
+}
+
+/** One never-seen keepstack face. `face` is 'side' | 'back' | 'top'; the paint
+ *  is aspect-agnostic (everything is a fraction of w/h), so re-cutting the
+ *  canvas to the real mesh aspect is a dimension change and nothing else. */
+function innSliverFace(w, h, seed, face) {
+  const r = mulberry32(seed)
+  const P = INN_SLIVER
+  let s = ''
+
+  if (face === 'top') {
+    // Weathered tile: horizontal courses, each course a hair off its neighbour
+    // so the plane has tooth without any drawn tile.
+    s += `<rect width="${w}" height="${h}" fill="${P.tile}"/>`
+    const courses = 7
+    for (let i = 0; i < courses; i++) {
+      const y0 = (h * i) / courses
+      const tone = r() < 0.5 ? P.tileDim : P.tileLit
+      s += `<rect x="0" y="${fx(y0)}" width="${w}" height="${fx(h / courses)}" fill="${tone}" opacity="${fx(rr(r, 0.07, 0.17))}"/>`
+      s += `<line x1="0" y1="${fx(y0)}" x2="${w}" y2="${fx(y0)}" stroke="${P.tileDim}" stroke-width="1.6" opacity="0.45"/>`
+    }
+    // ridge highlight along the upstage edge — where the roof catches the sky
+    s += `<rect width="${w}" height="${fx(h * 0.1)}" fill="${P.tileLit}" opacity="0.3"/>`
+    return svgPiece(w, h, s)
+  }
+
+  // side + back share the plaster ground; the back is the same wall in shadow.
+  s += `<rect width="${w}" height="${h}" fill="${P.plaster}"/>`
+  s += `<rect width="${fx(w * 0.42)}" height="${h}" fill="${P.plasterLit}" opacity="0.35"/>`
+  s += `<rect y="${fx(h * 0.82)}" width="${w}" height="${fx(h * 0.18)}" fill="${P.plasterDim}" opacity="0.5"/>`
+
+  if (face === 'side') {
+    // Half-timbering: two rails and a pair of studs. Oxblood, thin, no joinery.
+    for (const yf of [0.24, 0.66]) {
+      s += `<rect y="${fx(h * yf)}" width="${w}" height="${fx(h * 0.075)}" fill="${P.timber}"/>`
+      s += `<rect y="${fx(h * yf)}" width="${w}" height="${fx(h * 0.024)}" fill="${P.timberLit}" opacity="0.7"/>`
+    }
+    for (const xf of [0.3, 0.68]) {
+      s += `<rect x="${fx(w * xf)}" y="${fx(h * 0.24)}" width="${fx(w * 0.05)}" height="${fx(h * 0.5)}" fill="${P.timber}" opacity="0.92"/>`
+    }
+    // corner posts, so the face has an edge rather than bleeding into its
+    // neighbour when two tiers meet
+    for (const xf of [0, 0.955]) {
+      s += `<rect x="${fx(w * xf)}" width="${fx(w * 0.045)}" height="${h}" fill="${P.timber}" opacity="0.85"/>`
+    }
+    return svgPiece(w, h, s)
+  }
+
+  // back: the plaster carried onto storm slate — one flat shade wash plus a
+  // faint gradient down the wall. No timber; the reader never gets a back-lit
+  // angle on this face, so banding there would only ever be seen as stripes.
+  s += `<rect width="${w}" height="${h}" fill="${P.slate}" opacity="0.62"/>`
+  s += `<rect y="${fx(h * 0.55)}" width="${w}" height="${fx(h * 0.45)}" fill="${P.slate}" opacity="0.22"/>`
+  s += `<rect y="${fx(h * 0.18)}" width="${w}" height="${fx(h * 0.055)}" fill="${P.timber}" opacity="0.3"/>`
+  return svgPiece(w, h, s)
+}
+
 async function bakePieceTexture(piece, outDir) {
   // HAND-PAINTED YIELD (see the HAND_PAINTED note at the top of this file): the
   // delivery on disk wins over the painter. Reported with its real on-disk dims
@@ -16885,6 +16967,21 @@ const PIECES = [
   { id: 'ch1-wall', seed: 20267, w: 1024, h: 164, grain: 12, paint() { return friezeKeys(this.w, this.h, this.seed) } },
   // the T-FLOOR flagship: the s2 spread print (same uv contract as page-4)
   { id: 'page-2', seed: 20270, w: 1024, h: 683, grain: 10, paint() { return innCourtyardSpread(this.w, this.h, this.seed) } },
+  // ---- E4 PAINTED — the inn keepstack's never-seen faces (innSliverFace).
+  // The hall/guest tiers' facade plates and balcony are HAND_PAINTED; these six
+  // grazing-angle slivers are not, and never will be. Canvases are cut from the
+  // ch3-keep massing (hall a .40 H .25 z .68, gallery a .34 H .22 z .56) as the
+  // nearest analogue, since the inn stack's own story dims live in content.ts
+  // and are still being finalised. Face aspects: back = 2a/H, side = z/H,
+  // top = 2a/z. The painter is aspect-agnostic, so re-cutting to the real dims
+  // is a number change here and nothing else. Long edge 512 = SLIVER_TIER's
+  // ceiling; anything larger is downscaled at load and pays memory for nothing.
+  { id: 'ch1-inn-hall-back', seed: 20280, w: 512, h: 160, grain: 18, paint() { return innSliverFace(this.w, this.h, this.seed, 'back') } },
+  { id: 'ch1-inn-hall-side', seed: 20281, w: 512, h: 188, grain: 18, paint() { return innSliverFace(this.w, this.h, this.seed, 'side') } },
+  { id: 'ch1-inn-hall-top', seed: 20282, w: 512, h: 435, grain: 16, paint() { return innSliverFace(this.w, this.h, this.seed, 'top') } },
+  { id: 'ch1-inn-guest-back', seed: 20283, w: 512, h: 166, grain: 18, paint() { return innSliverFace(this.w, this.h, this.seed, 'back') } },
+  { id: 'ch1-inn-guest-side', seed: 20284, w: 512, h: 201, grain: 18, paint() { return innSliverFace(this.w, this.h, this.seed, 'side') } },
+  { id: 'ch1-inn-guest-top', seed: 20285, w: 512, h: 422, grain: 16, paint() { return innSliverFace(this.w, this.h, this.seed, 'top') } },
   { id: 'ch1-stable-side', seed: 20210, w: 512, h: 512, grain: 12, paint() { return boxFace(this.w, this.h, this.seed, 'side', 'barn') } },
   { id: 'ch1-stable-back', seed: 20211, w: 512, h: 295, grain: 12, paint() { return boxFace(this.w, this.h, this.seed, 'back', 'barn') } },
   { id: 'ch1-stable-top', seed: 20212, w: 512, h: 295, grain: 12, paint() { return boxFace(this.w, this.h, this.seed, 'top', 'barn') } },
