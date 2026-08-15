@@ -15,6 +15,13 @@
 
 export type Vec3 = readonly [number, number, number]
 
+/**
+ * The open spread's own footprint in this frame — the trim the fold-birth has to fold flat
+ * INSIDE. Stated here rather than in the fold solver because it is a fact about the stage, and
+ * this file is the stage's single owner.
+ */
+export const SPREAD = { halfX: 1.15, halfZ: 0.75 } as const
+
 /** An axis-aligned volume. `min`/`max` are corners in the frame described above. */
 export type MassBox = {
   readonly id: string
@@ -91,6 +98,16 @@ export const DORMERS = [
 export const CHIMNEY = {
   min: [-0.065, 0, -0.4] as Vec3,
   max: [0.065, 0.9, -0.27] as Vec3,
+  /**
+   * Where the BUILT shaft actually starts. The stack is plan-centred on the spine and buried in
+   * the hall and the jetty all the way up to the slates, so nothing below the roof was ever
+   * visible — and the fold-birth needs the chimney to hinge up out of the roof as its own piece,
+   * which a shaft running to the ground cannot do (its buried half would flail outside the roof
+   * mid-flight). The stack is therefore built from here, a few centimetres under the lowest
+   * point of either slope over its plan (back slope y ~0.783 at z -0.4), so the trim costs zero
+   * pixels at rest and gives the fold a crease exactly where brick meets shingle.
+   */
+  foldBase: 0.74,
   /** Corbelled cap flares beyond the shaft. */
   cap: { baseY: 0.9, topY: 0.94, oversail: 0.018 },
   /** Smoke leaves here once the kitchen is lit. */
@@ -527,17 +544,20 @@ export const LIGHT_POOLS = [
   { room: 'kitchen' as RoomId, center: [0.24, -0.16] as const, rx: 0.16, rz: 0.14, strength: 0.5 },
 ] as const
 
-/** Highest point of the built mass — the reveal's clipping plane sweeps from 0 to here. */
+/** Highest point of the built mass. The night stage frames the inn off it. */
 export const MASS_APEX_Y = TOWER.cap.apexY
 
 /**
- * Curtain-up: which reveal event owns which slice of `open`. Four separated events, so the
- * page turn reads as a build rather than one simultaneous inflate.
+ * Curtain-up: which reveal event owns which slice of `open`. Four separated beats, so the page
+ * turn reads as a build rather than one simultaneous inflate.
+ *
+ * Beat 2 — the inn arriving — used to be a clipping-plane RISE and is now the FOLD-BIRTH: the
+ * building erects in seven staged hinge events whose own windows live in `wild/fold-birth.ts`
+ * (they span open 0.16..0.99). The other three beats are untouched; the night still arrives with
+ * the leaf, the courtyard still resolves under it, the dressing still lands last.
  */
 export const REVEAL = {
   night: [0.0, 0.34] as const,
-  /** The inn rises through a clipping plane at the page surface. */
-  rise: [0.18, 0.68] as const,
   courtyard: [0.46, 0.8] as const,
   dressing: [0.72, 1.0] as const,
 } as const

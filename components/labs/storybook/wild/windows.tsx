@@ -19,6 +19,8 @@ import { useFrame } from '@react-three/fiber'
 import { useEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
 
+import { foldSlot, type FoldChunkName } from './fold-birth'
+import { FOLD_GLSL_MOVE, foldMoveUniforms } from './fold-uniforms'
 import {
   NIGHT_WINDOW_ID,
   PALETTE,
@@ -312,6 +314,7 @@ vec2 atlasUv(vec2 uv, float idx, vec2 grid) {
 
 const VERT = /* glsl */ `
 #include <clipping_planes_pars_vertex>
+${FOLD_GLSL_MOVE}
 attribute float aGlow;
 attribute float aPhase;
 attribute float aShape;
@@ -328,7 +331,11 @@ void main() {
   vPhase = aPhase;
   vShape = aShape;
   vOcc = aOcc;
-  vec4 mvPosition = modelViewMatrix * instanceMatrix * vec4(position, 1.0);
+  // Each pane rides the fold chunk of the wall it is cut into. The instance matrix places it at
+  // its REST position first; the fold map then moves that, exactly as it moves the wall's own
+  // vertices — so a window can never drift out of its hole mid-fold.
+  vec4 rest = instanceMatrix * vec4(position, 1.0);
+  vec4 mvPosition = modelViewMatrix * uFoldM[ int( aFold + 0.5 ) ] * rest;
   gl_Position = projectionMatrix * mvPosition;
   #include <clipping_planes_vertex>
 }
@@ -418,6 +425,26 @@ void main() {
 
 const UP = new THREE.Vector3(0, 1, 0)
 
+/**
+ * Which hinge chunk each pane rides. Derived from the room, because the room already says which
+ * wall the pane is cut into — the one exception is the bullseye, which lies IN the roof slope
+ * rather than in a dormer face and so folds with the roof.
+ */
+const ROOM_FOLD: Record<RoomId, FoldChunkName> = {
+  passage: 'walls',
+  taproom: 'walls',
+  kitchen: 'walls',
+  stair: 'tower',
+  gallery: 'jetty',
+  chambers: 'jetty',
+  attic: 'dormers',
+}
+
+function foldSlotFor(slot: WindowSlot): number {
+  if (Math.abs(slot.facing[1]) > 0.5) return foldSlot('roof')
+  return foldSlot(ROOM_FOLD[slot.room])
+}
+
 /** Deterministic per-window phase — a hash, not Math.random, so a reload looks the same. */
 function phaseFor(index: number): number {
   const s = Math.sin(index * 127.1 + 311.7) * 43758.5453
@@ -446,10 +473,12 @@ export function InnWindows() {
     const phase = new Float32Array(n)
     const shape = new Float32Array(n)
     const occ = new Float32Array(n)
+    const fold = new Float32Array(n)
     WINDOWS.forEach((slot, i) => {
       phase[i] = phaseFor(i)
       shape[i] = SHAPE_INDEX[slot.shape]
       occ[i] = OCCUPANT_INDEX[slot.occupant]
+      fold[i] = foldSlotFor(slot)
     })
     const glowAttr = new THREE.InstancedBufferAttribute(glow, 1)
     glowAttr.setUsage(THREE.DynamicDrawUsage)
@@ -457,6 +486,7 @@ export function InnWindows() {
     geo.setAttribute('aPhase', new THREE.InstancedBufferAttribute(phase, 1))
     geo.setAttribute('aShape', new THREE.InstancedBufferAttribute(shape, 1))
     geo.setAttribute('aOcc', new THREE.InstancedBufferAttribute(occ, 1))
+    geo.setAttribute('aFold', new THREE.InstancedBufferAttribute(fold, 1))
     return geo
   }, [])
 
@@ -465,6 +495,7 @@ export function InnWindows() {
       vertexShader: VERT,
       fragmentShader: FRAG,
       uniforms: {
+        ...foldMoveUniforms(),
         uShapes: { value: shapes },
         uOccupants: { value: occupants },
         uTime: { value: 0 },

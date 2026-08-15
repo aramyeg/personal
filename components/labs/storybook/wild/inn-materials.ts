@@ -16,6 +16,7 @@
 import * as THREE from 'three'
 
 import { createCanvas } from '../procedural/canvas-utils'
+import { applyFoldPatch } from './fold-uniforms'
 import { PALETTE } from './inn-model'
 import { applyRiseClip } from './rise-clip'
 
@@ -692,24 +693,33 @@ export type InnMaterials = {
 
 let cachedMaterials: InnMaterials | null = null
 
+/**
+ * Every inn material is BOTH clipped at the page surface and taught the fold-birth's vertex map.
+ * The patch is unconditional on purpose: a shared material must compile to one program, and an
+ * untagged mesh reads fold slot 0, which is the identity (see fold-uniforms.ts).
+ */
 function skinned(skin: InnSkin, colour: string, extra?: Partial<THREE.MeshStandardMaterialParameters>) {
   const tex = skinTextures(skin)
-  return applyRiseClip(
-    new THREE.MeshStandardMaterial({
-      color: colour,
-      map: tex.map,
-      normalMap: tex.normalMap,
-      normalScale: new THREE.Vector2(1, 1),
-      roughnessMap: tex.roughnessMap,
-      roughness: 1,
-      metalness: 0,
-      ...extra,
-    }),
+  return applyFoldPatch(
+    applyRiseClip(
+      new THREE.MeshStandardMaterial({
+        color: colour,
+        map: tex.map,
+        normalMap: tex.normalMap,
+        normalScale: new THREE.Vector2(1, 1),
+        roughnessMap: tex.roughnessMap,
+        roughness: 1,
+        metalness: 0,
+        ...extra,
+      }),
+    ),
   )
 }
 
 function plain(params: THREE.MeshStandardMaterialParameters) {
-  return applyRiseClip(new THREE.MeshStandardMaterial({ roughness: 1, metalness: 0, ...params }))
+  return applyFoldPatch(
+    applyRiseClip(new THREE.MeshStandardMaterial({ roughness: 1, metalness: 0, ...params })),
+  )
 }
 
 /**
@@ -728,15 +738,17 @@ export function innMaterials(): InnMaterials {
     iron: plain({ color: '#14171f', roughness: 0.72, metalness: 0.25 }),
     brass: plain({ color: PALETTE.brass, roughness: 0.38, metalness: 0.85 }),
     interior: plain({ color: '#080b13', roughness: 1 }),
-    glass: applyRiseClip(
-      new THREE.MeshStandardMaterial({
-        color: PALETTE.glassDark,
-        roughness: 0.16,
-        metalness: 0,
-        transparent: true,
-        opacity: 0.34,
-        depthWrite: false,
-      }),
+    glass: applyFoldPatch(
+      applyRiseClip(
+        new THREE.MeshStandardMaterial({
+          color: PALETTE.glassDark,
+          roughness: 0.16,
+          metalness: 0,
+          transparent: true,
+          opacity: 0.34,
+          depthWrite: false,
+        }),
+      ),
     ),
   }
   return cachedMaterials

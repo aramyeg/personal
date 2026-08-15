@@ -18,14 +18,23 @@
  *     so the moon lays a hard shadow band across the ground floor. That band is the proof the
  *     spread is built rather than painted.
  *
- * The parent group owns the curtain-up rise; everything here is authored at final position and
- * simply clipped at the page surface by `applyRiseClip`.
+ * THE FOLD-BIRTH lives here as ONE FLOAT PER VERTEX. Everything is still authored at its final
+ * position and still merges by material, so the draw count is unchanged; each piece of geometry
+ * is simply tagged with the hinge chunk it belongs to (`aFold`), and the vertex shader swings it
+ * up about that chunk's crease as the leaf comes over. See wild/fold-birth.ts for the hinge
+ * lines and wild/fold-uniforms.ts for how the tag reaches the GPU.
+ *
+ * The three pieces that are NOT merged — the sign, the lantern and the hundred keys — ride their
+ * chunk's map on a real group instead, because their materials are shared with meshes that carry
+ * no tag and an InstancedMesh applies its instance matrix after the vertex map anyway.
  */
 import { useFrame } from '@react-three/fiber'
 import { useEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 
+import { foldSlot, signBoardAngle } from './fold-birth'
+import { foldDepthMaterial, foldMatrix } from './fold-uniforms'
 import { innMaterials, type InnMaterials } from './inn-materials'
 import {
   ARCH,
@@ -47,7 +56,7 @@ import {
   type Vec3,
   type WindowSlot,
 } from './inn-model'
-import { useWild } from './wild-frame'
+import { readWildFrame, useWild } from './wild-frame'
 
 // ---------------------------------------------------------------------------------------------
 // tuning that belongs to the BUILDER, not to the model
@@ -63,7 +72,33 @@ const TILE = { stone: 0.3, timber: 0.46, shingle: 0.26 } as const
 type MatKey = keyof InnMaterials
 type Bucket = Map<MatKey, THREE.BufferGeometry[]>
 
-const push = (bucket: Bucket, key: MatKey, geo: THREE.BufferGeometry): void => {
+/** The hinge chunk each part of the building belongs to. Named once, threaded everywhere. */
+const SLOT = {
+  walls: foldSlot('walls'),
+  tower: foldSlot('tower'),
+  jetty: foldSlot('jetty'),
+  yard: foldSlot('yard'),
+  roof: foldSlot('roof'),
+  dormers: foldSlot('dormers'),
+  chimney: foldSlot('chimney'),
+  sign: foldSlot('sign'),
+  lantern: foldSlot('lantern'),
+} as const
+
+/**
+ * Stamp a geometry with its hinge chunk. Every geometry in a merge bucket must carry the same
+ * attribute set, so this runs on the way IN to the bucket and never anywhere else.
+ */
+function tagFold(geo: THREE.BufferGeometry, slot: number): THREE.BufferGeometry {
+  const count = geo.getAttribute('position').count
+  const tag = new Float32Array(count)
+  if (slot !== 0) tag.fill(slot)
+  geo.setAttribute('aFold', new THREE.BufferAttribute(tag, 1))
+  return geo
+}
+
+const push = (bucket: Bucket, key: MatKey, geo: THREE.BufferGeometry, slot: number): void => {
+  tagFold(geo, slot)
   const list = bucket.get(key)
   if (list) list.push(geo)
   else bucket.set(key, [geo])
@@ -250,6 +285,8 @@ type Wall = {
   /** Outer surface: world z for a FRONT wall, world x for a RIGHT wall. */
   readonly plane: number
   readonly slots: readonly WindowSlot[]
+  /** The hinge chunk this wall and all its dressing swing with. */
+  readonly fold: number
 }
 
 /** Where a slot sits along its wall: world x on a front wall, world z on a right wall. */
@@ -297,14 +334,19 @@ function dressOpenings(bucket: Bucket, wall: Wall): void {
       panel.rotateY(Math.PI / 2)
       panel.translate(backPlane + 0.0015, v, u)
     }
-    push(bucket, 'interior', panel.toNonIndexed())
+    push(bucket, 'interior', panel.toNonIndexed(), wall.fold)
 
     // Lining: jambs and a cill board just inside the hole.
     const t = 0.007
     const d0 = wall.plane - REVEAL_D * 0.95
     const d1 = wall.plane + 0.0015
     const bar = (a0: number, b0: number, a1: number, b1: number) =>
-      push(bucket, 'joinery', front ? box(a0, b0, d0, a1, b1, d1) : box(d0, b0, a0, d1, b1, a1))
+      push(
+        bucket,
+        'joinery',
+        front ? box(a0, b0, d0, a1, b1, d1) : box(d0, b0, a0, d1, b1, a1),
+        wall.fold,
+      )
     bar(u - hw, v - hh, u - hw + t, v + hh)
     bar(u + hw - t, v - hh, u + hw, v + hh)
     bar(u - hw, v - hh, u + hw, v - hh + t * 0.8)
@@ -320,6 +362,7 @@ function dressOpenings(bucket: Bucket, wall: Wall): void {
       front
         ? box(u - sw, sy0, wall.plane - 0.03, u + sw, sy1, wall.plane + 0.015)
         : box(wall.plane - 0.03, sy0, u - sw, wall.plane + 0.015, sy1, u + sw),
+      wall.fold,
     )
   }
 }
@@ -338,7 +381,7 @@ function facadeSkin(
     wall.axis === 'z'
       ? spanZ(outline, wall.plane - REVEAL_D, wall.plane)
       : spanX(outline, wall.plane - REVEAL_D, wall.plane)
-  push(bucket, skin, uvProject(geo, tile))
+  push(bucket, skin, uvProject(geo, tile), wall.fold)
   dressOpenings(bucket, wall)
 }
 
@@ -360,18 +403,25 @@ function buildHall(bucket: Bucket): void {
   const ARCH_FLOOR = y0 + 0.002
   const core = rectShape(x0, y0 - 0.006, coreX1, y1)
   core.holes.push(archPath(0, ARCH_FLOOR))
-  push(bucket, 'stone', uvProject(spanZ(core, z0, coreZ1), TILE.stone))
+  push(bucket, 'stone', uvProject(spanZ(core, z0, coreZ1), TILE.stone), SLOT.walls)
 
   // Front skin, holed by the arch and the taproom windows.
-  const frontWall: Wall = { axis: 'z', plane: z1, slots: slotsOn('z', z1) }
+  const frontWall: Wall = { axis: 'z', plane: z1, slots: slotsOn('z', z1), fold: SLOT.walls }
   facadeSkin(bucket, frontWall, rectShape(x0, y0 - 0.006, x1, y1), [archPath(0, ARCH_FLOOR)], 'stone', TILE.stone)
 
   // Right return, holed by the kitchen windows. Authored in (z, y).
-  const rightWall: Wall = { axis: 'x', plane: x1, slots: slotsOn('x', x1) }
+  const rightWall: Wall = { axis: 'x', plane: x1, slots: slotsOn('x', x1), fold: SLOT.walls }
   facadeSkin(bucket, rightWall, rectShape(z0, y0 - 0.006, z1, y1), [], 'stone', TILE.stone)
 
   // Plinth course: the wall sits on a proud footing, which catches the moon along its top arris.
-  push(bucket, 'stone', uvProject(box(x0, 0, z0 - 0.012, x1 + 0.012, 0.034, z1 + 0.012), TILE.stone))
+  // It is also the fold's visible hinge line — the crease the whole ground floor swings up about
+  // runs along the front of this course.
+  push(
+    bucket,
+    'stone',
+    uvProject(box(x0, 0, z0 - 0.012, x1 + 0.012, 0.034, z1 + 0.012), TILE.stone),
+    SLOT.walls,
+  )
 }
 
 function buildArch(bucket: Bucket): void {
@@ -384,7 +434,7 @@ function buildArch(bucket: Bucket): void {
   // base reads as the gate's threshold stone.
   const surround = archShape(0.026, -0.02)
   surround.holes.push(archPath(0, 0.002))
-  push(bucket, 'stone', uvProject(spanZ(surround, zFront, zFront + ARCH.reveal), TILE.stone))
+  push(bucket, 'stone', uvProject(spanZ(surround, zFront, zFront + ARCH.reveal), TILE.stone), SLOT.walls)
   // Keystone at the crown, springer blocks at the haunches.
   push(
     bucket,
@@ -400,6 +450,7 @@ function buildArch(bucket: Bucket): void {
       ),
       TILE.stone,
     ),
+    SLOT.walls,
   )
   for (const sx of [-1, 1]) {
     const cx = ARCH.cx + sx * (hw - 0.002)
@@ -410,11 +461,17 @@ function buildArch(bucket: Bucket): void {
         box(cx - 0.02, ARCH.springY - 0.016, zFront, cx + 0.02, ARCH.springY + 0.008, zFront + ARCH.reveal + 0.006),
         TILE.stone,
       ),
+      SLOT.walls,
     )
   }
 
   // Passage floor: worn flags, a touch above the cobbles so the mouth has an edge.
-  push(bucket, 'stone', uvProject(box(ARCH.cx - hw, 0, zBack, ARCH.cx + hw, 0.009, zFront + 0.01), TILE.stone))
+  push(
+    bucket,
+    'stone',
+    uvProject(box(ARCH.cx - hw, 0, zBack, ARCH.cx + hw, 0.009, zFront + 0.01), TILE.stone),
+    SLOT.walls,
+  )
 
   // Rear wall of the passage, filling the arch profile, with a door standing part open.
   // Deliberately NOT stone: through the bore the rear wall is most of what the reader sees,
@@ -426,15 +483,20 @@ function buildArch(bucket: Bucket): void {
   const doorX = ARCH.cx + 0.014
   const rear = archShape(-0.004, -0.02)
   rear.holes.push(rectPath(doorX - doorW / 2, 0.008, doorX + doorW / 2, doorH))
-  push(bucket, 'joinery', uvProject(spanZ(rear, zBack + 0.02, zBack + 0.038), TILE.timber))
+  push(bucket, 'joinery', uvProject(spanZ(rear, zBack + 0.02, zBack + 0.038), TILE.timber), SLOT.walls)
 
   // Whatever lies beyond the door is dark until the passage lamp is lit.
-  push(bucket, 'interior', box(ARCH.cx - hw, 0, zBack - 0.02, ARCH.cx + hw, ARCH.apexY, zBack + 0.021))
+  push(
+    bucket,
+    'interior',
+    box(ARCH.cx - hw, 0, zBack - 0.02, ARCH.cx + hw, ARCH.apexY, zBack + 0.021),
+    SLOT.walls,
+  )
 
   const leaf = box(0, 0, 0, doorW * 0.98, doorH - 0.01, 0.011)
   leaf.rotateY(0.62)
   leaf.translate(doorX - doorW / 2, 0.008, zBack + 0.022)
-  push(bucket, 'joinery', leaf)
+  push(bucket, 'joinery', leaf, SLOT.walls)
 
   // The key board's backing plank on the passage's far inner wall, and its rail.
   push(
@@ -448,6 +510,7 @@ function buildArch(bucket: Bucket): void {
       KEY_BOARD.maxY + 0.02,
       KEY_BOARD.maxZ + 0.014,
     ),
+    SLOT.walls,
   )
   push(
     bucket,
@@ -460,6 +523,7 @@ function buildArch(bucket: Bucket): void {
       KEY_BOARD.maxY + 0.031,
       KEY_BOARD.maxZ + 0.014,
     ),
+    SLOT.walls,
   )
 }
 
@@ -509,14 +573,14 @@ function buildJetty(bucket: Bucket): void {
   const [x1, y1, z1] = JETTY.max
 
   // Core, sitting behind both skins.
-  push(bucket, 'timber', uvProject(boxOf(JETTY, REVEAL_D), TILE.timber))
+  push(bucket, 'timber', uvProject(boxOf(JETTY, REVEAL_D), TILE.timber), SLOT.jetty)
 
   // Front: the gallery, clustered rather than ruled.
-  const front: Wall = { axis: 'z', plane: z1, slots: slotsOn('z', z1) }
+  const front: Wall = { axis: 'z', plane: z1, slots: slotsOn('z', z1), fold: SLOT.jetty }
   facadeSkin(bucket, front, rectShape(x0, y0, x1, y1), [], 'timber', TILE.timber)
 
   // Right return: the chambers. Authored in (z, y), like every right-hand wall here.
-  const right: Wall = { axis: 'x', plane: x1, slots: slotsOn('x', x1) }
+  const right: Wall = { axis: 'x', plane: x1, slots: slotsOn('x', x1), fold: SLOT.jetty }
   facadeSkin(bucket, right, rectShape(z0, y0, z1, y1), [], 'timber', TILE.timber)
 
   // THE OVERSAIL. The floor stands out past the stone by JETTY_OVERHANG on both visible sides,
@@ -536,6 +600,7 @@ function buildJetty(bucket: Bucket): void {
       bucket,
       'joinery',
       box(cx - JOIST.halfW, jy0, bearZ - JOIST.bearing, cx + JOIST.halfW, soffit, z1 + JOIST.proud),
+      SLOT.jetty,
     )
   }
   // The return's joists stop short of the front run so the corner is one solid, not a lattice.
@@ -544,10 +609,23 @@ function buildJetty(bucket: Bucket): void {
       bucket,
       'joinery',
       box(bearX - JOIST.bearing, jy0, cz - JOIST.halfW, x1 + JOIST.proud, soffit, cz + JOIST.halfW),
+      SLOT.jetty,
     )
   }
-  push(bucket, 'joinery', box(x0, soffit - BRESSUMMER.height, beamZ, x1, soffit, z1 + BRESSUMMER.proud))
-  push(bucket, 'joinery', box(beamX, soffit - BRESSUMMER.height, z0, x1 + BRESSUMMER.proud, soffit, beamZ))
+  // The bressummer is the jetty's hinge line made visible: the whole first floor swings up about
+  // the crease this beam runs along.
+  push(
+    bucket,
+    'joinery',
+    box(x0, soffit - BRESSUMMER.height, beamZ, x1, soffit, z1 + BRESSUMMER.proud),
+    SLOT.jetty,
+  )
+  push(
+    bucket,
+    'joinery',
+    box(beamX, soffit - BRESSUMMER.height, z0, x1 + BRESSUMMER.proud, soffit, beamZ),
+    SLOT.jetty,
+  )
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -593,16 +671,17 @@ function buildTower(bucket: Bucket): void {
   const [x1, y1, z1] = TOWER.max
   const { baseY, apexY, oversail } = TOWER.cap
 
-  push(bucket, 'stone', uvProject(box(x0, y0, z0, x1 - REVEAL_D, y1, z1 - REVEAL_D), TILE.stone))
+  push(bucket, 'stone', uvProject(box(x0, y0, z0, x1 - REVEAL_D, y1, z1 - REVEAL_D), TILE.stone), SLOT.tower)
 
   // The stair alternates faces as it climbs, so both visible walls are holed by the same run.
-  const front: Wall = { axis: 'z', plane: z1, slots: slotsOn('z', z1) }
+  const front: Wall = { axis: 'z', plane: z1, slots: slotsOn('z', z1), fold: SLOT.tower }
   facadeSkin(bucket, front, rectShape(x0, y0, x1, y1), [], 'stone', TILE.stone)
-  const right: Wall = { axis: 'x', plane: x1, slots: slotsOn('x', x1) }
+  const right: Wall = { axis: 'x', plane: x1, slots: slotsOn('x', x1), fold: SLOT.tower }
   facadeSkin(bucket, right, rectShape(z0, y0, z1, y1), [], 'stone', TILE.stone)
 
-  // Footing, matching the hall's so the two masses share one ground line.
-  push(bucket, 'stone', uvProject(box(x0, 0, z0, x1 + 0.012, 0.034, z1 + 0.012), TILE.stone))
+  // Footing, matching the hall's so the two masses share one ground line — and, since the fold,
+  // carrying the tower's own base crease, parallel to the hall's a hand's breadth away.
+  push(bucket, 'stone', uvProject(box(x0, 0, z0, x1 + 0.012, 0.034, z1 + 0.012), TILE.stone), SLOT.tower)
 
   // THE CAP. Steep enough to read as a spire rather than a hat, and oversailing the shaft, so
   // there is a shadow line right round the top of the stonework instead of a butt joint.
@@ -610,13 +689,14 @@ function buildTower(bucket: Bucket): void {
     bucket,
     'shingle',
     uvProject(pyramid(x0 - oversail, z0 - oversail, x1 + oversail, z1 + oversail, baseY, apexY), TILE.shingle),
+    SLOT.tower,
   )
   // Verge course under the eaves: what the cap's shadow line is actually cast by.
   // (A finial belongs here and there is deliberately none: MASS_APEX_Y is the cap's apex, the
   // rise starts the mass exactly that far under the page, and anything taller floats a spike on
   // blank paper before the curtain goes up.)
   const vo = oversail + 0.005
-  push(bucket, 'joinery', box(x0 - vo, baseY - 0.013, z0 - vo, x1 + vo, baseY, z1 + vo))
+  push(bucket, 'joinery', box(x0 - vo, baseY - 0.013, z0 - vo, x1 + vo, baseY, z1 + vo), SLOT.tower)
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -697,6 +777,7 @@ function buildDormer(bucket: Bucket, d: (typeof DORMERS)[number]): void {
       spanZ(gableShape(d.cx, d.halfW, d.sillY, d.apexY), backZ, d.frontZ - REVEAL_D),
       TILE.shingle,
     ),
+    SLOT.dormers,
   )
 
   // Front, holed by this dormer's attic light — and only this one's; both gables share a plane.
@@ -704,6 +785,7 @@ function buildDormer(bucket: Bucket, d: (typeof DORMERS)[number]): void {
     axis: 'z',
     plane: d.frontZ,
     slots: slotsOn('z', d.frontZ).filter((s) => Math.abs(s.pos[0] - d.cx) <= d.halfW),
+    fold: SLOT.dormers,
   }
   facadeSkin(bucket, wall, gableShape(d.cx, d.halfW, d.sillY, d.apexY), [], 'timber', TILE.timber)
 
@@ -711,28 +793,31 @@ function buildDormer(bucket: Bucket, d: (typeof DORMERS)[number]): void {
   // proud of the face. One ring instead of five boards.
   const ring = gableShape(d.cx, d.halfW, d.sillY, d.apexY, DORMER.verge)
   ring.holes.push(gableShape(d.cx, d.halfW, d.sillY, d.apexY))
-  push(bucket, 'joinery', spanZ(ring, d.frontZ - 0.004, d.frontZ + DORMER.proud))
+  push(bucket, 'joinery', spanZ(ring, d.frontZ - 0.004, d.frontZ + DORMER.proud), SLOT.dormers)
 }
 
 function buildRoof(bucket: Bucket): void {
   const { minX, maxX, eaveY, ridgeY, ridgeZ, frontEaveZ, backEaveZ } = ROOF
 
-  // The two planes. Both run the full length; the ridge is where they meet.
+  // The two planes. Both run the full length; the ridge is where they meet — and the ridge is
+  // also the fold's read: the slopes start folded face to face and OPEN as the roof lifts.
   push(
     bucket,
     'shingle',
     uvProject(spanX(slabShape(frontEaveZ, eaveY, ridgeZ, ridgeY, ROOF_T), minX, maxX), TILE.shingle),
+    SLOT.roof,
   )
   push(
     bucket,
     'shingle',
     uvProject(spanX(slabShape(backEaveZ, eaveY, ridgeZ, ridgeY, ROOF_T), minX, maxX), TILE.shingle),
+    SLOT.roof,
   )
 
   // Ridge capping, and a fascia at each eaves deep enough to hide the slab's cut end.
-  push(bucket, 'joinery', box(minX, ridgeY - RIDGE.half, ridgeZ - RIDGE.reach, maxX, ridgeY + RIDGE.half, ridgeZ + RIDGE.reach))
-  push(bucket, 'joinery', box(minX, eaveY - EAVES.fascia, frontEaveZ - ROOF_T, maxX, eaveY + 0.003, frontEaveZ + EAVES.proud))
-  push(bucket, 'joinery', box(minX, eaveY - EAVES.fascia, backEaveZ - EAVES.proud, maxX, eaveY + 0.003, backEaveZ + ROOF_T))
+  push(bucket, 'joinery', box(minX, ridgeY - RIDGE.half, ridgeZ - RIDGE.reach, maxX, ridgeY + RIDGE.half, ridgeZ + RIDGE.reach), SLOT.roof)
+  push(bucket, 'joinery', box(minX, eaveY - EAVES.fascia, frontEaveZ - ROOF_T, maxX, eaveY + 0.003, frontEaveZ + EAVES.proud), SLOT.roof)
+  push(bucket, 'joinery', box(minX, eaveY - EAVES.fascia, backEaveZ - EAVES.proud, maxX, eaveY + 0.003, backEaveZ + ROOF_T), SLOT.roof)
 
   // The gable end. Only the right one is built: the left is buried in the tower shaft, and the
   // camera never sees a -x face anyway.
@@ -741,7 +826,7 @@ function buildRoof(bucket: Bucket): void {
   gable.lineTo(backEaveZ, eaveY)
   gable.lineTo(ridgeZ, ridgeY)
   gable.closePath()
-  push(bucket, 'timber', uvProject(spanX(gable, maxX - REVEAL_D, maxX), TILE.timber))
+  push(bucket, 'timber', uvProject(spanX(gable, maxX - REVEAL_D, maxX), TILE.timber), SLOT.roof)
 
   // Barge boards down both rakes of that gable, standing out past the shingles.
   for (const eaveZ of [frontEaveZ, backEaveZ]) {
@@ -749,6 +834,7 @@ function buildRoof(bucket: Bucket): void {
       bucket,
       'joinery',
       spanX(slabShape(eaveZ, eaveY, ridgeZ, ridgeY, ROOF_T + BARGE.deep), maxX, maxX + BARGE.out),
+      SLOT.roof,
     )
   }
 
@@ -764,12 +850,12 @@ function buildRoof(bucket: Bucket): void {
     const curb = new THREE.CylinderGeometry(r, r, 0.018, 20, 1, true)
     curb.applyQuaternion(lift)
     curb.translate(s.pos[0] - n.x * 0.006, s.pos[1] - n.y * 0.006, s.pos[2] - n.z * 0.006)
-    push(bucket, 'joinery', curb.toNonIndexed())
+    push(bucket, 'joinery', curb.toNonIndexed(), SLOT.roof)
 
     const back = new THREE.CircleGeometry(r, 20)
     back.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), n))
     back.translate(s.pos[0] - n.x * 0.014, s.pos[1] - n.y * 0.014, s.pos[2] - n.z * 0.014)
-    push(bucket, 'interior', back.toNonIndexed())
+    push(bucket, 'interior', back.toNonIndexed(), SLOT.roof)
   }
 }
 
@@ -781,13 +867,19 @@ function buildRoof(bucket: Bucket): void {
 const CORBEL_COURSES = 3
 
 function buildChimney(bucket: Bucket): void {
-  const [x0, y0, z0] = CHIMNEY.min
+  const [x0, , z0] = CHIMNEY.min
   const [x1, , z1] = CHIMNEY.max
   const { baseY, topY, oversail } = CHIMNEY.cap
-  const height = topY - y0
+  // The shaft is BUILT from the slates down (CHIMNEY.foldBase) so it can hinge up out of the
+  // roof as its own piece — everything below that was always buried in the jetty and the hall.
+  // The UV height still runs from the model's ground, so the painted soot gradient samples the
+  // exact same band of the tile it always did: the trim costs zero pixels.
+  const y0 = CHIMNEY.foldBase
+  const height = topY - CHIMNEY.min[1]
   // One horizontal repeat per face, so the brick courses line up round every arris.
   const around = (x1 - x0 + (z1 - z0)) / 2
-  const brick = (g: THREE.BufferGeometry): void => push(bucket, 'brick', uvStack(g, topY, height, around))
+  const brick = (g: THREE.BufferGeometry): void =>
+    push(bucket, 'brick', uvStack(g, topY, height, around), SLOT.chimney)
 
   brick(box(x0, y0, z0, x1, baseY, z1))
 
@@ -807,14 +899,14 @@ function buildChimney(bucket: Bucket): void {
   const cy0 = topY
   const cy1 = topY + 0.014
   const slab = (ax: number, az: number, bx: number, bz: number): void =>
-    push(bucket, 'stone', uvProject(box(ax, cy0, az, bx, cy1, bz), TILE.stone))
+    push(bucket, 'stone', uvProject(box(ax, cy0, az, bx, cy1, bz), TILE.stone), SLOT.chimney)
   slab(x0 - o, z0 - o, x1 + o, vz - fh)
   slab(x0 - o, vz + fh, x1 + o, z1 + o)
   slab(x0 - o, vz - fh, vx - fh, vz + fh)
   slab(vx + fh, vz - fh, x1 + o, vz + fh)
 
   // The flue: dark all the way down, so the opening is a hole and not a painted square.
-  push(bucket, 'interior', box(vx - fh, baseY, vz - fh, vx + fh, cy1 - 0.002, vz + fh))
+  push(bucket, 'interior', box(vx - fh, baseY, vz - fh, vx + fh, cy1 - 0.002, vz + fh), SLOT.chimney)
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -835,8 +927,10 @@ function buildStep(bucket: Bucket): void {
   // The tread overhangs its own bed, so the step has a shadow line under the nosing and reads
   // as worn stone rather than as a tile laid on the cobbles.
   const u = 0.008
-  push(bucket, 'stone', uvProject(box(x0 + u, 0, z0 + u, x1 - u, y1 - u, z1), TILE.stone))
-  push(bucket, 'stone', uvProject(box(x0, y1 - u, z0, x1, y1, z1), TILE.stone))
+  // The threshold step belongs to the WALLS: it is the arch's own doorstep and rides the ground
+  // floor's crease, not the courtyard's.
+  push(bucket, 'stone', uvProject(box(x0 + u, 0, z0 + u, x1 - u, y1 - u, z1), TILE.stone), SLOT.walls)
+  push(bucket, 'stone', uvProject(box(x0, y1 - u, z0, x1, y1, z1), TILE.stone), SLOT.walls)
 }
 
 function buildWell(bucket: Bucket): void {
@@ -847,36 +941,36 @@ function buildWell(bucket: Bucket): void {
 
   // Drum, coping and shaft. The drum is a tube and the coping an annulus, because a well with a
   // lid on it is a drum: the hole is the whole point of the object.
-  push(bucket, 'stone', uvProject(cylinder(r, r * 1.03, WELL.wallY - 0.012, 24, WELL.center, true), TILE.stone))
-  push(bucket, 'stone', uvProject(cylinder(cope, cope, 0.012, 24, [cx, WELL.wallY - 0.012, cz], true), TILE.stone))
+  push(bucket, 'stone', uvProject(cylinder(r, r * 1.03, WELL.wallY - 0.012, 24, WELL.center, true), TILE.stone), SLOT.yard)
+  push(bucket, 'stone', uvProject(cylinder(cope, cope, 0.012, 24, [cx, WELL.wallY - 0.012, cz], true), TILE.stone), SLOT.yard)
   const ring = new THREE.RingGeometry(inner, cope, 24)
   ring.rotateX(-Math.PI / 2)
   ring.translate(cx, WELL.wallY, cz)
-  push(bucket, 'stone', uvProject(ring.toNonIndexed(), TILE.stone))
+  push(bucket, 'stone', uvProject(ring.toNonIndexed(), TILE.stone), SLOT.yard)
   // Sunk a hair below the coping: enough for the rim to shade it, not enough to show daylight
   // through the far side of the shaft.
-  push(bucket, 'interior', cylinder(inner + 0.002, inner + 0.002, WELL.wallY - 0.006, 24, [cx, 0, cz]))
+  push(bucket, 'interior', cylinder(inner + 0.002, inner + 0.002, WELL.wallY - 0.006, 24, [cx, 0, cz]), SLOT.yard)
 
   // Two posts and a little gable, up to the height the model sets for it.
   const postX = r * 0.8
   const headY = WELL.archY - 0.05
   for (const sx of [-1, 1]) {
     const px = cx + sx * postX
-    push(bucket, 'joinery', box(px - 0.009, WELL.wallY - 0.03, cz - 0.009, px + 0.009, headY + 0.01, cz + 0.009))
+    push(bucket, 'joinery', box(px - 0.009, WELL.wallY - 0.03, cz - 0.009, px + 0.009, headY + 0.01, cz + 0.009), SLOT.yard)
   }
   const roofline = new THREE.Shape()
   roofline.moveTo(cz - r * 0.85, headY)
   roofline.lineTo(cz + r * 0.85, headY)
   roofline.lineTo(cz, WELL.archY)
   roofline.closePath()
-  push(bucket, 'shingle', uvProject(spanX(roofline, cx - postX - 0.016, cx + postX + 0.016), TILE.shingle))
+  push(bucket, 'shingle', uvProject(spanX(roofline, cx - postX - 0.016, cx + postX + 0.016), TILE.shingle), SLOT.yard)
 
   // Windlass: the roller, its bearings and a crank, all at a size a hand could turn.
   const rollY = headY - 0.036
-  push(bucket, 'joinery', roller(0.013, postX * 2 - 0.006, [cx, rollY, cz]))
-  push(bucket, 'iron', roller(0.004, postX * 2 + 0.03, [cx, rollY, cz], 8))
-  push(bucket, 'iron', box(cx + postX + 0.013, rollY - 0.004, cz - 0.004, cx + postX + 0.021, rollY + 0.026, cz + 0.004))
-  push(bucket, 'iron', roller(0.0035, 0.022, [cx + postX + 0.026, rollY + 0.022, cz], 8))
+  push(bucket, 'joinery', roller(0.013, postX * 2 - 0.006, [cx, rollY, cz]), SLOT.yard)
+  push(bucket, 'iron', roller(0.004, postX * 2 + 0.03, [cx, rollY, cz], 8), SLOT.yard)
+  push(bucket, 'iron', box(cx + postX + 0.013, rollY - 0.004, cz - 0.004, cx + postX + 0.021, rollY + 0.026, cz + 0.004), SLOT.yard)
+  push(bucket, 'iron', roller(0.0035, 0.022, [cx + postX + 0.026, rollY + 0.022, cz], 8), SLOT.yard)
 }
 
 function buildBarrels(bucket: Bucket): void {
@@ -884,13 +978,13 @@ function buildBarrels(bucket: Bucket): void {
     const [bx, by, bz] = b.center
     const half = b.height / 2
     // Two shallow cones back to back: a barrel is a bulge, and a straight tube is a bin.
-    push(bucket, 'joinery', cylinder(b.radius, b.radius * 0.88, half, 16, [bx, by, bz]))
-    push(bucket, 'joinery', cylinder(b.radius * 0.88, b.radius, half, 16, [bx, by + half, bz]))
+    push(bucket, 'joinery', cylinder(b.radius, b.radius * 0.88, half, 16, [bx, by, bz]), SLOT.yard)
+    push(bucket, 'joinery', cylinder(b.radius * 0.88, b.radius, half, 16, [bx, by + half, bz]), SLOT.yard)
     for (const f of [0.12, 0.5, 0.88]) {
       const y = by + b.height * f
       // The hoops follow the bulge, so the middle one stands furthest out.
       const taper = 1 - Math.abs(f - 0.5) * 0.24
-      push(bucket, 'iron', cylinder(b.radius * taper + 0.002, b.radius * taper + 0.002, 0.008, 16, [bx, y, bz], true))
+      push(bucket, 'iron', cylinder(b.radius * taper + 0.002, b.radius * taper + 0.002, 0.008, 16, [bx, y, bz], true), SLOT.yard)
     }
   }
 }
@@ -955,9 +1049,29 @@ function buildSignBoard(): { board: THREE.BufferGeometry; hangers: THREE.BufferG
   return { board: board.toNonIndexed(), hangers: merged }
 }
 
+/**
+ * A group posed straight off a fold chunk's world map. The three unmerged pieces use this rather
+ * than the vertex path: their materials are shared with untagged meshes, and an InstancedMesh
+ * applies its instance matrix downstream of the vertex map anyway.
+ */
+function useFoldGroup(slot: number) {
+  const ref = useRef<THREE.Group>(null)
+  useFrame(() => {
+    const g = ref.current
+    if (!g) return
+    g.matrixAutoUpdate = false
+    g.matrix.copy(foldMatrix(slot))
+    g.matrixWorldNeedsUpdate = true
+  })
+  return ref
+}
+
 function TheSign({ materials }: { materials: InnMaterials }) {
-  const { clock } = useWild()
+  const ctx = useWild()
+  const { clock } = ctx
+  const foldRef = useFoldGroup(SLOT.sign)
   const swayRef = useRef<THREE.Group>(null)
+  const dropRef = useRef<THREE.Group>(null)
   const parts = useMemo(() => ({ bracket: buildBracket(), ...buildSignBoard() }), [])
 
   useEffect(
@@ -973,16 +1087,21 @@ function TheSign({ materials }: { materials: InnMaterials }) {
   // have to agree about what time it is or the spread develops two different winds.
   useFrame(() => {
     const g = swayRef.current
-    if (!g) return
-    g.rotation.z = Math.sin((clock.current * Math.PI * 2) / SIGN.sway.period) * SIGN.sway.amp
+    if (g) g.rotation.z = Math.sin((clock.current * Math.PI * 2) / SIGN.sway.period) * SIGN.sway.amp
+    // THE LAST BEAT OF THE CURTAIN-UP. The board rides the bracket out folded up against the arm
+    // and then DROPS onto its shackle — the same event the clip-rise staged, now crease-born.
+    const d = dropRef.current
+    if (d) d.rotation.x = signBoardAngle(readWildFrame(ctx).open)
   })
 
   return (
-    <group name="wild-sign">
+    <group ref={foldRef} name="wild-sign">
       <mesh geometry={parts.bracket} material={materials.iron} castShadow receiveShadow />
       <group ref={swayRef} position={SIGN.pivot as unknown as [number, number, number]}>
-        <mesh geometry={parts.hangers} material={materials.iron} castShadow />
-        <mesh geometry={parts.board} material={materials.sign} castShadow receiveShadow />
+        <group ref={dropRef}>
+          <mesh geometry={parts.hangers} material={materials.iron} castShadow />
+          <mesh geometry={parts.board} material={materials.sign} castShadow receiveShadow />
+        </group>
       </group>
     </group>
   )
@@ -1029,6 +1148,7 @@ function buildLantern(): { iron: THREE.BufferGeometry; glass: THREE.BufferGeomet
 }
 
 function TheLantern({ materials }: { materials: InnMaterials }) {
+  const foldRef = useFoldGroup(SLOT.lantern)
   const parts = useMemo(() => buildLantern(), [])
   useEffect(
     () => () => {
@@ -1038,7 +1158,7 @@ function TheLantern({ materials }: { materials: InnMaterials }) {
     [parts],
   )
   return (
-    <group name="wild-lantern">
+    <group ref={foldRef} name="wild-lantern">
       <mesh geometry={parts.iron} material={materials.iron} castShadow receiveShadow />
       <mesh geometry={parts.glass} material={materials.glass} renderOrder={1} />
     </group>
@@ -1075,6 +1195,8 @@ function buildKey(): THREE.BufferGeometry {
 
 function TheHundredKeys({ material }: { material: THREE.MeshStandardMaterial }) {
   const meshRef = useRef<THREE.InstancedMesh>(null)
+  // The board hangs on the passage's inner wall, so the keys swing up with the ground floor.
+  const foldRef = useFoldGroup(SLOT.walls)
   const geometry = useMemo(() => buildKey(), [])
 
   useEffect(() => () => geometry.dispose(), [geometry])
@@ -1111,11 +1233,13 @@ function TheHundredKeys({ material }: { material: THREE.MeshStandardMaterial }) 
   }, [])
 
   return (
-    <instancedMesh
-      ref={meshRef}
-      args={[geometry, material, KEY_BOARD.count]}
-      name="wild-keys"
-    />
+    <group ref={foldRef} name="wild-keys-fold">
+      <instancedMesh
+        ref={meshRef}
+        args={[geometry, material, KEY_BOARD.count]}
+        name="wild-keys"
+      />
+    </group>
   )
 }
 
@@ -1153,12 +1277,16 @@ function buildInn(): Merged[] {
 export function InnBuilding() {
   const materials = useMemo(() => innMaterials(), [])
   const merged = useMemo(() => buildInn(), [])
+  // THE SHADOW HAS TO FOLD TOO. The depth pass runs its own material, so without this the moon
+  // lays the shadow of a finished inn across the courtyard while the inn is still lying flat.
+  const depth = useMemo(() => foldDepthMaterial(), [])
 
   useEffect(
     () => () => {
       for (const part of merged) part.geometry.dispose()
+      depth.dispose()
     },
-    [merged],
+    [merged, depth],
   )
 
   return (
@@ -1169,6 +1297,7 @@ export function InnBuilding() {
           name={`wild-inn-${key}`}
           geometry={geometry}
           material={materials[key]}
+          customDepthMaterial={CASTERS.has(key) ? depth : undefined}
           castShadow={CASTERS.has(key)}
           receiveShadow
         />

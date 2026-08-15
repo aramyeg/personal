@@ -1,9 +1,11 @@
 /**
- * WILD lane — the curtain-up clip.
+ * WILD lane — the page-surface floor.
  *
- * The inn does not unfold; it RISES out of the paper. The whole built mass translates up from
- * -MASS_APEX_Y to 0 across REVEAL.rise while this world-space plane hides everything still
- * below the page surface, so the building appears to grow out of the page.
+ * This plane used to BE the curtain-up: the whole mass translated up from -MASS_APEX_Y and the
+ * plane hid whatever was still buried, so the inn grew out of the paper. The inn now ERECTS
+ * instead (wild/fold-birth.ts) and nothing is ever buried — but the plane stays, doing the job
+ * it was always quietly doing as well: it is the hard floor that guarantees no fold, no barge
+ * board and no shadow can ever show BENEATH the page it is folding on.
  *
  * The plane is a module singleton on purpose: three compares clipping planes by identity when
  * it builds programs, so every material sharing this one instance shares a shader variant.

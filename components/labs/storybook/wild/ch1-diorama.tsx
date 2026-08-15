@@ -22,10 +22,14 @@
  *    written down — a number copied by hand is a number that drifts when the page stack does.
  *    It is re-read every frame because the desk's parallax rig LIFTS the whole book (up to
  *    ~0.1 world units at the edge of its swing); a height sampled once at mount would let the
- *    page surface climb out from under the plane and slice the base off the inn.
+ *    page surface climb out from under the plane and slice the base off the inn. Nothing rises
+ *    through the plane any more — it is now purely the floor that keeps the fold-birth from ever
+ *    showing paper under the paper.
  *
- *  - THE RISE ITSELF. The children build the inn at its final position and never translate for
- *    the reveal; this group does the moving. One owner means the building cannot tear.
+ *  - THE FOLD-BIRTH ITSELF. The inn no longer grows out of the page through a clipping plane; it
+ *    ERECTS, in seven separated hinge events (wild/fold-birth.ts). This component is the single
+ *    owner of that solve: once per frame it poses every chunk and writes the result into the
+ *    shared fold uniforms, so no two consumers can ever disagree about where a piece is.
  */
 
 import { type RefObject, useEffect, useLayoutEffect, useMemo, useRef } from 'react'
@@ -36,14 +40,15 @@ import type { PopupRole } from '../book/popup-spread'
 import type { TurnFrame } from '../book/use-turn-driver'
 import { AtmosphereFx } from './atmosphere-fx'
 import { CinematicGrade, warmGradePrograms } from './cinematic-grade'
+import { createLandingWatch, solveFoldBirth } from './fold-birth'
+import { writeFoldPoses } from './fold-uniforms'
 import { InnBuilding } from './inn-building'
 import { innMaterials, skinTextures } from './inn-materials'
-import { MASS_APEX_Y, REVEAL } from './inn-model'
 import { NightStage, nightArt } from './night-stage'
 import { setRiseClipHeight } from './rise-clip'
 import { TheKey } from './the-key'
 import { InnWindows, windowAtlases } from './windows'
-import { ramp, readWildFrame, WildContext, type WildContextValue } from './wild-frame'
+import { readWildFrame, WildContext, type WildContextValue } from './wild-frame'
 import { scheduleWildWarmup } from './warmup'
 
 // The diorama's procedural painting starts warming the moment the book's bundle loads —
@@ -67,20 +72,6 @@ export type Ch1DioramaProps = {
   committedSpread: RefObject<number>
 }
 
-/**
- * How hard the building brakes on its way up. `ramp` is a smoothstep, so the mass already
- * leaves the paper gently; composing an ease-out cubic on top of it moves the energy to the
- * front of the travel and flattens the last third almost to nothing — the inn arrives at its
- * final height with (very nearly) zero velocity. A building that slams looks like a prop being
- * dropped into place; this one looks like it grew there and stopped growing.
- */
-const RISE_BRAKE = 3
-
-function riseSettle(open: number): number {
-  const p = ramp(open, REVEAL.rise[0], REVEAL.rise[1])
-  return 1 - (1 - p) ** RISE_BRAKE
-}
-
 /** World y of an object, straight off its world matrix (element 13 is the translation's y). */
 function worldY(object: THREE.Object3D): number {
   object.updateWorldMatrix(true, false)
@@ -94,7 +85,9 @@ export function Ch1Diorama({ spreadIndex, role, frame, committedSpread }: Ch1Dio
   const clock = useRef(0)
   const rootRef = useRef<THREE.Group>(null)
   const stageRef = useRef<THREE.Group>(null)
-  const riseRef = useRef<THREE.Group>(null)
+  /** Last `open` the fold was solved at, so a resting spread allocates nothing per frame. */
+  const solvedOpen = useRef(Number.NaN)
+  const landingWatch = useMemo(() => createLandingWatch(), [])
 
   const context = useMemo<WildContextValue>(
     () => ({ spreadIndex, frame, committedSpread, wake, clock }),
@@ -173,11 +166,17 @@ export function Ch1Diorama({ spreadIndex, role, frame, committedSpread }: Ch1Dio
     // The stage is NEVER hidden by visibility: flipping it would change the renderer's
     // visible-light set, and a light-count change re-links every program in the scene — the
     // ~1s dead frames the production profile caught on arrival and at the first drag. While
-    // the spread is closed everything hides itself instead: the building is parked below the
-    // page and clipped, and every card, pool, beam and glow fades by `open`/`stage` to zero.
+    // the spread is closed everything hides itself instead: the building is folded dead flat
+    // into the page, and every card, pool, beam and glow fades by `open`/`stage` to zero.
 
-    const rise = riseRef.current
-    if (rise) rise.position.y = -MASS_APEX_Y * (1 - riseSettle(open))
+    // THE FOLD-BIRTH. Solved once, written once. Skipped entirely while `open` holds still —
+    // which is every frame the reader is not turning the page, i.e. almost all of them.
+    if (open !== solvedOpen.current) {
+      solvedOpen.current = open
+      const poses = solveFoldBirth(open)
+      writeFoldPoses(poses)
+      landingWatch(poses)
+    }
   })
 
   const live = role !== 'hidden'
@@ -193,8 +192,9 @@ export function Ch1Diorama({ spreadIndex, role, frame, committedSpread }: Ch1Dio
         {live && <CinematicGrade />}
         <group ref={stageRef}>
           <NightStage />
-          {/* The reveal's one moving part. Children build at final position; this translates. */}
-          <group ref={riseRef} name="wild-rise" position={[0, -MASS_APEX_Y, 0]}>
+          {/* No transform here any more: the inn is authored at its final position and every
+              moving piece is swung up about its own crease by the fold uniforms. */}
+          <group name="wild-fold">
             <InnBuilding />
             <InnWindows />
           </group>
