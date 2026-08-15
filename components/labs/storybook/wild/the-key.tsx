@@ -340,8 +340,10 @@ export function TheKey() {
       if (!physics.held) return
       if (pointerIdRef.current !== null && e.pointerId !== pointerIdRef.current) return
       // Backstop for an up we never heard (the pointer left the browser window and came back
-      // with the button released). Without pointer capture this is the only signal.
-      if (e.buttons === 0) {
+      // with the button released). Without pointer capture this is the only signal. MOUSE ONLY:
+      // touch contact is specified to report buttons 1, but a browser that gets that wrong would
+      // kill every touch drag on its first move — and a dropped grab is the defect being fixed.
+      if (e.pointerType === 'mouse' && e.buttons === 0) {
         endGrab()
         return
       }
