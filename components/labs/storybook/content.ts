@@ -334,7 +334,14 @@ const CH1_LAYERS: readonly SceneLayer[] = [
   // against the 0.4405 lid, radial span 0.071..0.409 inside the hall's own walls
   // at 0.42. The pull RAISES them: bowed out over the step at rest, upright in
   // the archway at the stop.
-  { id: 'ch1-rank', kind: 'midground', role: 'figure', mech: 'stripflap', side: 'right', anchor: 0.22, anchorZ: 0.2, slot: 0.3, slotZ: 0.2, hingeX: 0.24, hingeZ: 0.18, hingeDeg: 20, width: 0.36, height: 0.38, restDeg: 44, travelDeg: [44, 90] },
+  // E4 judge round: restDeg 44 -> 90. The 44-degree fore-lying rest, seen from
+  // the camera's 26-degree depression, projected as an anamorphic streak on
+  // the step — "a collapsed piece" (judge verdict), the one thing a rest pose
+  // must never read as. Standing rest inverts the narrative: the family WAITS
+  // upright in the lit archway (face-on 0.83, fully readable), and the pull
+  // BOWS them out toward the reader over the step — the low-face-on poses now
+  // exist only in motion, where they read as motion. Travel window unchanged.
+  { id: 'ch1-rank', kind: 'midground', role: 'figure', mech: 'stripflap', side: 'right', anchor: 0.22, anchorZ: 0.2, slot: 0.3, slotZ: 0.2, hingeX: 0.24, hingeZ: 0.18, hingeDeg: 20, width: 0.36, height: 0.38, restDeg: 90, travelDeg: [44, 90] },
   // ---------------------------------------------------------------------
   // THE COURTYARD FLOOR — a page-flat venetian rack (Birmingham 92/93) filling
   // the left page outboard of the hall wall. Page-flat is this family's natural
