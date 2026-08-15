@@ -44,6 +44,11 @@ function magentaDistance(r, g, b) {
 // page faces, not cutouts, so they get no rim either.
 const skipsRim = (id) => id.startsWith('cover-') || id.startsWith('page-')
 
+// Hand-delivered ids that print FULL-BLEED on opaque materials: never
+// background-key them (see the flood-key call site). Keep in sync with the
+// materials: dissolve dunes/gold/tab have no alphaTest (popup-dissolve-layer).
+const FULL_BLEED = new Set(['ch1-yard-dunes', 'ch1-yard-gold', 'ch1-yard-tab'])
+
 // PAD-TO-ASPECT (per id, target width/height): after the alpha trim, pad the
 // SHORTER axis with centered transparent pixels so the piece renders at the
 // mesh aspect its quad demands — for radial/round cutouts whose trim landed a
@@ -345,8 +350,13 @@ async function processOne(fileName) {
   const { data, info } = await source.ensureAlpha().raw().toBuffer({ resolveWithObject: true })
   let pixels = hasMagentaCorners(data, info) ? chromaKey(data, info) : data
   // Page prints are full-bleed page faces by design — never background-key
-  // them even if a sky corner happens to read uniform.
-  if (!id.startsWith('page-')) {
+  // them even if a sky corner happens to read uniform. FULL_BLEED ids are the
+  // same class piecewise: dissolve A/B paintings and pull tabs print on
+  // opaque materials (no alphaTest), so a keyed hole never reads as a die-cut
+  // — it reads as the cream page glaring through the picture. The E4 ch1 dusk
+  // yard proved it: its night-uniform border tripped the vote and the flood
+  // ate 1.5% of the painting (the whole mortar network).
+  if (!id.startsWith('page-') && !FULL_BLEED.has(id)) {
     const backed = uniformBorderColor(pixels, info)
     if (backed) pixels = floodKeyBackground(pixels, info, backed)
   }

@@ -104,6 +104,13 @@ const TAP_ARRIVE_EPS = 1e-3
  *  night floor and the gaps between tilted slats mid-flip read as dark sand. */
 const SAND_COLOR = '#5c4160'
 const SAND_SHADE = '#38294a'
+// E4 PAINTED staging (ch1-yard): the base band's flip-driven grade — see the
+// useFrame note. Gold matches the palette's lamp gold; night matches the dusk
+// painting's deep passages so the vacated pitch band at tau=PI reads as part
+// of the picture, not as a violet foreign strip.
+const STAGE_SAND = new THREE.Color(SAND_COLOR)
+const STAGE_NIGHT = new THREE.Color('#232043')
+const STAGE_GOLD = new THREE.Color('#f6c66a')
 
 const rad = (d: number): number => (d * Math.PI) / 180
 const clamp = (x: number, lo: number, hi: number): number => Math.min(hi, Math.max(lo, x))
@@ -527,6 +534,18 @@ export function DissolvePopupLayer({
       Math.PI,
       Math.max(0, dissolveShownTau(tauHeld, beta) + nudgeOffset(layer.id, tauHeld, 0, Math.PI, 2 * NUDGE_SPAN_ANGLE))
     )
+    // E4 PAINTED staging: this flip is the chapter's hero payoff and the floor
+    // is hard-foreshortened at the reading camera, so the MOMENT carries the
+    // drama — mid-flip, while the slats stand, the base band between them
+    // floods lamp-gold (light pouring out of the turn); at full draw it
+    // settles to deep night so the vacated band belongs to the dusk painting.
+    // baseMaterial is not hover-managed, so a per-frame write is safe here
+    // (applyHandleGlow's cached-base contract only covers the slat/tab mats).
+    const stageGlow = Math.sin(tau)
+    baseMaterial.color
+      .copy(STAGE_SAND)
+      .lerp(STAGE_NIGHT, tau / Math.PI)
+      .lerp(STAGE_GOLD, stageGlow * 0.85)
     const pose = solveDissolvePose(layer, tau, thetaL, thetaR)
     writeQuad(baseGeom, pose.base)
     pose.slats.forEach((quad, k) => {
