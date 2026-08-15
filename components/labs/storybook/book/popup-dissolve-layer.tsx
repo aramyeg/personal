@@ -258,8 +258,12 @@ export function DissolvePopupLayer({
     () => new THREE.MeshBasicMaterial({ side: THREE.BackSide, color: '#ffffff', transparent: true }),
     []
   )
-  const baseMaterial = useMemo(() => new THREE.MeshBasicMaterial({ side: THREE.FrontSide, color: SAND_COLOR, transparent: true }), [])
-  const baseBackMaterial = useMemo(() => new THREE.MeshBasicMaterial({ side: THREE.BackSide, color: SAND_SHADE, transparent: true }), [])
+  // The base is the ONE surface on this piece no painting covers, so its colour
+  // is the mid-flip frame's ground. The s5 violet is the family default, not a
+  // law (DissolveGeom.floor).
+  const floor = layer.floor ?? { lit: SAND_COLOR, shade: SAND_SHADE }
+  const baseMaterial = useMemo(() => new THREE.MeshBasicMaterial({ side: THREE.FrontSide, color: floor.lit, transparent: true }), [floor.lit])
+  const baseBackMaterial = useMemo(() => new THREE.MeshBasicMaterial({ side: THREE.BackSide, color: floor.shade, transparent: true }), [floor.shade])
   const tabMaterial = useMemo(() => new THREE.MeshBasicMaterial({ side: THREE.FrontSide, color: tint.shade, transparent: true }), [tint])
   const edgeMaterial = useMemo(
     () => new THREE.LineBasicMaterial({ color: tint.edge, transparent: true, opacity: 0.9 }),

@@ -903,6 +903,13 @@ export type DissolveGeom = {
    *  restores it inside the landing-settle beat. Visual only: no pose,
    *  envelope, or fold-flat proof is touched. */
   turnCull?: boolean
+  /** The opaque BASE plane under the slats — what the reader sees through the
+   *  gaps while the rack is mid-flip, and the only surface on the piece that no
+   *  painting covers. It defaults to the s5 desert's violet dune shadow, which
+   *  is correct for a hoard under the dunes and wrong everywhere else: the E4
+   *  courtyard rack inherited it and its mid-flip frame came out bright purple.
+   *  A rack over paved paper declares its own pair here. */
+  floor?: { readonly lit: string; readonly shade: string }
 }
 
 export type LayerGeom =

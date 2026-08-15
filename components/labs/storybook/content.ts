@@ -364,7 +364,12 @@ const CH1_LAYERS: readonly SceneLayer[] = [
   // and inboard of the wings (whose roots sit aft at z <= 0.10), so no standing
   // paper is rooted inside the rack's band. The tab emerges at the right fore
   // edge, the one handle on the spread.
-  { id: 'ch1-arrival-floor', kind: 'foreground', role: 'story', mech: 'dissolve', side: 'right', d0: 0.18, d1: 0.86, z0: 0.3, z1: 0.66, slats: 7, stroke: 0.14, tabW: 0.24, tabTip: 0.06, turnCull: true },
+  // `floor` is the plane the gaps between tilted slats reveal mid-flip. The
+  // family's default is spread 5's violet dune shadow, and inheriting it printed
+  // this courtyard's mid-flip frame BRIGHT PURPLE — a colour that appears
+  // nowhere else on the spread. Warm cream/kraft instead, so a half-turned rack
+  // reads as the paper underlay it is.
+  { id: 'ch1-arrival-floor', kind: 'foreground', role: 'story', mech: 'dissolve', side: 'right', d0: 0.18, d1: 0.86, z0: 0.3, z1: 0.66, slats: 7, stroke: 0.14, tabW: 0.24, tabTip: 0.06, turnCull: true, floor: { lit: '#a68f66', shade: '#6b5a3e' } },
   // RETIRED with the E3 stage set (their painters may stay in generate-art.mjs
   // unused): ch1-mountain, ch1-inn-row, ch1-dormer, ch1-sign, ch1-key,
   // ch1-gate, ch1-rank, ch1-keyboard, ch1-stable, ch1-stable-vane,
