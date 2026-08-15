@@ -1279,14 +1279,21 @@ export function InnBuilding() {
   const merged = useMemo(() => buildInn(), [])
   // THE SHADOW HAS TO FOLD TOO. The depth pass runs its own material, so without this the moon
   // lays the shadow of a finished inn across the courtyard while the inn is still lying flat.
-  const depth = useMemo(() => foldDepthMaterial(), [])
+  // ONE PER CASTER, not one shared: three copies the source material's `map` and `side` onto the
+  // depth material before every object, and a shared instance would have those thrashing between
+  // four different skins behind three's back.
+  const depths = useMemo(() => {
+    const out = new Map<MatKey, THREE.MeshDepthMaterial>()
+    for (const { key } of merged) if (CASTERS.has(key)) out.set(key, foldDepthMaterial())
+    return out
+  }, [merged])
 
   useEffect(
     () => () => {
       for (const part of merged) part.geometry.dispose()
-      depth.dispose()
+      for (const d of depths.values()) d.dispose()
     },
-    [merged, depth],
+    [merged, depths],
   )
 
   return (
@@ -1297,7 +1304,7 @@ export function InnBuilding() {
           name={`wild-inn-${key}`}
           geometry={geometry}
           material={materials[key]}
-          customDepthMaterial={CASTERS.has(key) ? depth : undefined}
+          customDepthMaterial={depths.get(key)}
           castShadow={CASTERS.has(key)}
           receiveShadow
           // The fold happens in the VERTEX shader, so a folded piece leaves the bounding sphere
