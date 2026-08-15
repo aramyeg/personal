@@ -424,13 +424,20 @@ function phaseFor(index: number): number {
   return s - Math.floor(s)
 }
 
+let atlasCache: { shapes: THREE.CanvasTexture; occupants: THREE.CanvasTexture } | null = null
+
+/** Both window atlases, painted once per session (idle-warmed via wild/warmup). */
+export function windowAtlases(): NonNullable<typeof atlasCache> {
+  if (!atlasCache) atlasCache = { shapes: paintShapeAtlas(), occupants: paintOccupantAtlas() }
+  return atlasCache
+}
+
 export function InnWindows() {
   const ctx = useWild()
   const meshRef = useRef<THREE.InstancedMesh>(null)
   const lightRefs = useRef<(THREE.PointLight | null)[]>([])
 
-  const shapes = useMemo(() => paintShapeAtlas(), [])
-  const occupants = useMemo(() => paintOccupantAtlas(), [])
+  const { shapes, occupants } = windowAtlases()
 
   const geometry = useMemo(() => {
     const geo = new THREE.PlaneGeometry(1, 1)
@@ -499,14 +506,14 @@ export function InnWindows() {
     mesh.frustumCulled = false
   }, [])
 
+  // The atlases are NOT disposed: they live in the module cache so a later remount (paging
+  // away and back) reuses them instead of repainting on the turn.
   useEffect(
     () => () => {
       geometry.dispose()
       material.dispose()
-      shapes.dispose()
-      occupants.dispose()
     },
-    [geometry, material, shapes, occupants],
+    [geometry, material],
   )
 
   useFrame(() => {
@@ -528,6 +535,8 @@ export function InnWindows() {
 
     // FOUR lights for thirty windows (D5). Each one carries its whole room's spill, and gets
     // a slow two-sine wander so the pool it throws on the cobbles is never dead still.
+    // Lights are NEVER visibility-flipped — a change in the visible-light count re-links every
+    // program in the scene (a ~1s dead frame); an unlit room is intensity 0, not a hidden light.
     ROOM_LIGHTS.forEach((spec, i) => {
       const light = lightRefs.current[i]
       if (!light) return
@@ -535,7 +544,6 @@ export function InnWindows() {
       const wander =
         1 + 0.055 * Math.sin(f.time * (1.7 + i * 0.43) + i * 2.1) + 0.03 * Math.sin(f.time * 4.3 + i)
       light.intensity = spec.intensity * level * wander
-      light.visible = level > 0.002
     })
   })
 

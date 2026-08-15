@@ -511,14 +511,23 @@ function useRoomLights(scene: THREE.Scene) {
 
 // ---------------------------------------------------------------------------------------------
 
-export function NightStage() {
-  const wild = useWild()
-  const scene = useThree((s) => s.scene)
-  const roomLights = useRoomLights(scene)
+type NightArt = {
+  sky: THREE.CanvasTexture
+  halo: THREE.CanvasTexture
+  haze: THREE.CanvasTexture
+  skyline: THREE.CanvasTexture
+  mist: THREE.CanvasTexture[]
+  cobbles: THREE.CanvasTexture[]
+}
 
-  const art = useMemo(() => {
+let artCache: NightArt | null = null
+
+/** The stage's painted textures, once per session (idle-warmed via wild/warmup) — never
+ *  disposed, so paging away and back reuses them instead of repainting on the turn. */
+export function nightArt(): NightArt {
+  if (!artCache) {
     const paving = paintCobbles()
-    return {
+    artCache = {
       sky: paintSky(),
       halo: paintRadialGlow('rgba(196,218,255,0.85)', 'rgba(120,158,214,0.22)'),
       haze: paintHaze(),
@@ -526,19 +535,16 @@ export function NightStage() {
       mist: STAGE.mist.map((_, i) => paintMist(0x4d15 + i * 977)),
       cobbles: HALVES.map((half) => cobbleTexture(paving, half.offset)),
     }
-  }, [])
+  }
+  return artCache
+}
 
-  useEffect(
-    () => () => {
-      art.sky.dispose()
-      art.halo.dispose()
-      art.haze.dispose()
-      art.skyline.dispose()
-      for (const c of art.cobbles) c.dispose()
-      for (const m of art.mist) m.dispose()
-    },
-    [art]
-  )
+export function NightStage() {
+  const wild = useWild()
+  const scene = useThree((s) => s.scene)
+  const roomLights = useRoomLights(scene)
+
+  const art = nightArt()
 
   const moonTarget = useMemo(() => {
     const object = new THREE.Object3D()
@@ -548,6 +554,7 @@ export function NightStage() {
 
   const moonRef = useRef<THREE.DirectionalLight>(null)
   const fillRef = useRef<THREE.DirectionalLight>(null)
+  const ambientRef = useRef<THREE.AmbientLight>(null)
   const skyRef = useRef<THREE.Mesh>(null)
   const moonGroupRef = useRef<THREE.Group>(null)
   const haloRef = useRef<THREE.Mesh>(null)
@@ -615,6 +622,9 @@ export function NightStage() {
     const fill = fillRef.current
     if (fill) fill.intensity = STAGE.fill.intensity * arrived * (1 - STAGE.fill.wakeCut * wake)
 
+    const ambient = ambientRef.current
+    if (ambient) ambient.intensity = STAGE.ambient.intensity * arrived
+
     opacityOf(skyRef.current, arrived)
     opacityOf(hazeRef.current, arrived * 0.92)
     opacityOf(farGroundRef.current, arrived)
@@ -625,6 +635,10 @@ export function NightStage() {
     if (moonGroup) {
       const settle = 0.9 + 0.1 * arrived
       moonGroup.scale.setScalar(settle)
+      // The disc itself has no opacity ramp (its over-1 colour is the point), and this tree is
+      // never visibility-gated as a whole — so the moon must gate itself or it hangs over the
+      // title page. A mesh-group flip is safe; only LIGHT visibility re-links programs.
+      moonGroup.visible = arrived > 0.004
     }
     opacityOf(haloRef.current, arrived * (0.82 + 0.06 * Math.sin(time * 0.31)))
 
@@ -670,10 +684,13 @@ export function NightStage() {
   return (
     <group name="wild-night-stage">
       {/* Cool fill. The moon rims the mass from behind; this is the only thing keeping the
-          faces we actually see off pure black while the inn sleeps. */}
+          faces we actually see off pure black while the inn sleeps. Intensity rides `arrived`
+          (see the useFrame): this tree is never visibility-gated, so a constant ambient would
+          leak the diorama's cool wash over every other spread. */}
       <ambientLight
+        ref={ambientRef}
         color={STAGE.ambient.color}
-        intensity={STAGE.ambient.intensity}
+        intensity={0}
         userData={{ wildStage: true }}
       />
       <directionalLight
@@ -708,7 +725,7 @@ export function NightStage() {
       {/* MOON — a hot disc over its own halo. The disc's colour is deliberately above 1 in
           linear space so it clears the bloom threshold and ACES rolls it off to white; that is
           what makes it a light source in the frame rather than a pale circle. */}
-      <group ref={moonGroupRef} position={STAGE.moon.pos}>
+      <group ref={moonGroupRef} position={STAGE.moon.pos} visible={false}>
         <mesh ref={haloRef} position={[0, 0, -0.02]} renderOrder={-29}>
           <planeGeometry args={[STAGE.moon.haloRadius * 2, STAGE.moon.haloRadius * 2]} />
           <meshBasicMaterial

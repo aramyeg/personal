@@ -620,11 +620,9 @@ export function AtmosphereFx() {
         const s = LANTERN.radius * (3.4 + 2.6 * passage)
         sprite.scale.set(s, s * 1.1, 1)
       }
+      // Intensity only — flipping a light's visibility re-links every program in the scene.
       const light = lanternLightRef.current
-      if (light) {
-        light.intensity = (0.16 + 1.15 * passage) * stage * flicker
-        light.visible = light.intensity > 0.004
-      }
+      if (light) light.intensity = (0.16 + 1.15 * passage) * stage * flicker
     }
 
     // GALLERY SHAFTS — thin, late, and only ever a supporting voice.
@@ -758,7 +756,6 @@ export function AtmosphereFx() {
         intensity={0}
         distance={0.55}
         decay={2}
-        visible={false}
       />
 
       {/* Thin shafts from the gallery. */}

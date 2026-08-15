@@ -35,14 +35,30 @@ import { useFrame, useThree } from '@react-three/fiber'
 import type { PopupRole } from '../book/popup-spread'
 import type { TurnFrame } from '../book/use-turn-driver'
 import { AtmosphereFx } from './atmosphere-fx'
-import { CinematicGrade } from './cinematic-grade'
+import { CinematicGrade, warmGradePrograms } from './cinematic-grade'
 import { InnBuilding } from './inn-building'
+import { innMaterials, skinTextures } from './inn-materials'
 import { MASS_APEX_Y, REVEAL } from './inn-model'
-import { NightStage } from './night-stage'
+import { NightStage, nightArt } from './night-stage'
 import { setRiseClipHeight } from './rise-clip'
 import { TheKey } from './the-key'
-import { InnWindows } from './windows'
+import { InnWindows, windowAtlases } from './windows'
 import { ramp, readWildFrame, WildContext, type WildContextValue } from './wild-frame'
+import { scheduleWildWarmup } from './warmup'
+
+// The diorama's procedural painting starts warming the moment the book's bundle loads —
+// one paint per idle slice — so the page-turn that mounts this spread finds every cache hot
+// instead of paying ~15M canvas pixel ops in a single dead frame (see wild/warmup.ts).
+scheduleWildWarmup([
+  () => skinTextures('stone'),
+  () => skinTextures('timber'),
+  () => skinTextures('shingle'),
+  () => skinTextures('brick'),
+  () => skinTextures('sign'),
+  () => innMaterials(),
+  () => windowAtlases(),
+  () => nightArt(),
+])
 
 export type Ch1DioramaProps = {
   spreadIndex: number
@@ -116,6 +132,28 @@ export function Ch1Diorama({ spreadIndex, role, frame, committedSpread }: Ch1Dio
     }
   }, [gl])
 
+  // Warm the grade chain's programs while the spread is still shut. The scene-graph materials
+  // are covered by the book's own E-G4 `gl.compile` pass (which runs on mount, at load — and
+  // whose header documents that `compileAsync` CRASHES on this scene's materials, so none of
+  // that here); the composer's passes are NOT in the scene graph, so they get this one
+  // idle-time warm render instead of a ~1s link stall on arrival at the chapter.
+  useEffect(() => {
+    let cancelled = false
+    const kick = (): void => {
+      if (!cancelled) warmGradePrograms(gl)
+    }
+    const idle: number | ReturnType<typeof setTimeout> =
+      typeof window.requestIdleCallback === 'function'
+        ? window.requestIdleCallback(kick, { timeout: 1500 })
+        : setTimeout(kick, 300)
+    return () => {
+      cancelled = true
+      if (typeof window.cancelIdleCallback === 'function' && typeof idle === 'number')
+        window.cancelIdleCallback(idle)
+      else clearTimeout(idle as ReturnType<typeof setTimeout>)
+    }
+  }, [gl])
+
   // Pin the clip to the page surface before the first frame, so nothing can render for even one
   // frame against a plane at y = 0 (which would be BELOW the page and reveal the buried mass).
   useLayoutEffect(() => {
@@ -130,10 +168,13 @@ export function Ch1Diorama({ spreadIndex, role, frame, committedSpread }: Ch1Dio
     if (!root) return
     setRiseClipHeight(worldY(root))
 
-    const { open, hidden } = readWildFrame(context)
+    const { open } = readWildFrame(context)
 
-    const stage = stageRef.current
-    if (stage) stage.visible = !hidden
+    // The stage is NEVER hidden by visibility: flipping it would change the renderer's
+    // visible-light set, and a light-count change re-links every program in the scene — the
+    // ~1s dead frames the production profile caught on arrival and at the first drag. While
+    // the spread is closed everything hides itself instead: the building is parked below the
+    // page and clipped, and every card, pool, beam and glow fades by `open`/`stage` to zero.
 
     const rise = riseRef.current
     if (rise) rise.position.y = -MASS_APEX_Y * (1 - riseSettle(open))
@@ -142,7 +183,9 @@ export function Ch1Diorama({ spreadIndex, role, frame, committedSpread }: Ch1Dio
   const live = role !== 'hidden'
 
   return (
-    <group ref={rootRef} name={`popup-spread-${spreadIndex}`} visible={live}>
+    // Always visible for the same light-count reason as the stage gate above; `live` only
+    // decides whether the grade owns presentation.
+    <group ref={rootRef} name={`popup-spread-${spreadIndex}`}>
       <WildContext.Provider value={context}>
         {/* The composer seizes r3f's render loop for as long as it is mounted, so it mounts
             only while this spread is on screen (current, incoming or outgoing) and unmounts

@@ -119,6 +119,48 @@ const GradeShader = {
   `,
 }
 
+let gradeWarmed = false
+
+/**
+ * Compile the grade chain's shader programs ahead of first use. The renderer caches programs
+ * by shader source, so one render through a throwaway 32-square composer at book-idle time
+ * means the real composer's first frame links nothing — the ~1s dead frame the profile caught
+ * on arrival at the chapter was dominated by these compiles. ACES is forced for the warm
+ * render because OutputPass specializes its shader on the renderer's tone mapping, and the
+ * variant the diorama actually uses is the ACES one.
+ */
+export function warmGradePrograms(gl: THREE.WebGLRenderer): void {
+  if (gradeWarmed) return
+  gradeWarmed = true
+  const prevToneMapping = gl.toneMapping
+  const prevTarget = gl.getRenderTarget()
+  try {
+    gl.toneMapping = THREE.ACESFilmicToneMapping
+    const scene = new THREE.Scene()
+    const camera = new THREE.PerspectiveCamera()
+    const composer = new EffectComposer(gl)
+    composer.renderToScreen = false
+    composer.setSize(32, 32)
+    const bloom = new UnrealBloomPass(new THREE.Vector2(32, 32), 0.5, 0.5, 0.5)
+    const grade = new ShaderPass(GradeShader)
+    const output = new OutputPass()
+    composer.addPass(new RenderPass(scene, camera))
+    composer.addPass(bloom)
+    composer.addPass(grade)
+    composer.addPass(output)
+    composer.render(1 / 60)
+    composer.dispose()
+    bloom.dispose()
+    grade.dispose()
+    output.dispose()
+  } catch {
+    // A failed warm costs nothing but the head start.
+  } finally {
+    gl.toneMapping = prevToneMapping
+    gl.setRenderTarget(prevTarget)
+  }
+}
+
 export function CinematicGrade() {
   const wild = useWild()
   const gl = useThree((s) => s.gl)
@@ -128,6 +170,18 @@ export function CinematicGrade() {
   const dpr = useThree((s) => s.viewport.dpr)
 
   const contextLost = useRef(false)
+
+  const perfRef = useRef<{ frames: number; head: number; times: Float32Array } | null>(null)
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get('wilddebug') !== '1') return
+    perfRef.current = { frames: 0, head: 0, times: new Float32Array(240) }
+    // info.autoReset clears the counters after every internal pass; whole-frame numbers need
+    // one manual reset per frame instead (done at the top of the useFrame below).
+    gl.info.autoReset = false
+    return () => {
+      gl.info.autoReset = true
+    }
+  }, [gl])
 
   const rig = useMemo(() => {
     const composer = new EffectComposer(gl)
@@ -202,6 +256,8 @@ export function CinematicGrade() {
   useFrame((_, delta) => {
     if (contextLost.current || size.width <= 0 || size.height <= 0) return
 
+    if (perfRef.current) gl.info.reset()
+
     const { open, wake, time } = readWildFrame(wild)
 
     // The grade arrives with the night rather than snapping on with the component, and it keeps
@@ -222,6 +278,25 @@ export function CinematicGrade() {
     rig.grade.uniforms.uTime.value = time
 
     rig.composer.render(delta)
+
+    // Dev-only perf telemetry for the capture harness (?wilddebug=1): renderer counters for
+    // the whole frame (composer passes included) plus a rolling frame-time window.
+    if (perfRef.current) {
+      const p = perfRef.current
+      p.frames += 1
+      p.times[p.head] = delta * 1000
+      p.head = (p.head + 1) % p.times.length
+      const info = gl.info.render
+      ;(window as unknown as { __wildPerf?: unknown }).__wildPerf = {
+        calls: info.calls,
+        triangles: info.triangles,
+        frames: p.frames,
+        times: Array.from(p.times.slice(0, Math.min(p.frames, p.times.length))),
+        dpr,
+        size: [size.width, size.height],
+        wake,
+      }
+    }
   }, 1)
 
   return null

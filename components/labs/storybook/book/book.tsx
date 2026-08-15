@@ -505,10 +505,19 @@ export function Book() {
   // imperceptible warm-up lag traded for two fewer mounted spreads' worth of
   // resident textures and memory (the mid-book ch3 keep alone is 38 tex).
   const popupSpreadIndices = useMemo(
-    () =>
-      [spread - 1, spread, spread + 1].filter(
+    () => {
+      const window = [spread - 1, spread, spread + 1]
+      // WILD: chapter 1's diorama is RESIDENT from load, not windowed. Mounting it mid-turn
+      // added its lights to the scene mid-play, and a visible-light-count change re-links
+      // every program in the scene — a ~1s dead frame landing exactly on the page turn
+      // (production profile, wild lane scratch/perf/). Resident, its lights exist before the
+      // reader's first interaction and the E-G4 compile below warms its programs at load,
+      // behind the loader, where the cost cannot land on a turn.
+      if (!window.includes(2)) window.push(2)
+      return window.filter(
         (i) => i >= 1 && i <= SPREAD_MAX && popupContentForSpread(i) !== undefined
-      ),
+      )
+    },
     [spread]
   )
   // The spread a turn (if any) is headed toward — `spread` itself is always

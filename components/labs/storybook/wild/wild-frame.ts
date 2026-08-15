@@ -91,15 +91,20 @@ export function readWildFrame(ctx: WildContextValue): WildFrame {
     f ? easeTurnWeighted(f.t) : 0,
   )
   const beta = thetaL - thetaR
+  const hidden = role === 'hidden' || beta <= BETA_HIDDEN
   return {
     role,
     beta,
     thetaL,
     thetaR,
-    open: opennessFromBeta(beta),
+    // A role-hidden spread reads as SHUT no matter what the page angles say: the angle
+    // derivation is only meaningful for the current/turning spreads, and the diorama tree is
+    // never visibility-gated (a light-count change re-links every program in the scene), so
+    // `open` is the one switch every consumer self-hides from — the stage must arrive at 0.
+    open: hidden ? 0 : opennessFromBeta(beta),
     wake: clamp01(ctx.wake.current),
     time: ctx.clock.current,
-    hidden: role === 'hidden' || beta <= BETA_HIDDEN,
+    hidden,
   }
 }
 
