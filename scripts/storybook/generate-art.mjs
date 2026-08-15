@@ -627,7 +627,7 @@ function citadelStrip({ seed, w, h, towers = 7 }) {
 // ---- seeded grain pass: a whisper of monochrome tooth, its alpha MASKED by
 // the art's own silhouette (per-pixel) so grain never bleeds outside the cut.
 // Deterministic (seeded), so it stays golden-safe. ----
-function grainOverArt(flatRaw, w, h, seed, amount) {
+function grainOverArt(flatRaw, w, h, seed, amount, tooth = GRAIN_TOOTH) {
   const { data } = flatRaw // RGBA raw of the flats
   const rand = mulberry32(seed ^ 0x5bd1e995)
   const g = Buffer.alloc(w * h * 4)
@@ -636,10 +636,22 @@ function grainOverArt(flatRaw, w, h, seed, amount) {
     const n = ((rand() * 2 - 1) * amount) | 0
     const v = Math.max(0, Math.min(255, 128 + n))
     g[i * 4] = g[i * 4 + 1] = g[i * 4 + 2] = v
-    g[i * 4 + 3] = a > 0 ? 40 : 0 // tooth only inside the silhouette
+    g[i * 4 + 3] = a > 0 ? tooth : 0 // tooth only inside the silhouette
   }
   return sharp(g, { raw: { width: w, height: h, channels: 4 } }).png().toBuffer()
 }
+/**
+ * THE TOOTH'S OWN ALPHA, and the ceiling it puts on every highlight in the book.
+ *
+ * The grain layer is a 50%-grey field laid OVER the finished art at this alpha,
+ * so whatever a painter does, the brightest pixel it can ship is
+ * 255*(1 - tooth/255) + 128*(tooth/255) — at the house 40 that is 235, not 255,
+ * and the `amount` parameter has nothing to do with it. That is the right
+ * default (paper has no specular) and it stays the default. A piece whose whole
+ * job is to BE a light source may lower it, which is the only way a lamp on an
+ * unlit MeshBasicMaterial can compete with a window on a lit MeshStandard one.
+ */
+const GRAIN_TOOTH = 40
 
 /** SVG -> flat PNG -> seeded grain masked by the art's own alpha, for a module
  *  that also emits an outline (the shaped-mesh bakes). */
@@ -10493,57 +10505,33 @@ function innCourtyardSpread(w, h, seed) {
     farEdge.push(`${fx(PX(lerp(-0.04, 1.04, ft)))} ${fx(PY(fyy))}`)
   }
   const field = `M ${farEdge.join(' L ')} L ${fx(PX(1.04))} ${fx(PY(1.05))} L ${fx(PX(-0.04))} ${fx(PY(1.05))} Z`
-  s += `<path d="${field}" fill="#dcc697"/>`
-  s += `<path d="${field}" fill="url(#s2pgPave)"/>`
+  // THE SHARED SETT FIELD (see "THE YARD" module). The old paving was a fan of
+  // warm tan ELLIPSES — the "potato cobble" the judge named — and, worse, it
+  // spoke a different language from the dissolve rack lying on top of it, so
+  // the rack could only read as a panel. Page and rack now draw the SAME
+  // stones from the SAME generator through the SAME ambient key; the only
+  // thing that changes between them is which window of it they show.
+  s += `<path d="${field}" fill="${YARD.joint}"/>`
   s += `<g clip-path="url(#s2pgField)">`
-  // Six setts spanning a real LIGHT-to-DARK range, not four mid-tones: paving
-  // can only carry as much value range as its palette holds, and a mid-only
-  // palette caps the whole print's contrast however the lighting is graded.
-  const STONE_FILLS = ['#e2c88f', '#cbb078', '#c3a76e', '#b6976a', '#a98a5c', '#8a6f47']
-  // Courses are true ARCS about the great door, walked outward in PIXEL space so
-  // they stay circular on the plate: this is what makes the painted perspective
-  // CONVERGE on plane B's door (T-FLOOR, scene pack 1). Straight full-width rows
-  // pave the page but throw the convergence away and read as a rug of pebbles.
-  // Stone size grows with radius (perspective) and each course carries as many
-  // stones as it takes to TILE its own arc, so the joint stays thin everywhere
-  // instead of opening into mortar rivers at the apron.
-  const OXp = PX(doorX)
-  const OYp = PY(FAN0.y)
-  const TH0 = -0.2
-  const TH1 = Math.PI + 0.2
-  const RMAX = Math.hypot(w, h) * 1.15
-  let R = h * 0.062
-  let course = 0
-  while (R < RMAX) {
-    const grow = Math.pow(Math.min(1, R / (h * 1.15)), 0.78)
-    const ry = lerp(h * 0.005, h * 0.026, grow)
-    const rx = ry * 1.6
-    const stride = 2 * rx + 3.4
-    const count = Math.max(6, Math.ceil(((TH1 - TH0) * R) / stride))
-    const dTh = (TH1 - TH0) / count
-    // how much of the door's lamplight reaches this course — the value gradient
-    // that makes the paving LEAD INWARD instead of reading as an even texture
-    const warm = Math.max(0, 1 - R / (h * 0.78))
-    for (let c2 = 0; c2 < count; c2++) {
-      const th = TH0 + (c2 + (course % 2 ? 0.5 : 0)) * dTh // running bond
-      const sx2 = OXp + Math.cos(th) * R
-      const sy2 = OYp + Math.sin(th) * R
-      if (sy2 < -ry * 2 || sy2 > h + ry * 2 || sx2 < -rx * 2 || sx2 > w + rx * 2) continue
-      const fill = STONE_FILLS[Math.min(STONE_FILLS.length - 1, Math.floor(((r() + r()) / 2) * STONE_FILLS.length))] // triangular: mid-tones dominate
-      const spin = fx((th * 180) / Math.PI - 90 + rr(r, -7, 7))
-      const erx = fx(rx * rr(r, 0.8, 1))
-      const ery = fx(ry * rr(r, 0.86, 1.04))
-      s += `<ellipse cx="${fx(sx2 + rr(r, -2.6, 2.6))}" cy="${fx(sy2 + rr(r, -1.8, 1.8))}" rx="${erx}" ry="${ery}" fill="${fill}" stroke="${WALNUT}" stroke-width="2" stroke-opacity="0.62" transform="rotate(${spin} ${fx(sx2)} ${fx(sy2)})"/>`
-      if (warm > 0.03) s += `<ellipse cx="${fx(sx2)}" cy="${fx(sy2)}" rx="${erx}" ry="${ery}" fill="${INN.lamp}" opacity="${fx(warm * 0.26)}" transform="rotate(${spin} ${fx(sx2)} ${fx(sy2)})"/>`
-      if (r() < 0.12) s += `<ellipse cx="${fx(sx2)}" cy="${fx(sy2)}" rx="${fx(rx * 0.66)}" ry="${fx(ry * 0.7)}" fill="${WALNUT}" opacity="0.28"/>` // a darker set stone
-    }
-    R += 2 * ry + 3.4
-    course++
+  {
+    const V = yardView(0, 0, YARD_PW, YARD_PH, w, h)
+    const clip = [-40, -40, YARD_PW + 40, YARD_PH + 40]
+    s += yardPaveSvg(V, clip, { light: yardLampsPage })
+    // THE COACH LINE. The right quarter used to carry a pair of local curves;
+    // this is the SHARED `yardRutLine` — the same polyline the sett field wears
+    // its wheel-path against and the same one the rack's lit face draws its wet
+    // ruts on, so the tracks run under the rack and out the other side instead
+    // of stopping dead at its edge.
+    s += yardRutRails(V, { ink: YARD.joint, lit: YARD.cold, inkOp: 0.42, litOp: 0.22 })
+    s += yardPuddleSvg(V, clip)
   }
-  // the warm spill from the door running down the fan's throat
-  s += `<path d="M ${fx(PX(FAN0.x - 0.05))} ${fx(PY(FAN0.y))} L ${fx(PX(FAN0.x - 0.1))} ${fx(PY(gateY + 0.16))} L ${fx(PX(FAN0.x + 0.1))} ${fx(PY(gateY + 0.16))} L ${fx(PX(FAN0.x + 0.05))} ${fx(PY(FAN0.y))} Z" fill="${INN.lamp}" opacity="0.1"/>`
+  // the warm spill from the arch running down the fan's throat
+  s += `<path d="M ${fx(PX(FAN0.x - 0.05))} ${fx(PY(FAN0.y))} L ${fx(PX(FAN0.x - 0.1))} ${fx(PY(gateY + 0.16))} L ${fx(PX(FAN0.x + 0.1))} ${fx(PY(gateY + 0.16))} L ${fx(PX(FAN0.x + 0.05))} ${fx(PY(FAN0.y))} Z" fill="${INN.lamp}" opacity="0.09"/>`
   s += `</g>`
-  // the far courses dissolve rather than ending at a line (haze-carried recession)
+  // the far courses dissolve into the inn's own shadow rather than ending at a
+  // line (haze-carried recession — DUSK-keyed now that the yard is night stone;
+  // a parchment haze over dark paving printed a bright bar across the base of
+  // the hero)
   s += `<rect width="${w}" height="${fx(PY(farY + 0.13))}" fill="url(#s2pgHaze)"/>`
 
   // ---- WINDOW-LIGHT POOLS under plane B's facades (glue band z -0.2..-0.41).
@@ -10613,8 +10601,18 @@ function innCourtyardSpread(w, h, seed) {
   for (const [kx, ky] of [[0.36, 0.8], [0.2, 0.62]])
     s += `<g transform="translate(${fx(PX(kx))} ${fx(PY(ky))}) rotate(${fx(rr(r, -60, 60))})" opacity="0.8">${strewnKey(h * 0.026)}</g>`
 
-  // ---- THE KEY-BOARD'S PAPER CUES, where the LIFT banner and the manicule
-  // used to stand.
+  // ---- THE KEY-BOARD'S PAPER CUES — DELETED WITH THE PIECE THEY CUED.
+  //
+  // E4 retires `ch1-keyboard` (CONTRACT §2a). The contact pool and the ember
+  // arrow below were a shadow cast by nothing and a hand pointing at nothing,
+  // and worse, the plaque's footprint (x 0.674..0.822, y 0.44..0.88) lies
+  // squarely across the dissolve rack's — so the pool printed a hard rectangle
+  // of shading out from under the rack's aft edge, which is exactly the "panel
+  // dropped on the page" read this round exists to kill. The E3 reasoning is
+  // kept below because the affordance law it records still binds any future
+  // playable on this page.
+  //
+  // ---- (retired) the original note:
   //
   // Round 1 answered "the reader cannot tell the board is a playable" with a
   // parchment ribbon reading LIFT and a printer's manicule pointing at it. Both
@@ -10639,21 +10637,7 @@ function innCourtyardSpread(w, h, seed) {
   // content.ts's ch1-keyboard board box (d 0.40..0.74, z -0.09..0.57) run
   // through this file's own pageFX/pageFY, the same mapping every other anchor
   // on this page uses.
-  {
-    const bx0 = PX(pageFX(0.4, 'right'))
-    const bx1 = PX(pageFX(0.74, 'right'))
-    const by0 = PY(pageFY(-0.09))
-    const by1 = PY(pageFY(0.57))
-    const boardD = `M ${fx(bx0)} ${fx(by0)} L ${fx(bx1)} ${fx(by0)} L ${fx(bx1)} ${fx(by1)} L ${fx(bx0)} ${fx(by1)} Z`
-    // A plaque hung on a post stands about a finger's thickness off the ground
-    // it shadows; at this print's scale that is h*0.014 = 9.6 art px, which
-    // throws a 5.7 px pool — a contact shadow, not a slab.
-    s += raisedEdgeShadow(boardD, { lift: h * 0.014, part: 'pool', ink: WALNUT })
-    // The arrow sits clear of the plaque mesh (which covers x 0.674..0.822) and
-    // clear of the yard clutter that starts at 0.86, on the cobble the reader's
-    // hand crosses to reach the ring handles.
-    s += cueArrow(PX(0.843), PY(pageFY(0.24)), w * 0.052, { dir: 0, ink: WALNUT })
-  }
+  // (nothing here: the board is gone)
 
   // ---- THE GOOSE FAMILY crossing lower-left, heading for the gate.
   //
@@ -10701,7 +10685,7 @@ function innCourtyardSpread(w, h, seed) {
   for (let i = 0; i < 7; i++) {
     const px2 = 0.12 + i * 0.033 + rr(r, -0.006, 0.006)
     const py2 = 0.87 + (i % 2 ? 0.014 : -0.008)
-    s += `<path d="M ${fx(PX(px2))} ${fx(PY(py2))} l -3.4 5 m 3.4 -5 l 0 5.4 m 0 -5.4 l 3.4 5" stroke="${WALNUT}" stroke-width="1.3" opacity="0.4" fill="none"/>`
+    s += `<path d="M ${fx(PX(px2))} ${fx(PY(py2))} l -3.4 5 m 3.4 -5 l 0 5.4 m 0 -5.4 l 3.4 5" stroke="${YARD.cold}" stroke-width="1.3" opacity="0.34" fill="none"/>`
   }
 
   // ---- GUEST FOOTPRINTS doodled into the cobbles (Vegas floor-doodle
@@ -10713,9 +10697,10 @@ function innCourtyardSpread(w, h, seed) {
       const bx = lerp(x0, x1, t) + (i % 2 ? 0.012 : -0.012) + rr(r, -0.003, 0.003)
       const by = lerp(y0, y1, t) + rr(r, -0.004, 0.004)
       const ang = (Math.atan2(y1 - y0, x1 - x0) * 180) / Math.PI + 90 + rr(r, -14, 14)
-      out += `<g transform="translate(${fx(PX(bx))} ${fx(PY(by))}) rotate(${fx(ang)})" opacity="${fx(rr(r, 0.3, 0.44))}">` +
-        `<ellipse cx="0" cy="-3.4" rx="3.2" ry="5" fill="${WALNUT}"/>` +
-        `<ellipse cx="0" cy="5" rx="2.6" ry="2.2" fill="${WALNUT}"/></g>`
+      // dust ON dark stone, not a stain IN light stone — the yard inverted
+      out += `<g transform="translate(${fx(PX(bx))} ${fx(PY(by))}) rotate(${fx(ang)})" opacity="${fx(rr(r, 0.22, 0.34))}">` +
+        `<ellipse cx="0" cy="-3.4" rx="3.2" ry="5" fill="${YARD.cold}"/>` +
+        `<ellipse cx="0" cy="5" rx="2.6" ry="2.2" fill="${YARD.cold}"/></g>`
     }
     return out
   }
@@ -10744,15 +10729,14 @@ function innCourtyardSpread(w, h, seed) {
     s += `<ellipse cx="${fx(PX(yardCx))} " cy="${fx(PY(yardCy))}" rx="${fx(PX(0.108))}" ry="${fx(PY(0.088))}" fill="none" stroke="${INN.stoneLit}" stroke-width="7" opacity="0.5"/>`
     s += `<ellipse cx="${fx(PX(yardCx))}" cy="${fx(PY(yardCy))}" rx="${fx(PX(0.108))}" ry="${fx(PY(0.088))}" fill="none" stroke="${WALNUT}" stroke-width="2.4" opacity="0.5"/>`
     s += `<ellipse cx="${fx(PX(yardCx))}" cy="${fx(PY(yardCy))}" rx="${fx(PX(0.03))}" ry="${fx(PY(0.024))}" fill="${WALNUT}" opacity="0.12"/>` // the worn centre
-    // wheel ruts sweeping in from the fore-right corner, through the circle,
-    // out toward the gate — the coaches' own line across the empty quarter
-    for (const off of [-0.012, 0.012]) {
-      const rut =
-        `M ${fx(PX(1.02 + off))} ${fx(PY(0.99))} ` +
-        `C ${fx(PX(0.96 + off))} ${fx(PY(0.86))} ${fx(PX(0.98 + off))} ${fx(PY(0.66))} ${fx(PX(0.9 + off))} ${fx(PY(pageFY(0.2)))} ` +
-        `C ${fx(PX(0.84 + off))} ${fx(PY(pageFY(-0.02)))} ${fx(PX(0.74 + off))} ${fx(PY(pageFY(-0.1)))} ${fx(PX(0.6 + off))} ${fx(PY(pageFY(-0.16)))}`
-      s += `<path d="${rut}" fill="none" stroke="${WALNUT}" stroke-width="6" opacity="0.24"/>`
-      s += `<path d="${rut}" fill="none" stroke="${INN.stoneLit}" stroke-width="2" opacity="0.3" transform="translate(0 -3)"/>`
+    // THE COACH LINE. This used to be a pair of local curves down the right
+    // quarter; it is now the SHARED `yardRutLine` — the same polyline the sett
+    // field wears its wheel-path against and the same one the rack's lit face
+    // draws its wet ruts on, so the tracks run under the rack and out the other
+    // side instead of stopping at its edge.
+    {
+      // (drawn with the paving, above — water lies ON the stone and UNDER
+      //  everything that stands on it, geese included)
     }
     // THE STONE HORSE TROUGH, in plan against the fore wall
     {
@@ -10806,24 +10790,21 @@ function innCourtyardSpread(w, h, seed) {
     }
   }
 
-  // dusk shadow of the stable in the gutter lane (kept box, z 0.43..0.58)
-  s += `<ellipse cx="${fx(PX(0.5))}" cy="${fx(PY(pageFY(0.5)))}" rx="${fx(PX(0.07))}" ry="${fx(PY(0.03))}" fill="${WALNUT}" opacity="0.07"/>`
-  // vignette
-  s += `<rect width="${w}" height="${h}" fill="url(#s2pgVig)"/>`
+  // (the stable's dusk shadow went with `ch1-stable` — E4 retires it)
+  // NO VIGNETTE RECT. The corner falloff moved INTO `yardKey`, which the rack's
+  // faces read as well: an overlay wash that only one of two abutting surfaces
+  // carries is a visible edge wherever it bites, and this one bit hardest
+  // exactly at the rack's fore-right corner.
   s += `</g>`
   const defs =
     `<clipPath id="s2pgField"><path d="${field}"/></clipPath>` +
-    // RADIAL about the great door, not vertical: the courtyard is lit from the
-    // door, so the paving must brighten inward and fall off to the aprons. A
-    // vertical ramp darkened the very band the doorlight falls on.
-    `<radialGradient id="s2pgPave" cx="0.5" cy="${fx(pageFY(-0.18))}" r="0.78">` +
-    `<stop offset="0" stop-color="${INN.lamp}" stop-opacity="0.16"/>` +
-    `<stop offset="0.42" stop-color="${WALNUT}" stop-opacity="0.1"/>` +
-    `<stop offset="1" stop-color="${WALNUT}" stop-opacity="0.4"/></radialGradient>` +
+    // The paving's value gradient is no longer a wash over the top of it — it
+    // is `yardKey`, applied per stone by the shared generator, which is the
+    // only way the page and the rack can agree on a tone at their shared edge.
     `<linearGradient id="s2pgHaze" x1="0" y1="0" x2="0" y2="1">` +
-    `<stop offset="0" stop-color="${ROOK.parch}" stop-opacity="0.72"/>` +
-    `<stop offset="0.66" stop-color="${ROOK.parch}" stop-opacity="0.22"/>` +
-    `<stop offset="1" stop-color="${ROOK.parch}" stop-opacity="0"/></linearGradient>` +
+    `<stop offset="0" stop-color="${YARD.joint}" stop-opacity="0.85"/>` +
+    `<stop offset="0.66" stop-color="${YARD.joint}" stop-opacity="0.3"/>` +
+    `<stop offset="1" stop-color="${YARD.joint}" stop-opacity="0"/></linearGradient>` +
     `<linearGradient id="s2pgDusk" x1="0" y1="0" x2="0" y2="1">` +
     `<stop offset="0" stop-color="${INN.skyDeep}" stop-opacity="0.26"/>` +
     `<stop offset="0.6" stop-color="${INN.skyDeep}" stop-opacity="0.1"/>` +
@@ -10835,10 +10816,7 @@ function innCourtyardSpread(w, h, seed) {
     `<radialGradient id="s2pgPool" cx="0.5" cy="0.5" r="0.5">` +
     `<stop offset="0" stop-color="${INN.lamp}" stop-opacity="0.6"/>` +
     `<stop offset="0.6" stop-color="${INN.lamp}" stop-opacity="0.2"/>` +
-    `<stop offset="1" stop-color="${INN.lamp}" stop-opacity="0"/></radialGradient>` +
-    `<radialGradient id="s2pgVig" cx="0.5" cy="0.55" r="0.75">` +
-    `<stop offset="0.5" stop-color="${WALNUT}" stop-opacity="0"/>` +
-    `<stop offset="1" stop-color="${WALNUT}" stop-opacity="0.28"/></radialGradient>`
+    `<stop offset="1" stop-color="${INN.lamp}" stop-opacity="0"/></radialGradient>`
   return svgPiece(w, h, s, defs)
 }
 
@@ -16728,6 +16706,336 @@ function e4Glow(id, core = E4.lamp, peak = 0.86) {
   )
 }
 
+// ============================================================================
+// THE YARD — ONE GROUND LANGUAGE FOR THREE SURFACES
+//
+// THE FINDING THIS EXISTS TO ANSWER: "the cold slate courtyard at rest reads as
+// a flat blue swimming-pool rectangle dropped on the page; the potato-cobble
+// procedural ground cheapens the floor too."
+//
+// Both halves of that are one defect. The dissolve rack's rest face and the
+// page print around it were painted by two different hands in two different
+// languages — a saturated blue-slate ellipse field on the rack, a warm tan
+// ellipse field on the page — so the rack could only ever read as an alien
+// panel laid on the courtyard rather than as the courtyard floor itself.
+//
+// The fix is that there is now exactly ONE paving, generated once, and the
+// three surfaces that show yard floor are three WINDOWS onto it:
+//   * `page-2`                    — the whole canonical field
+//   * `ch1-arrival-floor-dunes`   — the rack's rest window, unlit
+//   * `ch1-arrival-floor-gold`    — the same window one pitch spine-ward (where
+//                                   the rack actually lies at tau = PI), re-lit
+// Every stone, every course, the coach-line wear and the ambient key are
+// functions of CANONICAL PAGE PIXELS, so the coursing crosses the rack's edges
+// without a step and the rack's rest boundary has nothing to announce itself
+// with. Registration is the whole point: measure it, do not eyeball it.
+//
+// THE COLD IS DESATURATION AND VALUE, NEVER HUE. `#5b6470` is a blue, and a
+// blue on a warm page is a swimming pool whatever it is drawn as. The ramp
+// below sits on one warm-grey axis at 15-22% chroma and reads stone-cold
+// against the inn's #dcc79c plaster because it is a full two value steps below
+// it, not because it is a different temperature.
+// ============================================================================
+
+/** The canonical authoring space: the spread-2 page print's own pixel grid. */
+const YARD_PW = 1024
+const YARD_PH = 683
+/** The point every course is struck about — the great door at the spine, which
+ *  is where the hall's carriage arch now stands. Courses are true arcs about
+ *  it, so the painted perspective converges where the reader walks in. */
+const YARD_O = [0.5 * YARD_PW, pageFY(-0.2) * YARD_PH]
+
+const YARD = {
+  /** the joint: the dark ground the setts are INSET into, so every stone is
+   *  read from its mortar rather than from an outline stroke */
+  joint: '#1b1710',
+  /** the sett ramp, dark -> light, one warm-grey axis at low chroma. NINE steps
+   *  and a real light-to-dark span (luma 0.15 -> 0.57): paving can only carry as
+   *  much contrast as its palette holds, and the first bake of this field sat
+   *  inside three mid-darks and read as one flat tone at the reading camera. */
+  ramp: ['#2a2620', '#363128', '#423c32', '#4e473c', '#5b5347', '#695f51', '#786d5c', '#8a7e6a', '#9d9078'],
+  /** what a polished crown catches when nothing is lit: near enough nothing */
+  cold: '#9a9080',
+  /** ...and when the lamps are lit */
+  warm: E4.lampHot,
+}
+
+/** Linear blend of two #rrggbb strings. */
+function yardMix(a, b, t) {
+  const k = Math.max(0, Math.min(1, t))
+  const ch = (c, i) => parseInt(c.slice(1 + i * 2, 3 + i * 2), 16)
+  const h2 = (n) => Math.round(Math.max(0, Math.min(255, n))).toString(16).padStart(2, '0')
+  return `#${[0, 1, 2].map((i) => h2(lerp(ch(a, i), ch(b, i), k))).join('')}`
+}
+
+/** The ambient key: the arch throws light down the yard and it falls off to the
+ *  aprons and the corners. Shared by every surface, which is why the rack's
+ *  rest face cannot drift off the page's value. */
+const yardKey = (px, py) => {
+  const dx = (px - YARD_O[0]) / (YARD_PW * 0.55)
+  const dy = (py - YARD_O[1]) / (YARD_PH * 0.86)
+  return Math.max(0, 1 - Math.hypot(dx, dy))
+}
+
+/** Low-frequency damp/dry modulation. Per-stone randomness alone reads as
+ *  noise; a floor needs PATCHES, which is what this is. */
+const yardBlotch = (px, py) =>
+  0.5 * Math.sin(px * 0.0075 + py * 0.0041 + 1.9) +
+  0.34 * Math.sin(px * 0.0031 - py * 0.0098 - 0.7) +
+  0.2 * Math.sin(px * 0.019 + py * 0.014 + 3.1)
+
+/** The three standing lights the PAGE itself carries in the yard (the arch
+ *  spill and the fore-wall lantern posts' pools). Face A reads the very same
+ *  function, so a pool that grazes the rack grazes both sides of its edge. */
+const YARD_PAGE_LAMPS = [
+  [0.5, pageFY(-0.185), 0.185, 0.8],
+  [0.985, 0.9, 0.072, 0.5],
+  [0.948, 0.652, 0.058, 0.45],
+  [0.868, 0.49, 0.05, 0.4],
+]
+const yardLampsPage = (px, py) => {
+  let v = 0
+  for (const [u, vv, rad, amp] of YARD_PAGE_LAMPS) {
+    const dx = (px - u * YARD_PW) / (rad * YARD_PW)
+    const dy = (py - vv * YARD_PH) / (rad * YARD_PH * 1.35)
+    v = Math.max(v, amp * Math.max(0, 1 - Math.hypot(dx, dy)))
+  }
+  return v
+}
+
+/** THE COACH LINE, in canonical page px: in at the right fore edge, across the
+ *  yard, up into the arch mouth. The wheel-path wear on all three surfaces and
+ *  the drawn ruts on face B are read off THIS one polyline, so the tracks cross
+ *  the rack boundary without a step. */
+let YARD_RUT_CACHE = null
+function yardRutLine() {
+  if (YARD_RUT_CACHE) return YARD_RUT_CACHE
+  const bez = (p0, p1, p2, p3, t) => {
+    const m = 1 - t
+    return [0, 1].map((k) => m * m * m * p0[k] + 3 * m * m * t * p1[k] + 3 * m * t * t * p2[k] + t * t * t * p3[k])
+  }
+  const A = [[1.05, 0.99], [0.95, 0.928], [0.86, 0.856], [0.755, 0.806]]
+  const B = [[0.755, 0.806], [0.686, 0.783], [0.623, 0.753], [0.566, 0.713]]
+  const pts = []
+  for (let i = 0; i <= 46; i++) pts.push(bez(A[0], A[1], A[2], A[3], i / 46))
+  for (let i = 1; i <= 34; i++) pts.push(bez(B[0], B[1], B[2], B[3], i / 34))
+  YARD_RUT_CACHE = pts.map(([u, v]) => [u * YARD_PW, v * YARD_PH])
+  return YARD_RUT_CACHE
+}
+/** Distance in canonical px from a point to the coach line. */
+function yardRutDist(px, py) {
+  const pts = yardRutLine()
+  let best = 1e9
+  for (let i = 0; i < pts.length; i++) {
+    const d2 = (px - pts[i][0]) ** 2 + (py - pts[i][1]) ** 2
+    if (d2 < best) best = d2
+  }
+  return Math.sqrt(best)
+}
+/** Half the track gauge, canonical px — a cart's wheels, at this print's scale. */
+const YARD_GAUGE = 26
+/** The wheel-path wear key: two polished rails with a lightly scuffed middle. */
+const yardWear = (dd) =>
+  Math.min(1, Math.exp(-(((dd - YARD_GAUGE) / 17) ** 2)) + 0.45 * Math.exp(-((dd / (YARD_GAUGE * 2.1)) ** 2)))
+
+/** THE FIELD. Generated once, deterministically, and shared by every consumer.
+ *
+ *  Coursing, not scattering: true arcs struck about the arch, each course a
+ *  running bond offset from its neighbour, each course's setts sized to TILE
+ *  their own arc so the joint stays even from the spine to the apron. Stone
+ *  size is varied on purpose — mostly setts, one in ten a long stretcher, one
+ *  in six a half — because a course of identical stones is a printed pattern
+ *  and a yard is not printed. Corners carry sub-pixel jitter so each stone is
+ *  a CUT stone rather than a rounded pebble: the potato read the judge named
+ *  came from ellipses, and there is not one ellipse in here. */
+let YARD_FIELD_CACHE = null
+function yardSettField() {
+  if (YARD_FIELD_CACHE) return YARD_FIELD_CACHE
+  const r = mulberry32(20440)
+  const [OX, OY] = YARD_O
+  const stones = []
+  const TH0 = -0.4
+  const TH1 = Math.PI + 0.4
+  const RMAX = 700
+  const J = 1.15 // half the joint, px
+  let R = YARD_PH * 0.048
+  let course = 0
+  while (R < RMAX) {
+    const grow = Math.pow(Math.min(1, R / (YARD_PH * 1.25)), 0.72)
+    const dep = lerp(YARD_PH * 0.0062, YARD_PH * 0.0172, grow)
+    let th = TH0 + (r() * dep * 1.8) / R // running bond: each course its own phase
+    while (th < TH1) {
+      const roll = r()
+      const ratio = roll > 0.9 ? rr(r, 2.8, 4.0) : roll > 0.17 ? rr(r, 1.25, 2.2) : rr(r, 0.72, 1.05)
+      const dth = (dep * ratio) / R
+      if (th + dth > TH1) break
+      const ja = J / R
+      const rIn = R + J
+      const rOut = R + dep - J
+      const t0 = th + ja
+      const t1 = th + dth - ja
+      const jit = () => rr(r, -0.9, 0.9)
+      const pt = (rad2, ang) => [OX + Math.cos(ang) * rad2 + jit(), OY + Math.sin(ang) * rad2 + jit()]
+      const a = pt(rIn, t0)
+      const b = pt(rIn, t1)
+      const c2 = pt(rOut, t1)
+      const d2 = pt(rOut, t0)
+      const thc = (t0 + t1) / 2
+      const rc = (rIn + rOut) / 2
+      const cx = OX + Math.cos(thc) * rc
+      const cy = OY + Math.sin(thc) * rc
+      th += dth
+      if (cx < -34 || cx > YARD_PW + 34 || cy < -34 || cy > YARD_PH + 34) continue
+      // the LIT LIP: a thin facet along the stone's arch-facing edge. A sett is
+      // domed, so the edge that faces the light is the only part of it that is
+      // ever brighter than the field — this is what makes 3000 quads read as
+      // relief instead of as tile.
+      const lipT = Math.min(dep * 0.34, 4.2)
+      stones.push({
+        p: [a, b, c2, d2],
+        lip: [
+          a,
+          b,
+          [b[0] + Math.cos(t1) * lipT, b[1] + Math.sin(t1) * lipT],
+          [a[0] + Math.cos(t0) * lipT, a[1] + Math.sin(t0) * lipT],
+        ],
+        cx,
+        cy,
+        base: (r() + r()) / 2,
+        key: yardKey(cx, cy),
+        wear: yardWear(yardRutDist(cx, cy)),
+        blot: yardBlotch(cx, cy),
+      })
+    }
+    R += dep
+    course++
+  }
+  YARD_FIELD_CACHE = stones
+  return stones
+}
+
+/** Canonical page px -> a consumer canvas. */
+const yardView = (x0, y0, x1, y1, w, h) => ({
+  X: (px) => ((px - x0) * w) / (x1 - x0),
+  Y: (py) => ((py - y0) * h) / (y1 - y0),
+})
+const yardPts = (pts, V) => pts.map(([x, y]) => `${fx(V.X(x))},${fx(V.Y(y))}`).join(' ')
+
+/**
+ * Paint the shared field into one consumer's canvas.
+ * `light(px, py) -> 0..1` is the warm lamplight ON TOP of the ambient key; pass
+ * the SAME function on two surfaces and their tones are continuous by
+ * construction rather than by eye.
+ */
+function yardPaveSvg(V, clip, { light = null, warm = YARD.warm, cold = YARD.cold, lift = 0, warmCap = 0.5 } = {}) {
+  const F = yardSettField()
+  const N = YARD.ramp.length - 1
+  let s = ''
+  for (const st of F) {
+    if (st.cx < clip[0] || st.cx > clip[2] || st.cy < clip[1] || st.cy > clip[3]) continue
+    const lit = light ? light(st.cx, st.cy) : 0
+    const v = 1.9 + st.base * 1.1 + st.key * 2 + st.wear * 1.8 + st.blot * 1.15 + lit * 3 + lift
+    let fill = YARD.ramp[Math.max(0, Math.min(N, Math.round(v)))]
+    if (lit > 0.02) fill = yardMix(fill, warm, Math.min(warmCap, lit * 0.66))
+    s += `<polygon points="${yardPts(st.p, V)}" fill="${fill}"/>`
+    const lipT = 0.14 + st.key * 0.5 + st.wear * 0.55 + lit * 0.95
+    if (lipT > 0.17) {
+      s += `<polygon points="${yardPts(st.lip, V)}" fill="${yardMix(fill, lit > 0.02 ? warm : cold, Math.min(0.6, lipT * 0.46))}"/>`
+    }
+  }
+  return s
+}
+
+/** The two RAILS of the coach line, offset +-YARD_GAUGE along the polyline's
+ *  own normal and emitted into a consumer's canvas. Widths are given in
+ *  canonical px and scaled with the view, so the page's ruts and the rack's are
+ *  the same ruts at the same width where they meet. */
+function yardRutRails(V, { ink = YARD.joint, lit = YARD.cold, inkOp = 0.4, litOp = 0.24, wide = 7, thin = 2, glow = 0 } = {}) {
+  const pts = yardRutLine()
+  const k = V.X(1) - V.X(0)
+  const ky = V.Y(1) - V.Y(0)
+  let out = ''
+  for (const sgn of [-1, 1]) {
+    const d = []
+    for (let i = 0; i < pts.length; i++) {
+      const a = pts[Math.max(0, i - 1)]
+      const b = pts[Math.min(pts.length - 1, i + 1)]
+      const tx = b[0] - a[0]
+      const ty = b[1] - a[1]
+      const l = Math.hypot(tx, ty) || 1
+      const px2 = pts[i][0] + (-ty / l) * YARD_GAUGE * sgn
+      const py2 = pts[i][1] + (tx / l) * YARD_GAUGE * sgn
+      d.push(`${fx(V.X(px2))} ${fx(V.Y(py2))}`)
+    }
+    const path = `M ${d.join(' L ')}`
+    const sw = ((k + ky) / 2) || 1
+    if (glow > 0) out += `<path d="${path}" fill="none" stroke="${lit}" stroke-width="${fx(wide * sw * 2.1)}" opacity="${fxOp(glow)}" stroke-linecap="round"/>`
+    out += `<path d="${path}" fill="none" stroke="${ink}" stroke-width="${fx(wide * sw)}" opacity="${fxOp(inkOp)}" stroke-linecap="round"/>`
+    out += `<path d="${path}" fill="none" stroke="${lit}" stroke-width="${fx(thin * sw)}" opacity="${fxOp(litOp)}" stroke-linecap="round"/>`
+  }
+  return out
+}
+
+/** STANDING WATER, sited in canonical page px so a puddle is in the yard rather
+ *  than on a picture of the yard. It is also the A->B beat that costs nothing:
+ *  the same puddles are black holes in the cold face and full of lamplight in
+ *  the lit one, which is a thing water does and a texture swap cannot fake. */
+const YARD_PUDDLES = [
+  [700, 560, 48, 20], [832, 506, 33, 14], [641, 617, 40, 16],
+  [966, 598, 44, 18], [252, 592, 40, 17], [420, 641, 34, 14],
+]
+function yardPuddleSvg(V, clip, { lit = false, warm = E4.lampHot } = {}) {
+  const kx = V.X(1) - V.X(0)
+  const ky = V.Y(1) - V.Y(0)
+  let out = ''
+  for (const [cx, cy, rx, ry] of YARD_PUDDLES) {
+    if (cx < clip[0] || cx > clip[2] || cy < clip[1] || cy > clip[3]) continue
+    const P = (dx, dy, sx, sy, fill, op) =>
+      `<ellipse cx="${fx(V.X(cx + dx))}" cy="${fx(V.Y(cy + dy))}" rx="${fx(rx * kx * sx)}" ry="${fx(ry * ky * sy)}" fill="${fill}" opacity="${fxOp(op)}"/>`
+    out += P(0, 0, 1, 1, YARD.joint, lit ? 0.46 : 0.62)
+    out += P(-rx * 0.42, -ry * 0.3, 0.62, 0.7, YARD.joint, lit ? 0.36 : 0.5)
+    out += P(rx * 0.5, ry * 0.22, 0.5, 0.6, YARD.joint, lit ? 0.36 : 0.5)
+    out += P(-rx * 0.1, -ry * 0.16, 0.72, 0.5, lit ? warm : YARD.cold, lit ? 0.7 : 0.14)
+    if (lit) out += P(-rx * 0.22, -ry * 0.2, 0.34, 0.24, E4.paneCore, 0.55)
+  }
+  return out
+}
+
+/**
+ * THE EXPOSURE MATCH, and it is not a fudge — it is the one systematic
+ * difference between the two surfaces this round has to make agree.
+ *
+ * The page prints on a `MeshStandardMaterial` (lit by the stage's ambient +
+ * directional + candle, and multiplied by the gutter fold's baked vertex AO);
+ * the dissolve rack prints on a `MeshBasicMaterial`, which is unlit. So the
+ * SAME hex renders about 30% brighter on the rack than on the page, and the
+ * rack's rest face floated a measured 15-22 luma above the paving it is
+ * supposed to be part of even after every stone matched. Measured at the
+ * boundary on a 1600x900 capture: page 58, rack 75.5 -> 0.77.
+ *
+ * A black rect at alpha (1 - k) over the finished face IS a multiply by k
+ * (src*a + dst*(1-a) with src = 0), so this is an exact per-channel scale and
+ * not an approximation. Both faces take it: the flip's payoff is the RATIO
+ * between them, which a common factor leaves alone.
+ */
+const RACK_TONE = 0.77
+const rackToneCut = (w, h) => `<rect width="${w}" height="${h}" fill="#000000" opacity="${fxOp(1 - RACK_TONE)}"/>`
+
+/** The dissolve rack's own numbers, off content.ts (`ch1-arrival-floor`), and
+ *  its footprint in canonical page px. `dShift` is 0 at rest and one pitch
+ *  spine-ward at tau = PI, which is where dissolveSlatQuad actually puts the
+ *  rack when the B face is showing — so face B registers with the page too. */
+const ARRIVAL = { d0: 0.18, d1: 0.86, z0: 0.3, z1: 0.66, slats: 7 }
+const ARRIVAL_PITCH = (ARRIVAL.d1 - ARRIVAL.d0) / ARRIVAL.slats
+function arrivalWindow(dShift = 0) {
+  return {
+    x0: pageFX(ARRIVAL.d0 + dShift, 'right') * YARD_PW,
+    x1: pageFX(ARRIVAL.d1 + dShift, 'right') * YARD_PW,
+    y0: pageFY(ARRIVAL.z0) * YARD_PH,
+    y1: pageFY(ARRIVAL.z1) * YARD_PH,
+  }
+}
+
 /**
  * ONE WINDOW LIT FROM WITHIN — not a yellow rectangle.
  * Four things in order, and the order is the whole trick: (1) the BURN washed
@@ -17950,6 +18258,9 @@ function innArrivalRank(w, h, seed) {
   }
   const lantX = w * 0.055
   const lantY = h * 0.1
+  /** the pane's half-extents; the cut above is struck around these */
+  const LW = w * 0.038
+  const LH = h * 0.072
   const B_KS = h * 0.6
   const B_SC = h * 0.64
   const B_CD = h * 0.79
@@ -17961,9 +18272,13 @@ function innArrivalRank(w, h, seed) {
     `M 0 ${fx(h)} L 0 ${fx(G - h * 0.015)} ` +
     `L ${fx(K.x - K.hw)} ${fx(G - h * 0.42)} ` +
     // the lantern arm up-left, the lantern head cut into the sky
-    `L ${fx(lantX + w * 0.032)} ${fx(lantY + h * 0.12)} L ${fx(lantX - w * 0.03)} ${fx(lantY + h * 0.07)} ` +
-    `L ${fx(lantX - w * 0.03)} ${fx(lantY - h * 0.055)} L ${fx(lantX + w * 0.03)} ${fx(lantY - h * 0.055)} ` +
-    `L ${fx(lantX + w * 0.03)} ${fx(lantY + h * 0.02)} L ${fx(lantX + w * 0.06)} ${fx(lantY + h * 0.06)} ` +
+    // THE LANTERN HEAD, cut half again as large (judge: "the first centimetre
+    // of pull must deliver an unmissable reward"). The die is ~130 screen px
+    // tall, so the old w*0.03 half-width put the whole lamp inside 12 screen px
+    // — a hot core that small cannot be the first thing a reader sees rise.
+    `L ${fx(lantX + w * 0.04)} ${fx(lantY + h * 0.135)} L ${fx(lantX - w * 0.046)} ${fx(lantY + h * 0.085)} ` +
+    `L ${fx(lantX - w * 0.046)} ${fx(lantY - h * 0.088)} L ${fx(lantX + w * 0.046)} ${fx(lantY - h * 0.088)} ` +
+    `L ${fx(lantX + w * 0.046)} ${fx(lantY + h * 0.02)} L ${fx(lantX + w * 0.07)} ${fx(lantY + h * 0.07)} ` +
     `L ${fx(K.x - K.hw * 0.42)} ${fx(K.top + h * 0.13)} L ${fx(K.x - K.hw * 0.48)} ${fx(K.top + h * 0.09)} ` +
     `A ${fx(K.hw * 0.66)} ${fx(K.hw * 0.66)} 0 1 1 ${fx(K.x + K.hw * 0.48)} ${fx(K.top + h * 0.09)} ` +
     `L ${fx(K.x + K.hw)} ${fx(K.top + h * 0.24)} ` +
@@ -17990,9 +18305,14 @@ function innArrivalRank(w, h, seed) {
   s += `<ellipse cx="${fx(lantX)}" cy="${fx(lantY)}" rx="${fx(w * 0.62)}" ry="${fx(h * 0.62)}" fill="url(#arGlow)"/>`
   // the cobbles under their feet — cold stone, so the family stands on the
   // courtyard the dissolve is about to light
-  s += `<rect x="0" y="${fx(G - h * 0.03)}" width="${w}" height="${fx(h * 0.12)}" fill="${E4.slateDim}"/>`
-  for (let i = 0; i < 18; i++) {
-    s += `<ellipse cx="${fx(rr(r, 0, w))}" cy="${fx(rr(r, G, h * 0.995))}" rx="${fx(rr(r, w * 0.02, w * 0.04))}" ry="${fx(rr(r, h * 0.008, h * 0.013))}" fill="${E4.slate}" stroke="${E4.ink}" stroke-width="1.2" stroke-opacity="0.5"/>`
+  // the setts under their feet, in the YARD language and not the retired blue
+  // slate — the family stands on the same paving the rack and the page print
+  s += `<rect x="0" y="${fx(G - h * 0.03)}" width="${w}" height="${fx(h * 0.12)}" fill="${YARD.joint}"/>`
+  for (let i = 0; i < 26; i++) {
+    const sx2 = rr(r, -w * 0.02, w)
+    const sy2 = rr(r, G - h * 0.018, h * 0.985)
+    const sw2 = rr(r, w * 0.03, w * 0.075)
+    s += `<rect x="${fx(sx2)}" y="${fx(sy2)}" width="${fx(sw2)}" height="${fx(rr(r, h * 0.013, h * 0.02))}" fill="${YARD.ramp[r() > 0.55 ? 3 : 2]}"/>`
   }
   s += `<rect x="0" y="${fx(G - h * 0.03)}" width="${w}" height="${fx(h * 0.012)}" fill="${E4.lamp}" opacity="0.28"/>`
   // the painted VALLEYS under the bridges
@@ -18021,14 +18341,23 @@ function innArrivalRank(w, h, seed) {
   s += `<path d="M ${fx(K.x - K.hw * 0.5)} ${fx(K.top + h * 0.3)} L ${fx(K.x + K.hw * 0.5)} ${fx(K.top + h * 0.3)} L ${fx(K.x + K.hw * 0.42)} ${fx(G - h * 0.01)} L ${fx(K.x - K.hw * 0.42)} ${fx(G - h * 0.01)} Z" fill="${E4.plasterLit}" opacity="0.9"/>`
   s += `<rect x="${fx(K.x - K.hw * 0.46)}" y="${fx(G - h * 0.1)}" width="${fx(K.hw * 0.92)}" height="${fx(h * 0.014)}" fill="${E4.timber}" opacity="0.7"/>`
   s += head(K.x, K.top + h * 0.085, K.hw * 0.62, E4.timber, true)
-  s += `<path d="M ${fx(K.x - K.hw * 0.66)} ${fx(K.top + h * 0.3)} L ${fx(lantX + w * 0.024)} ${fx(lantY + h * 0.09)}" stroke="${E4.rust}" stroke-width="${fx(w * 0.036)}" stroke-linecap="round"/>`
-  // the lantern: iron cage, hot pane, a white core — the brightest pixel here
-  s += `<rect x="${fx(lantX - w * 0.024)} " y="${fx(lantY - h * 0.045)}" width="${fx(w * 0.048)}" height="${fx(h * 0.1)}" fill="${E4.pane}" stroke="${E4.timber}" stroke-width="${fx(w * 0.008)}"/>`
-  s += `<ellipse cx="${fx(lantX)}" cy="${fx(lantY + h * 0.008)}" rx="${fx(w * 0.014)}" ry="${fx(h * 0.032)}" fill="${E4.paneCore}"/>`
-  s += `<path d="M ${fx(lantX - w * 0.024)} ${fx(lantY - h * 0.045)} L ${fx(lantX)} ${fx(lantY - h * 0.062)} L ${fx(lantX + w * 0.024)} ${fx(lantY - h * 0.045)} Z" fill="${E4.timber}"/>`
-  for (let k2 = 0; k2 < 4; k2++) {
-    const a = (k2 * Math.PI) / 2 + 0.5
-    s += `<line x1="${fx(lantX + Math.cos(a) * w * 0.04)}" y1="${fx(lantY + Math.sin(a) * h * 0.05)}" x2="${fx(lantX + Math.cos(a) * w * 0.085)}" y2="${fx(lantY + Math.sin(a) * h * 0.11)}" stroke="${E4.lamp}" stroke-width="3" opacity="0.55" stroke-linecap="round"/>`
+  s += `<path d="M ${fx(K.x - K.hw * 0.66)} ${fx(K.top + h * 0.3)} L ${fx(lantX + w * 0.03)} ${fx(lantY + h * 0.1)}" stroke="${E4.rust}" stroke-width="${fx(w * 0.036)}" stroke-linecap="round"/>`
+  // The lantern: a HEAVY iron cage around a pane that is very nearly white.
+  //
+  // Both halves are forced by scale. The die prints at 512 px and renders at
+  // roughly a quarter of that, so a 4-px cage disappears into the mip and the
+  // lamp reads as a plain white card (measured: it did), while a 7-px hot core
+  // averages away to nothing and the lamp loses to the guest facade's windows
+  // on peak luma (measured: 210 against 233). A thick frame and a big flat core
+  // are the only pair that survives the downscale as "a lantern" AND as "the
+  // brightest thing on the spread".
+  s += `<rect x="${fx(lantX - LW)}" y="${fx(lantY - LH)}" width="${fx(LW * 2)}" height="${fx(LH * 2)}" fill="${E4.paneEdge}" stroke="${E4.timber}" stroke-width="${fx(w * 0.019)}"/>`
+  s += `<rect x="${fx(lantX - LW * 0.82)}" y="${fx(lantY - LH * 0.88)}" width="${fx(LW * 1.64)}" height="${fx(LH * 1.76)}" fill="${E4.pane}"/>`
+  s += `<path d="M ${fx(lantX - LW - w * 0.006)} ${fx(lantY - LH)} L ${fx(lantX)} ${fx(lantY - LH - h * 0.026)} L ${fx(lantX + LW + w * 0.006)} ${fx(lantY - LH)} Z" fill="${E4.timber}"/>`
+  s += `<rect x="${fx(lantX - LW)}" y="${fx(lantY + LH - h * 0.008)}" width="${fx(LW * 2)}" height="${fx(h * 0.012)}" fill="${E4.timber}"/>`
+  for (let k2 = 0; k2 < 8; k2++) {
+    const a = (k2 * Math.PI) / 4 + 0.32
+    s += `<line x1="${fx(lantX + Math.cos(a) * w * 0.06)}" y1="${fx(lantY + Math.sin(a) * h * 0.08)}" x2="${fx(lantX + Math.cos(a) * w * 0.13)}" y2="${fx(lantY + Math.sin(a) * h * 0.17)}" stroke="${E4.lampHot}" stroke-width="${fx(w * 0.009)}" opacity="0.6" stroke-linecap="round"/>`
   }
   // THE LINKED ARMS: two sleeve wedges filling each bridge edge to edge, joined
   // at the hands in the middle — the bridge IS the sleeve, never a bar under it
@@ -18075,14 +18404,73 @@ function innArrivalRank(w, h, seed) {
   s += `<circle cx="${fx(D.x + D.hw * 0.12)}" cy="${fx(D.top + h * 0.27)}" r="3" fill="${E4.brassLit}"/>`
   // the lamp rim down every figure's lantern side, and the contact darks at the
   // feet, so four cut-outs read as four people standing ON something
-  s += `<path d="M ${fx(K.x - K.hw)} ${fx(K.top + h * 0.22)} L ${fx(K.x - K.hw)} ${fx(G)} M ${fx(S2.x - S2.hw * 0.82)} ${fx(S2.top + h * 0.2)} L ${fx(S2.x - S2.hw)} ${fx(G)} M ${fx(C2.x - C2.hw * 0.86)} ${fx(C2.top + h * 0.12)} L ${fx(C2.x - C2.hw * 0.92)} ${fx(G)} M ${fx(D.x - D.hw)} ${fx(G - h * 0.02)} L ${fx(D.x - D.hw * 0.7)} ${fx(D.top + h * 0.1)}" stroke="${E4.lamp}" stroke-width="3" opacity="0.72" fill="none"/>`
+  // One lit edge per silhouette, dimming with distance from the flame. The
+  // first cut of this drew all four at one weight and w*0.02 wide, and on an
+  // 84-px-wide figure that is a 12% white stripe down the middle of the body —
+  // four pale POLES, not rim light. A rim is a hairline or it is a prop.
+  const RIMS = [
+    [`M ${fx(K.x - K.hw)} ${fx(K.top + h * 0.22)} L ${fx(K.x - K.hw)} ${fx(G)}`, 1],
+    [`M ${fx(S2.x - S2.hw * 0.86)} ${fx(S2.top + h * 0.2)} L ${fx(S2.x - S2.hw)} ${fx(G)}`, 0.78],
+    [`M ${fx(C2.x - C2.hw * 0.9)} ${fx(C2.top + h * 0.12)} L ${fx(C2.x - C2.hw * 0.95)} ${fx(G)}`, 0.56],
+    [`M ${fx(D.x - D.hw)} ${fx(G - h * 0.02)} L ${fx(D.x - D.hw * 0.72)} ${fx(D.top + h * 0.1)}`, 0.4],
+  ]
+  const rimPass = () =>
+    RIMS.map(
+      ([d, k]) =>
+        `<path d="${d}" stroke="${E4.lamp}" stroke-width="${fx(w * 0.011)}" opacity="${fxOp(0.42 * k)}" fill="none" stroke-linecap="round"/>` +
+        `<path d="${d}" stroke="${E4.paneCore}" stroke-width="${fx(w * 0.004)}" opacity="${fxOp(0.85 * k)}" fill="none" stroke-linecap="round"/>`
+    ).join('')
   for (const [cx, rad] of [[K.x, K.hw], [S2.x, S2.hw], [C2.x, C2.hw], [D.x, D.hw * 1.1]]) {
     s += `<ellipse cx="${fx(cx)}" cy="${fx(G + h * 0.004)}" rx="${fx(rad * 1.25)}" ry="${fx(h * 0.016)}" fill="${E4.ink}" opacity="0.5"/>`
   }
+  // ---- THE LIGHT, PAINTED LAST ------------------------------------------------
+  //
+  // The judge: "the rise in the arch is the best story moment in the race but
+  // small and murky; the first centimetre of pull must deliver an unmissable
+  // reward." The lamp was not the problem on its own — the ORDER was. The halo
+  // was laid down first and then every body, sleeve and face was painted
+  // straight over the top of it, so the die shipped with a lantern that
+  // illuminated nothing, on a group of pale mid-tone cut-outs that had no dark
+  // for a rim light to appear against.
+  //
+  // Four passes, and the order IS the fix:
+  //   1. the night falls on the group, hard at the far end and barely at all at
+  //      the flame — now there is something for light to be brighter than;
+  //   2. the halo, over the figures, bleeding onto the arm that holds it, both
+  //      near faces and the spouse's shoulder;
+  //   3. the rims, so every silhouette has one lit edge;
+  //   4. the flame, re-struck last, so the hottest pixel region on the spread is
+  //      the lamp itself and not the bloom around it.
+  s += `<rect width="${w}" height="${h}" fill="url(#arShade)"/>`
+  s += `<ellipse cx="${fx(lantX)}" cy="${fx(lantY)}" rx="${fx(w * 0.92)}" ry="${fx(h * 0.86)}" fill="url(#arGlow)"/>`
+  s += rimPass()
+  // the innkeeper's raised SLEEVE, the crown of his head and the spouse's
+  // shoulder take the hardest rim of all — the three surfaces nearest the flame
+  s += `<path d="M ${fx(K.x - K.hw * 0.72)} ${fx(K.top + h * 0.32)} L ${fx(lantX + w * 0.026)} ${fx(lantY + h * 0.12)}" stroke="${E4.paneCore}" stroke-width="${fx(w * 0.008)}" opacity="0.92" fill="none" stroke-linecap="round"/>`
+  s += `<path d="M ${fx(K.x - K.hw * 0.62)} ${fx(K.top + h * 0.1)} A ${fx(K.hw * 0.66)} ${fx(K.hw * 0.66)} 0 0 1 ${fx(K.x - K.hw * 0.12)} ${fx(K.top - h * 0.008)}" stroke="${E4.paneCore}" stroke-width="${fx(w * 0.006)}" opacity="0.85" fill="none" stroke-linecap="round"/>`
+  s += `<path d="M ${fx(S2.x - S2.hw * 0.98)} ${fx(S2.top + h * 0.26)} Q ${fx(S2.x - S2.hw * 0.76)} ${fx(S2.top + h * 0.13)} ${fx(S2.x - S2.hw * 0.34)} ${fx(S2.top + h * 0.09)}" stroke="${E4.lampHot}" stroke-width="${fx(w * 0.006)}" opacity="0.8" fill="none" stroke-linecap="round"/>`
+  s += `<ellipse cx="${fx(lantX)}" cy="${fx(lantY)}" rx="${fx(w * 0.2)}" ry="${fx(h * 0.24)}" fill="url(#arCore)"/>`
+  s += `<rect x="${fx(lantX - LW * 0.74)}" y="${fx(lantY - LH * 0.78)}" width="${fx(LW * 1.48)}" height="${fx(LH * 1.56)}" rx="${fx(LW * 0.3)}" fill="${E4.paneCore}"/>`
+  s += `<rect x="${fx(lantX - LW * 0.52)}" y="${fx(lantY - LH * 0.58)}" width="${fx(LW * 1.04)}" height="${fx(LH * 1.16)}" rx="${fx(LW * 0.26)}" fill="#ffffff"/>`
   s += `</g>`
   s += rimPath(outline, 3.6)
   s += `</g>`
-  const defs = `<clipPath id="arCut"><path d="${outline}"/></clipPath>` + e4Glow('arGlow', E4.lamp, 0.5)
+  const defs =
+    `<clipPath id="arCut"><path d="${outline}"/></clipPath>` +
+    // a SLOWER falloff than the shared e4Glow: that curve is built for a lamp
+    // seen across a wall, and this one has to cross a whole family
+    `<radialGradient id="arGlow">` +
+    `<stop offset="0" stop-color="${E4.lampHot}" stop-opacity="0.88"/>` +
+    `<stop offset="0.2" stop-color="${E4.lampHot}" stop-opacity="0.6"/>` +
+    `<stop offset="0.46" stop-color="${E4.lamp}" stop-opacity="0.3"/>` +
+    `<stop offset="0.76" stop-color="${E4.lamp}" stop-opacity="0.11"/>` +
+    `<stop offset="1" stop-color="${E4.lamp}" stop-opacity="0"/></radialGradient>` +
+    e4Glow('arCore', E4.paneCore, 0.95) +
+    // the night on the group: almost nothing at the flame, deep at the dog
+    `<linearGradient id="arShade" x1="0" y1="0" x2="1" y2="0.3">` +
+    `<stop offset="0" stop-color="${E4.ink}" stop-opacity="0.06"/>` +
+    `<stop offset="0.34" stop-color="${E4.ink}" stop-opacity="0.3"/>` +
+    `<stop offset="1" stop-color="${E4.ink}" stop-opacity="0.5"/></linearGradient>`
   return svgPiece(w, h, s, defs)
 }
 
@@ -18099,127 +18487,118 @@ function innArrivalRank(w, h, seed) {
 // front face) and y = 1 at z1 (FORE, nearest the reader). So the archway is off
 // the TOP-LEFT corner, and everything in face B that leads anywhere leads there.
 //
-// A AND B SHARE THEIR BIG SHAPES — the same seeded cobble field, the same kerb,
-// the same drain channel — because a flip only reads as a transformation when
-// the reader can see it is the SAME PLACE. What changes is the temperature: A is
-// the contract's cold slate (#5b6470 family, the one cold note on the spread and
-// a deliberate clash with the warm tan page around it), B is lamp gold.
-function courtyardStones(w, h, seed) {
-  const r = mulberry32(seed)
-  const stones = []
-  const cols = 24
-  const rows = 13
-  // RADII, NOT DIAMETERS. The first bake sized each sett at up to 0.62 of the
-  // grid PITCH as a radius, so every stone was 1.24 pitches across, the field
-  // overlapped itself three deep and the yard read as foam. A cobbled yard is
-  // read from its MORTAR: the joints have to survive, so a sett is ~0.8 of a
-  // pitch across and the dark ground shows between every one of them.
-  for (let j = 0; j < rows; j++) {
-    for (let i = 0; i < cols; i++) {
-      const off = j % 2 ? 0.5 : 0
-      stones.push({
-        x: (w * (i + off + rr(r, -0.1, 0.1))) / cols,
-        y: (h * (j + rr(r, -0.12, 0.12) + 0.5)) / rows,
-        rx: (w / cols) * rr(r, 0.34, 0.44),
-        ry: (h / rows) * rr(r, 0.32, 0.42),
-        t: r(),
-        rot: rr(r, -22, 22),
-      })
-    }
-  }
-  // the drain channel: one shallow curve from the fore edge to the arch corner
-  const drain =
-    `M ${fx(w * 1.02)} ${fx(h * 0.74)} C ${fx(w * 0.68)} ${fx(h * 0.72)} ${fx(w * 0.4)} ${fx(h * 0.5)} ${fx(w * 0.1)} ${fx(h * 0.16)}`
-  return { stones, drain }
-}
-
+// A AND B ARE TWO WINDOWS ONTO THE PAGE'S OWN PAVING (see "THE YARD"). Face A
+// is not "a cold floor picture that happens to sit on the courtyard" — it IS
+// the courtyard, the very stones the page prints, read through the rack's
+// footprint and lit by the page's own ambient key. That is the whole answer to
+// "a flat blue swimming-pool rectangle dropped on the page": there is nothing
+// left at the rack's edge for the eye to catch on.
+//
+// Face B is the SAME stones one pitch spine-ward — which is where
+// dissolveSlatQuad actually lays the rack at tau = PI — re-lit. Same coursing,
+// same wheel-path, same drain of the eye toward the arch; what changes is that
+// the lamps are burning. A flip only reads as a transformation when the reader
+// can see it is the same place.
 function innCourtyardCold(w, h, seed) {
-  const { stones, drain } = courtyardStones(w, h, seed)
+  // THE RULER'S CALIBRATION HOOK. The rack's rest boundary can only be measured
+  // if you know to the pixel where it is, and neither the pinned-camera
+  // projection nor a tau-diff gets there: the projection misses the parallax
+  // rig's live rotation (~15 px), and a tau-diff also catches the rank, which
+  // rides the same channel. `SB_RACK_MASK=1 node scripts/storybook/generate-art.mjs`
+  // bakes this face as flat magenta; one capture then gives an exact footprint,
+  // which is what the corners hard-coded in bench/e4-ground-edge.mjs came from.
+  // The rack's screen position is paint-independent, so that calibration only
+  // needs redoing if content.ts moves the piece or the capture rig changes.
+  if (process.env.SB_RACK_MASK) return svgPiece(w, h, `<rect width="${w}" height="${h}" fill="#ff00ff"/>`)
   const r = mulberry32(seed * 3 + 11)
-  let s = `<rect width="${w}" height="${h}" fill="${E4.ink}"/>`
-  s += `<rect width="${w}" height="${h}" fill="${E4.slateDeep}" opacity="0.8"/>`
-  for (const st of stones) {
-    // three close tones and ONE opacity: a wide random value range on a regular
-    // grid reads as noise, and noise is what a floor must never be
-    const fill = st.t > 0.78 ? E4.slate : st.t > 0.34 ? E4.slateDim : E4.slateDeep
-    s += `<g transform="translate(${fx(st.x)},${fx(st.y)}) rotate(${fx(st.rot)})">` +
-      `<ellipse rx="${fx(st.rx)}" ry="${fx(st.ry)}" fill="${fill}"/>` +
-      `<ellipse cy="${fx(-st.ry * 0.24)}" rx="${fx(st.rx * 0.72)}" ry="${fx(st.ry * 0.5)}" fill="${E4.slateLit}" opacity="${fxOp(0.12 + st.t * 0.12)}"/>` +
-      `<ellipse cy="${fx(st.ry * 0.34)}" rx="${fx(st.rx * 0.86)}" ry="${fx(st.ry * 0.42)}" fill="${E4.ink}" opacity="0.2"/>` +
-      `</g>`
+  const W = arrivalWindow(0)
+  const V = yardView(W.x0, W.y0, W.x1, W.y1, w, h)
+  const M = 48 // canonical px of overscan, so the edge setts are whole
+  let s = `<rect width="${w}" height="${h}" fill="${YARD.joint}"/>`
+  s += yardPaveSvg(V, [W.x0 - M, W.y0 - M, W.x1 + M, W.y1 + M], { light: yardLampsPage })
+  // the coach line, DRY: the polish is already IN the stones (yardWear), so all
+  // that is drawn is the shadow standing in the rut bottoms
+  s += yardRutRails(V, { inkOp: 0.3, litOp: 0.14 })
+  s += yardPuddleSvg(V, [W.x0 - M, W.y0 - M, W.x1 + M, W.y1 + M])
+  // AN EMPTY YARD, BUT NOT A BLANK ONE. Everything here is litter that lies
+  // flat and cold: blown leaves, a cast horseshoe, a dropped iron ring, a
+  // scatter of straw off the last coach. Nothing warm, nothing gold — the yard
+  // is waiting, and the reader's pull is what arrives in it.
+  for (let i = 0; i < 22; i++) {
+    const x = rr(r, w * 0.04, w * 0.99)
+    const y = rr(r, h * 0.06, h * 0.96)
+    const sc = rr(r, 0.7, 1.5)
+    const rot = rr(r, -90, 90)
+    s += `<g transform="translate(${fx(x)},${fx(y)}) rotate(${fx(rot)}) scale(${fx(sc)})">` +
+      `<path d="M -14 0 Q 0 -9 15 -1 Q 2 8 -14 0 Z" fill="${YARD.ramp[1]}"/>` +
+      `<path d="M -12 -1 Q 0 -7 13 -1" fill="none" stroke="${YARD.ramp[4]}" stroke-width="1.6" opacity="0.7"/></g>`
   }
-  // the kerb along the aft edge (the inn's own plinth) and the drain
-  s += `<rect x="0" y="0" width="${w}" height="${fx(h * 0.07)}" fill="${E4.slateDim}"/>`
-  s += `<rect x="0" y="${fx(h * 0.07)}" width="${w}" height="${fx(h * 0.02)}" fill="${E4.ink}" opacity="0.5"/>`
-  s += `<path d="${drain}" fill="none" stroke="${E4.slateDeep}" stroke-width="${fx(h * 0.05)}" opacity="0.8"/>`
-  s += `<path d="${drain}" fill="none" stroke="${E4.ink}" stroke-width="${fx(h * 0.016)}" opacity="0.4"/>`
-  // a few dry leaves and a lost horseshoe: an EMPTY yard, but not a blank one
-  for (let i = 0; i < 12; i++) {
-    const x = rr(r, w * 0.1, w * 0.98)
-    const y = rr(r, h * 0.16, h * 0.94)
-    s += `<ellipse cx="${fx(x)}" cy="${fx(y)}" rx="${fx(w * 0.008)}" ry="${fx(h * 0.008)}" fill="${E4.slateLit}" opacity="0.3"/>`
+  // the straw: a few dry stalks, the one nearly-warm note and still grey
+  for (let i = 0; i < 26; i++) {
+    const x = rr(r, w * 0.05, w * 0.98)
+    const y = rr(r, h * 0.08, h * 0.95)
+    const a = rr(r, 0, Math.PI)
+    const L = rr(r, w * 0.012, w * 0.03)
+    s += `<line x1="${fx(x)}" y1="${fx(y)}" x2="${fx(x + Math.cos(a) * L)}" y2="${fx(y + Math.sin(a) * L * 0.5)}" stroke="${YARD.ramp[5]}" stroke-width="2.2" opacity="0.5" stroke-linecap="round"/>`
   }
-  s += `<path d="M ${fx(w * 0.62)} ${fx(h * 0.36)} a ${fx(w * 0.02)} ${fx(h * 0.036)} 0 1 1 ${fx(w * 0.026)} 0" fill="none" stroke="${E4.slateLit}" stroke-width="${fx(h * 0.012)}" opacity="0.42"/>`
-  // COLD, and colder still at the fore edge — the whole point of face A is that
-  // it is a temperature away from the warm page it is printed on
-  s += `<rect width="${w}" height="${h}" fill="url(#cyCold)"/>`
-  const defs =
-    `<linearGradient id="cyCold" x1="0" y1="0" x2="0.35" y2="1">` +
-    `<stop offset="0" stop-color="${E4.slateDeep}" stop-opacity="0.42"/>` +
-    `<stop offset="0.45" stop-color="${E4.slate}" stop-opacity="0.12"/>` +
-    `<stop offset="1" stop-color="${E4.slateDeep}" stop-opacity="0.5"/></linearGradient>`
-  return svgPiece(w, h, s, defs)
+  // the cast horseshoe, big enough to survive the rack's ~0.3 screen downscale
+  {
+    const hx = w * 0.42
+    const hy = h * 0.62
+    s += `<g transform="translate(${fx(hx)},${fx(hy)}) rotate(-24)">` +
+      `<path d="M ${fx(-w * 0.026)} ${fx(h * 0.05)} A ${fx(w * 0.028)} ${fx(h * 0.052)} 0 1 1 ${fx(w * 0.026)} ${fx(h * 0.05)}" fill="none" stroke="${YARD.joint}" stroke-width="${fx(h * 0.026)}" stroke-linecap="round"/>` +
+      `<path d="M ${fx(-w * 0.026)} ${fx(h * 0.044)} A ${fx(w * 0.028)} ${fx(h * 0.052)} 0 1 1 ${fx(w * 0.026)} ${fx(h * 0.044)}" fill="none" stroke="${YARD.ramp[5]}" stroke-width="${fx(h * 0.019)}" stroke-linecap="round"/></g>`
+  }
+  // a dropped iron ring by the fore edge
+  s += `<ellipse cx="${fx(w * 0.83)}" cy="${fx(h * 0.79)}" rx="${fx(w * 0.026)}" ry="${fx(h * 0.021)}" fill="none" stroke="${YARD.joint}" stroke-width="${fx(h * 0.017)}"/>`
+  s += `<ellipse cx="${fx(w * 0.83)}" cy="${fx(h * 0.777)}" rx="${fx(w * 0.026)}" ry="${fx(h * 0.021)}" fill="none" stroke="${YARD.ramp[4]}" stroke-width="${fx(h * 0.009)}"/>`
+  s += rackToneCut(w, h)
+  return svgPiece(w, h, s)
 }
 
 function innCourtyardWarm(w, h, seed) {
-  const { stones, drain } = courtyardStones(w, h, seed)
   const r = mulberry32(seed * 3 + 11)
+  // the B face lies one pitch spine-ward of the A face, so its window does too
+  const W = arrivalWindow(-ARRIVAL_PITCH)
+  const V = yardView(W.x0, W.y0, W.x1, W.y1, w, h)
+  const M = 48
   // the three lamps the pools come from, in image space (all toward the arch)
-  const LAMPS = [[0.14, 0.22, 0.56], [0.46, 0.34, 0.46], [0.8, 0.52, 0.38]]
-  let s = `<rect width="${w}" height="${h}" fill="${E4.stoneDim}"/>`
-  // the whole yard comes UP a step when the lamps are lit — the first warm bake
-  // sat darker than the tan page it is printed on, and a courtyard that is
-  // dimmer than the paper around it cannot claim to have been lit
-  s += `<rect width="${w}" height="${h}" fill="${E4.stone}" opacity="0.6"/>`
-  for (const st of stones) {
-    // warmth falls off with distance from the nearest lamp — the same cobbles,
-    // re-lit, which is what makes the flip read as an event and not a new floor
-    let lit = 0
-    for (const [u, v, rad] of LAMPS) {
-      const dx = (st.x - w * u) / (w * rad)
-      const dy = (st.y - h * v) / (h * rad * 1.7)
-      lit = Math.max(lit, Math.max(0, 1 - Math.hypot(dx, dy)))
+  const LAMPS = [[0.14, 0.22, 0.74], [0.46, 0.34, 0.62], [0.8, 0.52, 0.52]]
+  // ...and the same three in canonical page px, so the STONES are lit by the
+  // very lamps the overlay blooms come from rather than by a separate ramp
+  const spanX = W.x1 - W.x0
+  const spanY = W.y1 - W.y0
+  const rackLight = (px, py) => {
+    let v = 0
+    for (const [u, vv, rad] of LAMPS) {
+      const dx = (px - (W.x0 + u * spanX)) / (rad * spanX * 0.72)
+      const dy = (py - (W.y0 + vv * spanY)) / (rad * spanY * 1.5)
+      v = Math.max(v, Math.max(0, 1 - Math.hypot(dx, dy)))
     }
-    const fill = lit > 0.42 ? E4.stoneLit : lit > 0.14 ? E4.stone : E4.stoneDim
-    s += `<g transform="translate(${fx(st.x)},${fx(st.y)}) rotate(${fx(st.rot)})">` +
-      `<ellipse rx="${fx(st.rx)}" ry="${fx(st.ry)}" fill="${fill}"/>` +
-      `<ellipse cy="${fx(-st.ry * 0.24)}" rx="${fx(st.rx * 0.72)}" ry="${fx(st.ry * 0.5)}" fill="${E4.lampHot}" opacity="${fxOp(0.1 + lit * 0.6)}"/>` +
-      `<ellipse cy="${fx(st.ry * 0.34)}" rx="${fx(st.rx * 0.86)}" ry="${fx(st.ry * 0.42)}" fill="${E4.ink}" opacity="${fxOp(0.12 + (1 - lit) * 0.2)}"/>` +
-      `</g>`
+    return v
   }
-  s += `<rect x="0" y="0" width="${w}" height="${fx(h * 0.07)}" fill="${E4.stone}"/>`
-  s += `<rect x="0" y="0" width="${w}" height="${fx(h * 0.02)}" fill="${E4.lamp}" opacity="0.4"/>`
-  s += `<rect x="0" y="${fx(h * 0.07)}" width="${w}" height="${fx(h * 0.022)}" fill="${E4.ink}" opacity="0.45"/>`
-  // THE MAIL-COACH WHEEL TRACKS: two wet ruts swinging in off the fore edge and
-  // turning up into the archway — the yard has been ARRIVED IN
-  for (const off of [-0.075, 0.075]) {
-    const d =
-      `M ${fx(w * 1.02)} ${fx(h * (0.82 + off))} C ${fx(w * 0.66)} ${fx(h * (0.8 + off))} ` +
-      `${fx(w * 0.36)} ${fx(h * (0.56 + off * 1.3))} ${fx(w * 0.08)} ${fx(h * (0.2 + off * 1.6))}`
-    s += `<path d="${d}" fill="none" stroke="${E4.ink}" stroke-width="${fx(h * 0.028)}" opacity="0.34"/>`
-    s += `<path d="${d}" fill="none" stroke="${E4.lampHot}" stroke-width="${fx(h * 0.012)}" opacity="0.45"/>`
-  }
-  s += `<path d="${drain}" fill="none" stroke="${E4.ink}" stroke-width="${fx(h * 0.02)}" opacity="0.32"/>`
-  s += `<path d="${drain}" fill="none" stroke="${E4.lamp}" stroke-width="${fx(h * 0.008)}" opacity="0.4"/>`
+  // ...plus a floor of ambient bounce. Three lamps burning in a walled yard do
+  // not leave the ground between them at night value, and pooling ALL the light
+  // into three spots was what left the lit face reading as a dark floor with
+  // three lamps on it rather than as a lit courtyard.
+  const light = (px, py) => Math.min(1, 0.3 + Math.max(rackLight(px, py) * 0.95, yardLampsPage(px, py)))
+  let s = `<rect width="${w}" height="${h}" fill="${yardMix(YARD.joint, E4.lampDeep, 0.22)}"/>`
+  // +1.7 on the ramp before the exposure cut takes 0.77 back off it: the lit
+  // yard has to land WELL above the page it is printed on or it has not been lit
+  s += yardPaveSvg(V, [W.x0 - M, W.y0 - M, W.x1 + M, W.y1 + M], { light, lift: 1.7, warmCap: 0.66 })
+  // THE MAIL-COACH WHEEL TRACKS, now WET: the same rails the cold face carries
+  // dry, with the lamplight standing in the water at the bottom of each rut.
+  // Same polyline, so the tracks a reader followed across the page a moment ago
+  // are the tracks that light up.
+  s += yardRutRails(V, { ink: E4.ink, lit: E4.lampHot, inkOp: 0.46, litOp: 0.5, thin: 1.5 })
+  s += yardPuddleSvg(V, [W.x0 - M, W.y0 - M, W.x1 + M, W.y1 + M], { lit: true })
   // THE CAST SHADOWS of the group standing in the arch: four soft bodies thrown
   // FORE (down-image) and outboard, away from the lamplight at the top-left
-  const shadow = (u, v, len, wid, skew) => {
-    const g = `<g transform="rotate(${fx(skew)} ${fx(w * u)} ${fx(h * v)})">` +
-      `<ellipse cx="${fx(w * u)}" cy="${fx(h * v)}" rx="${fx(w * wid)}" ry="${fx(h * len)}" fill="${E4.ink}" opacity="0.46"/>` +
-      `<ellipse cx="${fx(w * u)}" cy="${fx(h * (v + len * 0.86))}" rx="${fx(w * wid * 0.72)}" ry="${fx(h * len * 0.16)}" fill="${E4.ink}" opacity="0.5"/>` +
-      `</g>`
-    return g
-  }
+  const shadow = (u, v, len, wid, skew) =>
+    `<g transform="rotate(${fx(skew)} ${fx(w * u)} ${fx(h * v)})">` +
+    `<ellipse cx="${fx(w * u)}" cy="${fx(h * v)}" rx="${fx(w * wid)}" ry="${fx(h * len)}" fill="${E4.ink}" opacity="0.46"/>` +
+    `<ellipse cx="${fx(w * u)}" cy="${fx(h * (v + len * 0.86))}" rx="${fx(w * wid * 0.72)}" ry="${fx(h * len * 0.16)}" fill="${E4.ink}" opacity="0.5"/>` +
+    `</g>`
   s += shadow(0.13, 0.46, 0.32, 0.046, -20)
   s += shadow(0.2, 0.43, 0.28, 0.04, -15)
   s += shadow(0.26, 0.37, 0.21, 0.033, -11)
@@ -18242,18 +18621,22 @@ function innCourtyardWarm(w, h, seed) {
     s += `<ellipse cx="${fx(w * u)}" cy="${fx(h * v)}" rx="${fx(w * rad * 0.62)}" ry="${fx(h * rad * 1.3)}" fill="url(#cyPool)"/>`
     s += `<ellipse cx="${fx(w * u)}" cy="${fx(h * v)}" rx="${fx(w * rad * 0.26)}" ry="${fx(h * rad * 0.6)}" fill="url(#cyPool)"/>`
   }
-  for (let i = 0; i < 10; i++) {
+  // the wet gleam: a scatter of tiny speculars where the water stands
+  for (let i = 0; i < 26; i++) {
     const x = rr(r, w * 0.05, w * 0.98)
     const y = rr(r, h * 0.14, h * 0.95)
-    s += `<ellipse cx="${fx(x)}" cy="${fx(y)}" rx="${fx(w * 0.007)}" ry="${fx(h * 0.007)}" fill="${E4.lampHot}" opacity="0.25"/>`
+    const lit = rackLight(W.x0 + (x / w) * spanX, W.y0 + (y / h) * spanY)
+    if (lit < 0.12) continue
+    s += `<ellipse cx="${fx(x)}" cy="${fx(y)}" rx="${fx(w * 0.006)}" ry="${fx(h * 0.005)}" fill="${E4.paneCore}" opacity="${fxOp(0.18 + lit * 0.4)}"/>`
   }
   s += `<rect width="${w}" height="${h}" fill="url(#cyFall)"/>`
+  s += rackToneCut(w, h)
   const defs =
-    e4Glow('cyPool', E4.lampHot, 0.72) +
+    e4Glow('cyPool', E4.lampHot, 0.82) +
     `<linearGradient id="cyFall" x1="0" y1="0" x2="0.8" y2="1">` +
-    `<stop offset="0" stop-color="${E4.lamp}" stop-opacity="0.18"/>` +
-    `<stop offset="0.55" stop-color="${E4.lamp}" stop-opacity="0.05"/>` +
-    `<stop offset="1" stop-color="${E4.ink}" stop-opacity="0.3"/></linearGradient>`
+    `<stop offset="0" stop-color="${E4.lamp}" stop-opacity="0.2"/>` +
+    `<stop offset="0.55" stop-color="${E4.lamp}" stop-opacity="0.06"/>` +
+    `<stop offset="1" stop-color="${E4.ink}" stop-opacity="0.22"/></linearGradient>`
   return svgPiece(w, h, s, defs)
 }
 
@@ -18264,7 +18647,7 @@ async function bakePieceTexture(piece, outDir) {
   const W = meta.width,
     H = meta.height
   const flatRaw = await sharp(flat).ensureAlpha().raw().toBuffer({ resolveWithObject: true })
-  const grainCut = await grainOverArt(flatRaw, W, H, piece.seed, piece.grain ?? 16)
+  const grainCut = await grainOverArt(flatRaw, W, H, piece.seed, piece.grain ?? 16, piece.tooth ?? GRAIN_TOOTH)
   const composed = await sharp(flat).composite([{ input: grainCut, blend: 'over' }]).png().toBuffer()
   // per-piece quality override: big smooth-gradient fields (page prints)
   // band into scalloped blocks at q84 once grain nudges the quantizer
@@ -18606,7 +18989,15 @@ const PIECES = [
       })
     },
   },
-  { id: 'ch1-arrival-rank', seed: 20432, w: 512, h: 480, grain: 10, paint() { return innArrivalRank(this.w, this.h, this.seed) } },
+  // THE LANTERN'S BUDGET. This die's whole job in round 3 is a lamp that is the
+  // brightest thing in frame, and it was fighting two ceilings it could not see:
+  // the house grain tooth (alpha 40) caps any white at 235 whatever `grain` is,
+  // and the strip flap renders its u<0.5 half — the half the lamp is on —
+  // through PAINTED_FOLD_SHADE (#e4e4e4, x0.894). 235 x 0.894 = 210, measured to
+  // the pixel, against 233 for the guest facade's hottest pane. Tooth 12 and
+  // grain 4 lift the ceiling to 249 x 0.894 = 223; the remaining gap is the fold
+  // shade, which is a renderer constant and not paint's to spend.
+  { id: 'ch1-arrival-rank', seed: 20432, w: 512, h: 480, grain: 4, tooth: 12, quality: 92, paint() { return innArrivalRank(this.w, this.h, this.seed) } },
   { id: 'ch1-arrival-floor-dunes', seed: 20433, w: 1024, h: 542, grain: 12, quality: 88, paint() { return innCourtyardCold(this.w, this.h, this.seed) } },
   { id: 'ch1-arrival-floor-gold', seed: 20434, w: 1024, h: 542, grain: 12, quality: 88, paint() { return innCourtyardWarm(this.w, this.h, this.seed) } },
   // the pull tab (`<id>-tab`, popup-dissolve-layer.tsx:232 — the id the layer
