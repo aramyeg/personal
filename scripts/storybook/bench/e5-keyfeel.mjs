@@ -19,7 +19,17 @@
  * UNITS. Page units throughout (escutcheon R = 0.105, bow rim 0.265, refR 0.182). The traces are
  * specified in screen pixels, converted with PX_PER_PAGE, which is derived rather than guessed:
  * the feel-spec calls GRAB_R_PX = 64 and GRAB_R_PAGE = 0.34 the same gate, so one page unit is
- * 64 / 0.34 = 188 px on the leaned reading camera.
+ * 64 / 0.34 = 188 px.
+ *
+ * That number checks out against the real optics, which is worth writing down because the lane's
+ * notes warn that "a finger-width of screen maps to several centimetres of paving". Reading camera
+ * at (0, 1.85, 3.05), fov 34, key at page (0.66, ~0.4 world, 0.44): the view direction meets the
+ * page normal at |dot| = 0.49, so one pixel of an 800 px viewport is 3.06 * 2 * tan(17deg) / 800 =
+ * 0.0023 world units transverse, and 0.0023 / 0.49 = 0.0048 page units along the shallow axis —
+ * 208 px per page unit, within 10% of the figure used here. The projection is therefore WELL
+ * conditioned (RAY_MIN_DOT = 0.10 should essentially never fire; `samplesDegenerate` in the
+ * telemetry is the number that would prove otherwise), and the residual defect is a 2:1 anisotropy
+ * between the screen axes, which the tangential integral absorbs.
  */
 
 import { fileURLToPath } from 'node:url'
