@@ -1919,8 +1919,17 @@ export const TITLE_LAYERS: readonly SceneLayer[] = [
   // because a spine-anchored fan behind this wider/taller spine-anchored
   // proscenium is fully occluded at the lid-dominant reading camera (verified
   // in the e28-r1 capture — cf. the "backdrop wings vs central tower wall" law).
-  { id: 'title-border', kind: 'backdrop', role: 'backdrop', mech: 'vfold', apexZ: -0.22, vDir: -1, phiDeg: 84, rhoDeg: 88, width: 1.55, height: 0.6 },
-  { id: 'title-hero', kind: 'hero', role: 'figure', mech: 'vfold', apexZ: 0.15, vDir: 1, phiDeg: 52, rhoDeg: 80, width: 0.38, height: 0.63 },
+  // E4 STAGE WINDOWS ON THE OVERTURE (eye-test finding, resume sweep t 0.45):
+  // un-staged, the boy and the quill fold down across the WHOLE outgoing turn,
+  // and at t ~0.45 the half-folded boy's hand sweeps exactly the space where
+  // the inn's guest-roof stack is rising — a cross-spread clip in the middle of
+  // the build's most important beat. Folding EARLY is paper-legal (a piece may
+  // always be flatter than its closing wedge demands), so the overture clears
+  // the stage before the inn's first storey completes (hall t1 0.32). The
+  // known price, same class the inn already ships: on a BACKWARD turn into the
+  // title these pieces erect ahead of the visual sheet for a few frames.
+  { id: 'title-border', kind: 'backdrop', role: 'backdrop', mech: 'vfold', apexZ: -0.22, vDir: -1, phiDeg: 84, rhoDeg: 88, width: 1.55, height: 0.6, stage: { t0: 0.04, t1: 0.36 } },
+  { id: 'title-hero', kind: 'hero', role: 'figure', mech: 'vfold', apexZ: 0.15, vDir: 1, phiDeg: 52, rhoDeg: 80, width: 0.38, height: 0.63, stage: { t0: 0.04, t1: 0.36 } },
   // IDLE (BW-2): the boy's gilt crest glints. The overture is the first thing a
   // reader looks at and the longest thing they look at before touching
   // anything — if any spread must not be pixel-frozen it is this one — but the
@@ -1934,7 +1943,7 @@ export const TITLE_LAYERS: readonly SceneLayer[] = [
   // it's exempt from the D-G8 sweep floor). Stood in profile at the fore edge,
   // downstage of the emblem in its own z-band (z >= 0.44) so, since spine
   // rotation preserves z, it never crosses the center cluster (extra-1 ceiling).
-  { id: 'title-quill', kind: 'hero', role: 'figure', mech: 'stripflap', side: 'right', anchor: 0.2, anchorZ: 0.44, slot: 0.26, slotZ: 0.44, hingeX: 0.36, hingeZ: 0.44, width: 0.0887, height: 0.24 },
+  { id: 'title-quill', kind: 'hero', role: 'figure', mech: 'stripflap', side: 'right', anchor: 0.2, anchorZ: 0.44, slot: 0.26, slotZ: 0.44, hingeX: 0.36, hingeZ: 0.44, width: 0.0887, height: 0.24, stage: { t0: 0.04, t1: 0.36 } },
   // The far berm massing (ground swell — parallel fold, covenant: scenery,
   // rise <= 0.08, carries a rider) upstage behind the crown, a distant berm
   // with a wax-seal tuft. Own z-band (z <= -0.36) so it never crosses center.
