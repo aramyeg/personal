@@ -178,6 +178,10 @@ export const STAGE_LIFE = {
     wavePeriod: 0.9,
     /** How far the whole banner is pushed downwind, in world units. */
     push: 0.014,
+    /** How far the fly end droops when the wind drops. A flag in still air is a rag. */
+    sag: 0.016,
+    /** How much of PALETTE.nightRim the wave crests catch. The cloth's shade is PALETTE.stoneCold. */
+    rim: 0.42,
   },
 
   /**

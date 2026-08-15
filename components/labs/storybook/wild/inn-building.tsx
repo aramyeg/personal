@@ -36,6 +36,8 @@ import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js
 import { foldSlot, signBoardAngle } from './fold-birth'
 import { foldDepthMaterial, foldMatrix } from './fold-uniforms'
 import { innMaterials, type InnMaterials } from './inn-materials'
+import { applyRiseClip } from './rise-clip'
+import { STAGE_LIFE as LIFE, windAt } from './stage-life'
 import {
   ARCH,
   BARRELS,
@@ -46,6 +48,7 @@ import {
   JETTY_OVERHANG,
   KEY_BOARD,
   LANTERN,
+  PALETTE,
   ROOF,
   SIGN,
   STEP,
@@ -1087,7 +1090,18 @@ function TheSign({ materials }: { materials: InnMaterials }) {
   // have to agree about what time it is or the spread develops two different winds.
   useFrame(() => {
     const g = swayRef.current
-    if (g) g.rotation.z = Math.sin((clock.current * Math.PI * 2) / SIGN.sway.period) * SIGN.sway.amp
+    if (g) {
+      // THE SIGN SWINGS ON THE WEATHER, not on a private sine. `windAt` is the one signal the
+      // plume, the mist and the tower pennant also answer, so a gust crosses the whole stage; the
+      // faster whip on top is the board snatching at the end of a swing, which is the difference
+      // between a hanging sign and a metronome. Amplitude is still SIGN.sway.amp (D8).
+      const wind = windAt(clock.current)
+      const whip =
+        LIFE.sign.whip *
+        Math.sin((clock.current * Math.PI * 2) / LIFE.sign.whipPeriod) *
+        Math.abs(wind)
+      g.rotation.z = SIGN.sway.amp * LIFE.sign.gain * (wind + whip)
+    }
     // THE LAST BEAT OF THE CURTAIN-UP. The board rides the bracket out folded up against the arm
     // and then DROPS onto its shackle — the same event the clip-rise staged, now crease-born.
     const d = dropRef.current
@@ -1161,6 +1175,159 @@ function TheLantern({ materials }: { materials: InnMaterials }) {
     <group ref={foldRef} name="wild-lantern">
       <mesh geometry={parts.iron} material={materials.iron} castShadow receiveShadow />
       <mesh geometry={parts.glass} material={materials.glass} renderOrder={1} />
+    </group>
+  )
+}
+
+// ---------------------------------------------------------------------------------------------
+// THE TOWER PENNANT — the tallest thing in the frame, and it was dead still
+// ---------------------------------------------------------------------------------------------
+
+/**
+ * A short staff at the stair tower's apex with a tapered banner flying off it. It exists for one
+ * reason: the sleeping inn needs a moving silhouette against the sky. The sign swings down at
+ * first-floor height where the mass is busy; up here the pennant reads against empty night, which
+ * is the cheapest movement on the whole stage.
+ *
+ * It flies +x — downwind, the same wind the sign swings on and the plume leans into — which is
+ * also toward the moon, so its crests have something to catch.
+ *
+ * STAFF AND CLOTH ARE ONE GEOMETRY, one draw. `aWave` is 0 along the staff and runs 0..1 from the
+ * hoist to the fly end of the banner, so the same vertex program leaves the staff rigid and puts
+ * a travelling wave through the cloth.
+ */
+const PENNANT_VERT = /* glsl */ `
+#include <clipping_planes_pars_vertex>
+attribute float aWave;
+uniform float uTime;
+uniform float uWind;
+varying float vWave;
+varying float vCrest;
+
+void main() {
+  float k = aWave;
+  vWave = k;
+  vec3 p = position;
+  float gust = abs(uWind);
+  // A travelling wave down the cloth, growing toward the free end (k*k), deeper in a gust.
+  float ph = uTime * ${((Math.PI * 2) / LIFE.pennant.wavePeriod).toFixed(4)} - k * 6.0;
+  float s = sin(ph);
+  p.z += ${LIFE.pennant.wave.toFixed(4)} * k * k * s * (0.4 + 0.6 * gust);
+  // Pushed downwind, and drooping toward the staff as the wind drops: a flag in still air is a
+  // rag, and a pennant that flies at full stretch through a lull is a decal.
+  p.x += uWind * ${LIFE.pennant.push.toFixed(4)} * k;
+  p.y -= (1.0 - gust) * ${LIFE.pennant.sag.toFixed(4)} * k * k;
+  vCrest = 0.5 + 0.5 * s;
+  vec4 mv = modelViewMatrix * vec4(p, 1.0);
+  gl_Position = projectionMatrix * mv;
+  #include <clipping_planes_vertex>
+}
+`
+
+const PENNANT_FRAG = /* glsl */ `
+#include <clipping_planes_pars_fragment>
+uniform vec3 uShade;
+uniform vec3 uRim;
+varying float vWave;
+varying float vCrest;
+void main() {
+  #include <clipping_planes_fragment>
+  // The crests turn their face to the moon and the troughs fall away from it; the hoist stays
+  // in the tower's own shadow, so the cloth reads as cloth rather than as a cut-out.
+  float lit = vCrest * mix(0.35, 1.0, vWave);
+  gl_FragColor = vec4(mix(uShade, uRim, lit * ${LIFE.pennant.rim.toFixed(3)}), 1.0);
+}
+`
+
+function buildPennant(): THREE.BufferGeometry {
+  const P = LIFE.pennant
+  const cx = (TOWER.min[0] + TOWER.max[0]) / 2
+  const cz = (TOWER.min[2] + TOWER.max[2]) / 2
+  const topY = TOWER.cap.apexY + P.staff
+
+  // The staff is tailed a few millimetres INTO the cap: a pole balanced on an apex is a pole
+  // about to fall off it.
+  const staff = box(
+    cx - P.staffT / 2,
+    TOWER.cap.apexY - 0.008,
+    cz - P.staffT / 2,
+    cx + P.staffT / 2,
+    topY,
+    cz + P.staffT / 2,
+  )
+
+  const cloth = new THREE.PlaneGeometry(P.length, P.height, 14, 2)
+  // Hoist edge to x = 0, top edge to y = 0, then taper to a swallowtail point at the fly end.
+  cloth.translate(P.length / 2, -P.height / 2, 0)
+  const pos = cloth.getAttribute('position') as THREE.BufferAttribute
+  for (let i = 0; i < pos.count; i += 1) {
+    const u = pos.getX(i) / P.length
+    pos.setY(i, pos.getY(i) * (1 - 0.72 * u))
+  }
+  pos.needsUpdate = true
+  cloth.translate(cx + P.staffT / 2, topY - 0.006, cz)
+
+  const staffWave = new Float32Array(staff.getAttribute('position').count)
+  staff.setAttribute('aWave', new THREE.BufferAttribute(staffWave, 1))
+  const clothPos = cloth.getAttribute('position') as THREE.BufferAttribute
+  const clothWave = new Float32Array(clothPos.count)
+  for (let i = 0; i < clothPos.count; i += 1) {
+    clothWave[i] = (clothPos.getX(i) - (cx + P.staffT / 2)) / P.length
+  }
+  cloth.setAttribute('aWave', new THREE.BufferAttribute(clothWave, 1))
+
+  const flat = cloth.toNonIndexed()
+  const merged = mergeGeometries([staff, flat])
+  staff.dispose()
+  cloth.dispose()
+  flat.dispose()
+  if (!merged) throw new Error('wild/inn-building: the pennant would not merge')
+  return merged
+}
+
+function ThePennant() {
+  const { clock } = useWild()
+  // It stands on the tower cap, so it rides the tower's crease — including flat and sunk under
+  // the page while the tower is still lying on the paper.
+  const foldRef = useFoldGroup(SLOT.tower)
+  const parts = useMemo(() => {
+    const geometry = buildPennant()
+    const material = applyRiseClip(
+      new THREE.ShaderMaterial({
+        vertexShader: PENNANT_VERT,
+        fragmentShader: PENNANT_FRAG,
+        uniforms: {
+          uTime: { value: 0 },
+          uWind: { value: 0 },
+          uShade: { value: new THREE.Color(PALETTE.stoneCold) },
+          uRim: { value: new THREE.Color(PALETTE.nightRim) },
+        },
+        side: THREE.DoubleSide,
+        clipping: true,
+      }),
+    )
+    return { geometry, material }
+  }, [])
+
+  useEffect(
+    () => () => {
+      parts.geometry.dispose()
+      parts.material.dispose()
+    },
+    [parts],
+  )
+
+  useFrame(() => {
+    parts.material.uniforms.uTime.value = clock.current
+    parts.material.uniforms.uWind.value = windAt(clock.current)
+  })
+
+  return (
+    <group ref={foldRef} name="wild-pennant">
+      {/* The wave happens in the vertex program and the group rides a sheared fold map, so the
+          rest bounding sphere is a lie in flight — and a culled pennant is a pennant that
+          disappears for exactly the frames it is moving. */}
+      <mesh geometry={parts.geometry} material={parts.material} frustumCulled={false} />
     </group>
   )
 }
@@ -1316,6 +1483,7 @@ export function InnBuilding() {
       ))}
       <TheSign materials={materials} />
       <TheLantern materials={materials} />
+      <ThePennant />
       <TheHundredKeys material={materials.brass} />
     </group>
   )
