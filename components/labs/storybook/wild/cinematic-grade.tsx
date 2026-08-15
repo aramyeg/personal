@@ -23,7 +23,7 @@
  * puts the loop, the tone mapping and every other spread back exactly as they were.
  */
 
-import { useEffect, useMemo, useRef } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
 import { useFrame, useThree } from '@react-three/fiber'
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js'
@@ -119,40 +119,192 @@ const GradeShader = {
   `,
 }
 
+// ---------------------------------------------------------------------------
+// THE SHARED, PRE-ALLOCATED RIG (E5 perf).
+//
+// <CinematicGrade> mounts and unmounts on every turn into and out of spread 2
+// (ch1-diorama.tsx's `live &&` gate — that gating is correct and stays: a
+// priority-1 useFrame seizes r3f's render loop GLOBALLY, so the grade may only
+// own presentation while the diorama is on screen). What must not happen on
+// that mount is the ALLOCATION. Built fresh, the chain costs two full-size
+// half-float buffers plus UnrealBloomPass's eleven mip targets, and
+// `new EffectComposer(gl)` sizes itself off the renderer immediately — so the
+// whole allocation landed in the frame the turn armed.
+//
+// So the rig is built ONCE, at load, behind the loader veil, and every later
+// mount borrows it. Only the RenderPass's scene/camera and the composer's
+// renderToScreen flag change hands. Resize still reallocates, which is fine:
+// a resize is not a turn.
+//
+// The old warm pass sized a THROWAWAY composer down to 32 squares. That warmed
+// the programs (its real point) but it also meant the first full-size chain was
+// allocated from scratch anyway — and worse, it made the 32-square targets the
+// only ones the driver had ever seen. The warm now runs the REAL rig at the
+// REAL drawing-buffer size, so the load-time render is both the program warm
+// and the allocation.
+//
+// THE PRICE, STATED PLAINLY: the chain's buffers are now resident for the whole
+// session rather than only while spread 2 is on screen. All of them are RGBA
+// half-float (8 B/px), so at 1600x900 CSS with dpr 2 — a 3200x1800 drawing
+// buffer — that is 2 x 46.1 MB for the composer's read/write pair, 11.5 MB for
+// renderTargetBright, and 30.7 MB across the five horizontal + five vertical
+// blur mips: ~134 MB of GPU memory, held from load. It scales with the square
+// of the window, and it is spent whether or not the reader ever opens the book.
+// If that budget ever has to come back, the lever is the composer's pixel ratio
+// (resizeRig is the single place that sets it), NOT going back to allocating on
+// the turn.
+// ---------------------------------------------------------------------------
+
+type GradeRig = {
+  readonly gl: THREE.WebGLRenderer
+  readonly composer: EffectComposer
+  readonly renderPass: RenderPass
+  readonly bloom: UnrealBloomPass
+  readonly grade: ShaderPass
+  readonly output: OutputPass
+  /** Last applied sizing, so an unchanged resize costs nothing. */
+  pixelRatio: number
+  width: number
+  height: number
+}
+
+/** The RenderPass needs a scene and a camera at all times; while nothing has
+ *  borrowed the rig it points at these, so a module-level singleton can never
+ *  keep a torn-down r3f scene graph alive. */
+let idleScene: THREE.Scene | null = null
+let idleCamera: THREE.Camera | null = null
+
+let sharedRig: GradeRig | null = null
 let gradeWarmed = false
 
+function disposeRig(rig: GradeRig): void {
+  rig.composer.dispose()
+  rig.bloom.dispose()
+  rig.grade.dispose()
+  rig.output.dispose()
+  rig.renderPass.dispose()
+}
+
 /**
- * Compile the grade chain's shader programs ahead of first use. The renderer caches programs
- * by shader source, so one render through a throwaway 32-square composer at book-idle time
- * means the real composer's first frame links nothing — the ~1s dead frame the profile caught
- * on arrival at the chapter was dominated by these compiles. ACES is forced for the warm
- * render because OutputPass specializes its shader on the renderer's tone mapping, and the
- * variant the diorama actually uses is the ACES one.
+ * Resize the rig. THE one place that knows EffectComposer multiplies its size
+ * by its pixel ratio, so the warm pass and the mount path can't disagree about
+ * what "full size" means and quietly reallocate every buffer past each other.
+ */
+function resizeRig(rig: GradeRig, pixelRatio: number, width: number, height: number): void {
+  if (rig.pixelRatio === pixelRatio && rig.width === width && rig.height === height) return
+  rig.pixelRatio = pixelRatio
+  rig.width = width
+  rig.height = height
+  // setPixelRatio internally re-runs setSize against the composer's STORED
+  // dimensions, so a genuine change sweeps the buffers twice — once at the old
+  // size, once at the new. Only an actual resize pays that, and a resize is not
+  // a page turn; the equality guard above keeps every other caller at zero.
+  rig.composer.setPixelRatio(pixelRatio)
+  rig.composer.setSize(width, height)
+  rig.grade.uniforms.uResolution.value.set(width * pixelRatio, height * pixelRatio)
+}
+
+/** Build the rig against `gl` at the renderer's CURRENT size, or return the
+ *  existing one. A different renderer (a remounted Canvas, a restored context)
+ *  retires the old rig — its buffers belong to a context that is gone. */
+function ensureRig(gl: THREE.WebGLRenderer): GradeRig {
+  if (sharedRig && sharedRig.gl === gl) return sharedRig
+  if (sharedRig) disposeRig(sharedRig)
+
+  idleScene ??= new THREE.Scene()
+  idleCamera ??= new THREE.PerspectiveCamera()
+
+  const size = gl.getSize(new THREE.Vector2())
+  const pixelRatio = gl.getPixelRatio()
+  const composer = new EffectComposer(gl)
+  const renderPass = new RenderPass(idleScene, idleCamera)
+  // Sized at construction rather than from a 1x1 seed: UnrealBloomPass
+  // allocates its mip chain in the constructor, and a 1x1 seed would throw all
+  // eleven targets away on the first resize.
+  const bloom = new UnrealBloomPass(
+    new THREE.Vector2(Math.max(1, size.width * pixelRatio), Math.max(1, size.height * pixelRatio)),
+    BLOOM.asleep.strength,
+    BLOOM.radius,
+    BLOOM.asleep.threshold
+  )
+  const grade = new ShaderPass(GradeShader)
+  const output = new OutputPass()
+  composer.addPass(renderPass)
+  composer.addPass(bloom)
+  composer.addPass(grade)
+  composer.addPass(output)
+
+  sharedRig = {
+    gl,
+    composer,
+    renderPass,
+    bloom,
+    grade,
+    output,
+    pixelRatio,
+    width: size.width,
+    height: size.height,
+  }
+  resizeRig(sharedRig, pixelRatio, size.width, size.height)
+  return sharedRig
+}
+
+/** True while a live <CinematicGrade> owns the rig. The warm pass must never
+ *  run against a borrowed rig: it renders off screen, and leaving
+ *  `renderToScreen` false under a live grade would freeze the canvas on the
+ *  last presented frame. */
+let rigBorrowed = false
+
+/** Lend the rig to a live <CinematicGrade>. */
+function acquireRig(rig: GradeRig, scene: THREE.Scene, camera: THREE.Camera): void {
+  rigBorrowed = true
+  rig.renderPass.scene = scene
+  rig.renderPass.camera = camera
+  // The composer owns presentation from here; it is the only difference between
+  // a borrowed rig and the warm pass's throwaway render.
+  rig.composer.renderToScreen = true
+}
+
+/** Hand it back WITHOUT disposing — the allocation is the thing being kept. */
+function releaseRig(rig: GradeRig): void {
+  rigBorrowed = false
+  rig.composer.renderToScreen = false
+  if (idleScene) rig.renderPass.scene = idleScene
+  if (idleCamera) rig.renderPass.camera = idleCamera
+}
+
+/**
+ * Warm the grade chain before the reader can ever reach it: build the shared
+ * rig at the real drawing-buffer size and push one throwaway frame through it,
+ * off screen. That single render both links the chain's programs (the renderer
+ * caches by shader source, and the ~1s dead frame the old profile caught on
+ * arrival at the chapter was dominated by these compiles) and forces the
+ * driver to actually back every render target it just allocated.
+ *
+ * ACES is forced because OutputPass specializes its shader on the renderer's
+ * tone mapping, and the variant the diorama actually uses is the ACES one.
+ *
+ * Called from an idle slice at diorama mount — which, since the pop-up group
+ * became resident, is book LOAD, behind the loader veil.
  */
 export function warmGradePrograms(gl: THREE.WebGLRenderer): void {
   if (gradeWarmed) return
+  // A rig already drawing the real spread is warm by definition, and rendering
+  // off screen underneath it would strand the canvas on its last frame.
+  if (rigBorrowed) {
+    gradeWarmed = true
+    return
+  }
   gradeWarmed = true
   const prevToneMapping = gl.toneMapping
   const prevTarget = gl.getRenderTarget()
   try {
     gl.toneMapping = THREE.ACESFilmicToneMapping
-    const scene = new THREE.Scene()
-    const camera = new THREE.PerspectiveCamera()
-    const composer = new EffectComposer(gl)
-    composer.renderToScreen = false
-    composer.setSize(32, 32)
-    const bloom = new UnrealBloomPass(new THREE.Vector2(32, 32), 0.5, 0.5, 0.5)
-    const grade = new ShaderPass(GradeShader)
-    const output = new OutputPass()
-    composer.addPass(new RenderPass(scene, camera))
-    composer.addPass(bloom)
-    composer.addPass(grade)
-    composer.addPass(output)
-    composer.render(1 / 60)
-    composer.dispose()
-    bloom.dispose()
-    grade.dispose()
-    output.dispose()
+    const rig = ensureRig(gl)
+    // Off screen: the veil is up, but a graded frame of an empty scene must
+    // never reach the canvas even so.
+    rig.composer.renderToScreen = false
+    rig.composer.render(1 / 60)
   } catch {
     // A failed warm costs nothing but the head start.
   } finally {
@@ -183,39 +335,23 @@ export function CinematicGrade() {
     }
   }, [gl])
 
-  const rig = useMemo(() => {
-    const composer = new EffectComposer(gl)
-    // The composer owns presentation from here; RenderPass must not be told to clear to screen.
-    composer.renderToScreen = true
+  // Borrowed, not built (E5 perf — see the shared-rig block above): the chain
+  // was allocated at load, behind the loader veil, and this mount only points
+  // its RenderPass at the live scene. The previous `useMemo` ran on the frame
+  // the turn into spread 2 armed, and built two full-size half-float buffers
+  // plus UnrealBloomPass's whole mip chain right there.
+  const rig = useMemo(() => ensureRig(gl), [gl])
 
-    const renderPass = new RenderPass(scene, camera)
-    const bloom = new UnrealBloomPass(
-      new THREE.Vector2(1, 1),
-      BLOOM.asleep.strength,
-      BLOOM.radius,
-      BLOOM.asleep.threshold
-    )
-    const grade = new ShaderPass(GradeShader)
-    const output = new OutputPass()
-
-    composer.addPass(renderPass)
-    composer.addPass(bloom)
-    composer.addPass(grade)
-    composer.addPass(output)
-
-    return { composer, renderPass, bloom, grade, output }
-  }, [gl, scene, camera])
-
-  useEffect(
-    () => () => {
-      rig.composer.dispose()
-      rig.bloom.dispose()
-      rig.grade.dispose()
-      rig.output.dispose()
-      rig.renderPass.dispose()
-    },
-    [rig]
-  )
+  // The borrow is a LAYOUT effect, not a passive one: it flips the chain to
+  // renderToScreen, and the priority-1 useFrame below could otherwise tick
+  // against an off-screen composer for a frame — a black flash on arrival.
+  // Released, NOT disposed, on the way out: keeping the allocation warm for the
+  // next arrival is the entire point. Release only detaches the r3f scene graph
+  // (so a module singleton cannot outlive it) and stops the chain presenting.
+  useLayoutEffect(() => {
+    acquireRig(rig, scene, camera)
+    return () => releaseRig(rig)
+  }, [rig, scene, camera])
 
   // ACES for as long as the diorama is up. OutputPass reads `renderer.toneMapping` every frame
   // and rebuilds its defines when it changes, so this is all that is needed to put the whole
@@ -246,11 +382,13 @@ export function CinematicGrade() {
     }
   }, [gl])
 
+  // A resize IS allowed to reallocate — a resize is not a page turn. In the
+  // ordinary case this is a no-op: the rig was built from the same renderer's
+  // own size and pixel ratio, which is exactly what r3f mirrors into `size`
+  // and `viewport.dpr`, so `resizeRig` recognises the numbers and returns.
   useEffect(() => {
     if (size.width <= 0 || size.height <= 0) return
-    rig.composer.setPixelRatio(dpr)
-    rig.composer.setSize(size.width, size.height)
-    rig.grade.uniforms.uResolution.value.set(size.width * dpr, size.height * dpr)
+    resizeRig(rig, dpr, size.width, size.height)
   }, [rig, size, dpr])
 
   useFrame((_, delta) => {
