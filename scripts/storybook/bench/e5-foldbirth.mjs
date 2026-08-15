@@ -1,9 +1,9 @@
 /**
  * e5-foldbirth.mjs — WILD lane, E5 FUSE: the fold-birth bench.
  *
- * The inn no longer rises through a clipping plane; it ERECTS, in seven separated staged events
- * whose pieces each swing about a hinge line. There is no browser this phase, so the whole
- * contract is proved here, on the REAL shipped solver (loaded through jiti, like the GRAND
+ * The inn no longer rises through a clipping plane; it ERECTS, in six separated staged events
+ * whose pieces each swing about a hinge line. Everything is proved here on the REAL shipped
+ * solver, the REAL WildFrame and the REAL driver curve (loaded through jiti, like the GRAND
  * lane's e4s2-reach.mjs) — nothing in this file re-implements the kinematics.
  *
  * WHAT IT GATES
@@ -30,8 +30,11 @@
  *                      about how much of the READER'S time each event gets. The first shipped
  *                      version spent 18-33 ms on each of its first six events because `open` was
  *                      a smoothstep of a dihedral that was itself a quint of wall time, and the
- *                      whole seven-event build ran in 261 ms. Every number here is measured
- *                      through the REAL WildFrame on the REAL driver curve.
+ *                      whole build ran in 261 ms. Every number here is measured through the REAL
+ *                      WildFrame on the REAL driver curve.
+ *   L  THE LEAF        no piece may erect on the half of the table the flying leaf has not yet
+ *                      swept — that half still belongs to the spread the reader is looking at —
+ *                      and, once clipped to the swept side, each piece must still SHOW its fold.
  *
  * Run:  node scripts/storybook/bench/e5-foldbirth.mjs      (from the worktree root)
  */

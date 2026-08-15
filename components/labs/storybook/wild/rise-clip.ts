@@ -39,6 +39,17 @@ export const RISE_CLIP = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0)
  */
 const LEAF_BIAS = 0.03
 
+/**
+ * MEASURED HARMLESS AT REST, and that measurement is the only reason there is no retire
+ * mechanism here. At the rest pose this plane is nearly coplanar with the page, so a grazing
+ * clip looked like an obvious precision hazard — and a capture round appeared to confirm it,
+ * with the moon's shadow on the left paving shredded into stripes. It was a phantom twice over:
+ * the frames carried a drifting idle clock (?sbidle=1 UNPINS it) and a parallax tilt that only
+ * settled on some loads. A numeric diff over the left page settled it in one shot: one plane vs
+ * two measures 2.28 mean, and two IDENTICAL runs measure 2.37. The planes are neutral; the
+ * stripes were mist. Do not add a retire without a diff that beats that noise floor.
+ */
+
 export const LEAF_CLIP = new THREE.Plane(new THREE.Vector3(0, 1, 0), LEAF_BIAS)
 
 /** Both planes, as ONE array whose LENGTH never changes — a clipping-plane count change
