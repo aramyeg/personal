@@ -76,8 +76,21 @@ const SHADOW_MAX_OPACITY = 0.32
 // for why each exists) — here they become vertex colors instead of materials.
 const PAINTED_FOLD_SHADE = '#e4e4e4'
 const CAP_TINT = '#f2ebdc'
-const INTERIOR_SHADOW_TINT = '#5f5138'
 const PLAIN = '#ffffff'
+
+/**
+ * A cap suppressed by a plate is normally an unseen interior — and popup-box-
+ * layer.tsx paints those with INTERIOR_SHADOW_TINT `#5f5138` — except on a
+ * DIE-CUT plate, where it is the one surface the reader looks straight at.
+ * Measured at the reading camera: under INTERIOR_SHADOW_TINT the brightest
+ * pixel that cap can produce is luma ~0.29 while the lit wall around the hole
+ * sits at ~0.62, so the arch could only ever read as murk no matter what was
+ * painted behind it. This warm tint lifts its ceiling to ~0.68 — above the
+ * wall, so a far doorway reads as a light SOURCE, and still a clear step under
+ * the guest facade's lit panes (~0.87), which stay the brightest rank on the
+ * spread. The passage art owns its own value range: dark walls, hot lanterns.
+ */
+const APERTURE_CAP_TINT = '#d9c9a6'
 
 /** Which art asset a box face prints, and which horizontal half of it —
  *  the same table popup-box-layer.tsx uses (`backbone` prints nothing). */
@@ -162,11 +175,22 @@ export function keepSlots(layer: SceneLayer & KeepStackGeom): Slot[] {
       const printed = asset !== null && !suppressed
       slots.push({
         artId: `${layer.id}-${g.key}-${printed ? asset : 'side'}`,
-        uvs: printed
-          ? new Float32Array([u0, 0, u1, 0, u1, 1, u0, 1])
-          : new Float32Array([0, 0, 1, 0, 1, 1, 0, 1]),
+        // A SUPPRESSED CAP KEEPS ITS OWN u-SPLIT even though it now samples the
+        // `-side` image. capFrontL/R are two quads; handing each of them the
+        // FULL image prints the passage TWICE and butts its two dark outer
+        // edges together at the spine — which is exactly where the hall plate's
+        // die-cut arch is, so the one surface the reader is meant to see through
+        // the hole showed its two darkest margins (measured: the arch read as
+        // near-black murk at rest). With the split the `-side` painting is drawn
+        // ONCE across the whole cap and its vanishing point (u 0.455) lands
+        // inside the aperture (plate u 0.311..0.599), as innPassage's own header
+        // note always assumed. Only the backbone (asset null) still tiles full.
+        uvs:
+          asset !== null
+            ? new Float32Array([u0, 0, u1, 0, u1, 1, u0, 1])
+            : new Float32Array([0, 0, 1, 0, 1, 1, 0, 1]),
         tint: suppressed
-          ? INTERIOR_SHADOW_TINT
+          ? APERTURE_CAP_TINT
           : SHADED_FACES.has(face)
             ? PAINTED_FOLD_SHADE
             : face.startsWith('capFront')

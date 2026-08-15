@@ -17089,86 +17089,193 @@ function innHallFacade(w, h, seed) {
 
 // ---- `ch1-inn-hall-side` — THE LAMPLIT PASSAGE -------------------------------
 // This one image does two jobs, because the engine gives it two (see the header
-// note): it is the hall box's two side walls AND — under INTERIOR_SHADOW_TINT —
-// the front cap standing solid behind the die-cut arch. So it is painted as the
-// inn's carriage passage seen straight down its axis: converging flags, beams
-// overhead, a great hanging lantern, the key board on the left wall, and a hot
-// doorway at the far end with the innkeeper in it. Centred at u 0.455 so the
-// vanishing point lands in the middle of the arch, and painted HOT so the
-// multiply leaves something to see.
+// note): it is the hall box's two flank walls AND the front cap standing solid
+// behind the die-cut arch. Job two is the one that matters, and it comes with a
+// window this painting must be COMPOSED FOR, derived rather than eyeballed:
+//
+//   the plate's arch is alpha at plate u 0.455 +- 0.15/1.04 and plate v 0..0.18/0.26
+//   the cap carries this image across the same 1.04 x 0.26 world rect
+//   => only  u 0.311..0.599  x  y 0.308h..1.0h  is EVER seen through the hole.
+//
+// That is 295 x 288 px of a 1024 x 416 image — a near-square keyhole holding 29%
+// of the width. Round one ignored it: the passage was drawn at full-image scale,
+// so the far doorway alone (half-width 0.155w) over-filled the keyhole and the
+// arch read as one flat blob. Everything is now composed INSIDE the window, and
+// everything outside it is dim boarded wall (what the two flank slivers show).
+//
+// The px grid is ANISOTROPIC on the cap: 1024px/1.04 world across vs 416px/0.36
+// world down (the hall story is 0.36 tall — content.ts, NOT the contract's
+// 0.26), so a visually round shape must be drawn 1.174x taller than wide.
+// `ry()` below is that factor; use it for every glow, or the lamps read as
+// squashed slots.
+//
+// Value range is the art's own now, not the tint's: the cap wears
+// APERTURE_CAP_TINT (popup-keepstack-merged.tsx), which multiplies to ~0.75, so
+// the walls must be painted near-black and the lamps near-white for the hole to
+// hold a real range against a 0.62-luma wall.
 function innPassage(w, h, seed) {
   const r = mulberry32(seed)
-  const vx = w * 0.455
-  const vy = h * 0.48
-  const MOUTH = w * 0.155 // the far doorway's half-width
+  /** px-per-world is 1.174x denser vertically: round things are drawn tall. */
+  const ANISO = 1.174
+  const ry = (rx) => rx * ANISO
+  const AX = w * 0.455 // the aperture's centre — the passage's vanishing axis
+  const MHW = w * 0.168 // mouth half-width, a hair wider than the hole (0.144w)
+  const YT = h * 0.2 // mouth head, a hair above the arch apex (0.308h)
+  const YB = h
+  const VY = h * 0.655 // the vanishing height: floor visible, ceiling closing in
+  const S = 0.3 // the far wall's share of the mouth
+  const FHW = MHW * S
+  const FT = VY - (VY - YT) * S
+  const FB = VY + (YB - VY) * S
+  /** The passage cross-section at recession t (0 mouth, 1 far wall). */
+  const rec = (t) => {
+    const e = Math.pow(t, 0.62)
+    return { hw: lerp(MHW, FHW, e), yt: lerp(YT, FT, e), yb: lerp(YB, FB, e) }
+  }
 
-  let s = `<rect width="${w}" height="${h}" fill="${E4.timber}"/>`
-  // side and ceiling planes, converging
-  s += `<path d="M 0 0 L ${w} 0 L ${fx(vx + MOUTH * 1.5)} ${fx(vy - h * 0.16)} L ${fx(vx - MOUTH * 1.5)} ${fx(vy - h * 0.16)} Z" fill="${E4.roofDim}"/>`
-  s += `<path d="M 0 0 L ${fx(vx - MOUTH * 1.5)} ${fx(vy - h * 0.16)} L ${fx(vx - MOUTH * 1.5)} ${fx(vy + h * 0.3)} L 0 ${h} Z" fill="${E4.stoneDim}"/>`
-  s += `<path d="M ${w} 0 L ${fx(vx + MOUTH * 1.5)} ${fx(vy - h * 0.16)} L ${fx(vx + MOUTH * 1.5)} ${fx(vy + h * 0.3)} L ${w} ${h} Z" fill="${E4.stoneDim}"/>`
-  s += `<path d="M 0 ${h} L ${fx(vx - MOUTH * 1.5)} ${fx(vy + h * 0.3)} L ${fx(vx + MOUTH * 1.5)} ${fx(vy + h * 0.3)} L ${w} ${h} Z" fill="${E4.stone}"/>`
-  // flagstones running away from the reader
-  for (let i = 1; i < 14; i++) {
-    const t = i / 14
-    const y = lerp(h, vy + h * 0.3, Math.pow(t, 0.55))
-    const half = lerp(w * 0.5, MOUTH * 1.5, Math.pow(t, 0.55))
-    s += `<line x1="${fx(vx - half)}" y1="${fx(y)}" x2="${fx(vx + half)}" y2="${fx(y)}" stroke="${E4.ink}" stroke-width="${fx(Math.max(1, 4 * (1 - t)))}" opacity="0.4"/>`
+  // --- OUTSIDE THE HOLE: the inn's dim boarded flank ---------------------------
+  let s = e4Boards(w, h, seed, E4.wingDim, E4.wing, E4.roofDim, 13, 'u')
+  s += `<rect width="${w}" height="${h}" fill="${E4.ink}" opacity="0.42"/>`
+
+  // --- INSIDE THE HOLE ---------------------------------------------------------
+  // Clipped to a jamb rect wider than the aperture, so every hard edge of this
+  // composition is hidden behind the plate and nothing leaks onto the flanks.
+  s += `<g clip-path="url(#p2clip)">`
+  s += `<rect x="${fx(AX - MHW)}" y="${fx(YT)}" width="${fx(MHW * 2)}" height="${fx(h - YT)}" fill="${E4.ink}"/>`
+  // the four planes, converging on the far wall
+  s += `<path d="M ${fx(AX - MHW)} ${fx(YT)} L ${fx(AX + MHW)} ${fx(YT)} L ${fx(AX + FHW)} ${fx(FT)} L ${fx(AX - FHW)} ${fx(FT)} Z" fill="url(#p2ceil)"/>`
+  s += `<path d="M ${fx(AX - MHW)} ${fx(YT)} L ${fx(AX - FHW)} ${fx(FT)} L ${fx(AX - FHW)} ${fx(FB)} L ${fx(AX - MHW)} ${fx(YB)} Z" fill="url(#p2wallL)"/>`
+  s += `<path d="M ${fx(AX + MHW)} ${fx(YT)} L ${fx(AX + FHW)} ${fx(FT)} L ${fx(AX + FHW)} ${fx(FB)} L ${fx(AX + MHW)} ${fx(YB)} Z" fill="url(#p2wallR)"/>`
+  s += `<path d="M ${fx(AX - MHW)} ${fx(YB)} L ${fx(AX + MHW)} ${fx(YB)} L ${fx(AX + FHW)} ${fx(FB)} L ${fx(AX - FHW)} ${fx(FB)} Z" fill="url(#p2floor)"/>`
+
+  // flagstone courses running away from the reader, and their joints
+  for (let i = 1; i < 9; i++) {
+    const { hw, yb } = rec(i / 9)
+    s += `<line x1="${fx(AX - hw)}" y1="${fx(yb)}" x2="${fx(AX + hw)}" y2="${fx(yb)}" stroke="${E4.ink}" stroke-width="${fx(Math.max(1, 3.4 * (1 - i / 9)))}" opacity="0.5"/>`
   }
-  for (let i = -4; i <= 4; i++) {
-    s += `<line x1="${fx(vx + i * w * 0.13)}" y1="${h}" x2="${fx(vx + i * MOUTH * 0.34)}" y2="${fx(vy + h * 0.3)}" stroke="${E4.ink}" stroke-width="2" opacity="0.32"/>`
+  for (const u of [-0.62, -0.2, 0.2, 0.62]) {
+    s += `<line x1="${fx(AX + u * MHW)}" y1="${fx(YB)}" x2="${fx(AX + u * FHW)}" y2="${fx(FB)}" stroke="${E4.ink}" stroke-width="2" opacity="0.34"/>`
   }
-  // ceiling beams marching in
-  for (let i = 1; i <= 5; i++) {
-    const t = i / 6
-    const y = lerp(0, vy - h * 0.16, Math.pow(t, 0.7))
-    const half = lerp(w * 0.5, MOUTH * 1.5, Math.pow(t, 0.7))
-    s += `<rect x="${fx(vx - half)}" y="${fx(y)}" width="${fx(half * 2)}" height="${fx(Math.max(3, h * 0.055 * (1 - t)))}" fill="${E4.timber}"/>`
+  // ceiling beams marching in — the count is what sells depth in a short window
+  for (let i = 1; i <= 4; i++) {
+    const { hw, yt } = rec(i / 5)
+    const th = Math.max(2.5, h * 0.05 * (1 - i / 5))
+    s += `<rect x="${fx(AX - hw)}" y="${fx(yt)}" width="${fx(hw * 2)}" height="${fx(th)}" fill="${E4.timber}"/>`
+    s += `<rect x="${fx(AX - hw)}" y="${fx(yt + th)}" width="${fx(hw * 2)}" height="${fx(th * 0.3)}" fill="${E4.ink}" opacity="0.6"/>`
   }
-  // the great warm wash out of the far end
-  s += `<ellipse cx="${fx(vx)}" cy="${fx(vy)}" rx="${fx(w * 0.62)}" ry="${fx(h * 0.85)}" fill="url(#p2glow)"/>`
-  // the far doorway — the hottest note, with the innkeeper standing in it
-  s += `<path d="M ${fx(vx - MOUTH)} ${fx(vy + h * 0.3)} L ${fx(vx - MOUTH)} ${fx(vy - h * 0.05)} Q ${fx(vx)} ${fx(vy - h * 0.2)} ${fx(vx + MOUTH)} ${fx(vy - h * 0.05)} L ${fx(vx + MOUTH)} ${fx(vy + h * 0.3)} Z" fill="${E4.pane}"/>`
-  s += `<ellipse cx="${fx(vx)}" cy="${fx(vy + h * 0.12)}" rx="${fx(MOUTH * 0.82)}" ry="${fx(h * 0.2)}" fill="${E4.paneCore}"/>`
-  s += `<ellipse cx="${fx(vx - MOUTH * 0.3)}" cy="${fx(vy + h * 0.1)}" rx="${fx(MOUTH * 0.2)}" ry="${fx(h * 0.11)}" fill="${E4.ink}" opacity="0.82"/>`
-  s += `<circle cx="${fx(vx - MOUTH * 0.3)}" cy="${fx(vy - h * 0.03)}" r="${fx(MOUTH * 0.12)}" fill="${E4.ink}" opacity="0.82"/>`
-  // the doorway's own frame
-  s += `<path d="M ${fx(vx - MOUTH)} ${fx(vy + h * 0.3)} L ${fx(vx - MOUTH)} ${fx(vy - h * 0.05)} Q ${fx(vx)} ${fx(vy - h * 0.2)} ${fx(vx + MOUTH)} ${fx(vy - h * 0.05)} L ${fx(vx + MOUTH)} ${fx(vy + h * 0.3)}" fill="none" stroke="${E4.timber}" stroke-width="${fx(h * 0.03)}"/>`
-  // THE KEY BOARD on the left wall, catching the light — a hundred keys
-  for (let row = 0; row < 5; row++) {
-    for (let col = 0; col < 8; col++) {
-      const t = 0.16 + col * 0.075
-      const x = lerp(w * 0.02, vx - MOUTH * 1.5, t)
-      const y = lerp(h * 0.3 + row * h * 0.1, vy - h * 0.02 + row * h * 0.05, t)
-      const sc = lerp(0.0055, 0.0022, t) * h
-      s += `<g transform="translate(${fx(x)},${fx(y)}) scale(${fx(sc)})">${keyGlyph(120, E4.brass, E4.brassLit)}</g>`
+  // wall posts, so the two side planes have something to recede WITH
+  for (const sgn of [-1, 1]) {
+    for (const t of [0.18, 0.46, 0.74]) {
+      const { hw, yt, yb } = rec(t)
+      const pw = Math.max(3, w * 0.008 * (1 - t))
+      s += `<rect x="${fx(AX + sgn * hw - pw / 2)}" y="${fx(yt)}" width="${fx(pw)}" height="${fx(yb - yt)}" fill="${E4.timber}"/>`
+      s += `<rect x="${fx(AX + sgn * hw - pw / 2 + (sgn < 0 ? pw * 0.55 : 0))}" y="${fx(yt)}" width="${fx(pw * 0.4)}" height="${fx(yb - yt)}" fill="${E4.timberLit}" opacity="0.55"/>`
     }
   }
-  s += `<path d="M ${fx(w * 0.0)} ${fx(h * 0.24)} L ${fx(vx - MOUTH * 1.5)} ${fx(vy - h * 0.06)} L ${fx(vx - MOUTH * 1.5)} ${fx(vy + h * 0.2)} L 0 ${fx(h * 0.86)} Z" fill="${E4.timberLit}" opacity="0.18"/>`
-  // barrels + a bench stacked against the right wall
-  for (let i = 0; i < 3; i++) {
-    const t = 0.12 + i * 0.19
-    const x = lerp(w * 0.95, vx + MOUTH * 1.55, t)
-    const y = lerp(h * 0.86, vy + h * 0.26, t)
-    const rad = lerp(h * 0.15, h * 0.06, t)
-    s += `<ellipse cx="${fx(x)}" cy="${fx(y)}" rx="${fx(rad * 0.72)}" ry="${fx(rad)}" fill="${E4.timber}"/>`
-    s += `<ellipse cx="${fx(x - rad * 0.2)}" cy="${fx(y)}" rx="${fx(rad * 0.3)}" ry="${fx(rad * 0.8)}" fill="${E4.timberLit}" opacity="0.45"/>`
+
+  // --- the warm body of air, deepening toward the far end ----------------------
+  // held at 0.6: at full strength it milks the two side walls into one haze and
+  // the recession the planes above just drew disappears.
+  s += `<g opacity="0.6"><ellipse cx="${fx(AX)}" cy="${fx(VY + h * 0.05)}" rx="${fx(MHW * 1.1)}" ry="${fx(ry(MHW * 1.1))}" fill="url(#p2glow)"/></g>`
+
+  // --- THE LIGHT POOL on the passage floor -------------------------------------
+  // the wedge the far doorway throws toward the reader, then the pool itself
+  s += `<path d="M ${fx(AX - FHW * 0.66)} ${fx(FB)} L ${fx(AX + FHW * 0.66)} ${fx(FB)} L ${fx(AX + MHW * 0.86)} ${fx(YB)} L ${fx(AX - MHW * 0.86)} ${fx(YB)} Z" fill="${E4.lamp}" opacity="0.3"/>`
+  s += `<ellipse cx="${fx(AX)}" cy="${fx(lerp(FB, YB, 0.42))}" rx="${fx(MHW * 0.72)}" ry="${fx(ry(MHW * 0.72) * 0.42)}" fill="url(#p2glow)"/>`
+  s += `<ellipse cx="${fx(AX)}" cy="${fx(lerp(FB, YB, 0.3))}" rx="${fx(MHW * 0.36)}" ry="${fx(ry(MHW * 0.36) * 0.34)}" fill="${E4.lampHot}" opacity="0.36"/>`
+
+  // --- THE FAR DOORWAY: the luminous destination inside the hole ---------------
+  const DHW = FHW * 0.72
+  const DAP = FT + (FB - FT) * 0.16
+  const door =
+    `M ${fx(AX - DHW)} ${fx(FB)} L ${fx(AX - DHW)} ${fx(FT + (FB - FT) * 0.46)} ` +
+    `Q ${fx(AX)} ${fx(DAP)} ${fx(AX + DHW)} ${fx(FT + (FB - FT) * 0.46)} ` +
+    `L ${fx(AX + DHW)} ${fx(FB)} Z`
+  s += `<rect x="${fx(AX - FHW)}" y="${fx(FT)}" width="${fx(FHW * 2)}" height="${fx(FB - FT)}" fill="${E4.timber}"/>`
+  s += `<path d="${door}" fill="url(#p2door)"/>`
+  // the innkeeper in it, kept small so the doorway still reads as light
+  const kx = AX - DHW * 0.34
+  s += `<ellipse cx="${fx(kx)}" cy="${fx(FB - (FB - FT) * 0.17)}" rx="${fx(DHW * 0.2)}" ry="${fx((FB - FT) * 0.2)}" fill="${E4.ink}" opacity="0.86"/>`
+  s += `<circle cx="${fx(kx)}" cy="${fx(FB - (FB - FT) * 0.37)}" r="${fx(DHW * 0.12)}" fill="${E4.ink}" opacity="0.86"/>`
+  // its frame and the burn it throws on the far wall
+  s += `<path d="${door}" fill="none" stroke="${E4.timber}" stroke-width="${fx(Math.max(2, h * 0.014))}"/>`
+  s += `<ellipse cx="${fx(AX)}" cy="${fx((FT + FB) / 2)}" rx="${fx(FHW * 2.1)}" ry="${fx(ry(FHW * 2.1))}" fill="url(#p2glow)"/>`
+
+  // --- TWO HANGING LANTERNS ----------------------------------------------------
+  // near one left of the axis and big, far one right of the axis and small: the
+  // pair is the depth cue that survives when the keyhole crops everything else.
+  for (const [t, sgn, sc] of [[0.16, -1, 1], [0.6, 0.85, 0.52]]) {
+    const { hw, yt } = rec(t)
+    const lx = AX + sgn * hw * 0.62
+    const ly = yt + h * 0.115 * sc
+    const bw = w * 0.016 * sc
+    const bh = h * 0.075 * sc
+    s += `<ellipse cx="${fx(lx)}" cy="${fx(ly)}" rx="${fx(w * 0.075 * sc)}" ry="${fx(ry(w * 0.075 * sc))}" fill="url(#p2glowHot)"/>`
+    s += `<line x1="${fx(lx)}" y1="${fx(yt)}" x2="${fx(lx)}" y2="${fx(ly - bh * 0.62)}" stroke="${E4.ink}" stroke-width="${fx(Math.max(1.4, 2.6 * sc))}"/>`
+    s += `<path d="M ${fx(lx - bw)} ${fx(ly - bh * 0.5)} L ${fx(lx + bw)} ${fx(ly - bh * 0.5)} L ${fx(lx + bw * 0.7)} ${fx(ly + bh * 0.5)} L ${fx(lx - bw * 0.7)} ${fx(ly + bh * 0.5)} Z" fill="${E4.paneCore}" stroke="${E4.ink}" stroke-width="${fx(Math.max(1.6, 3 * sc))}"/>`
+    s += `<ellipse cx="${fx(lx)}" cy="${fx(ly)}" rx="${fx(bw * 0.45)}" ry="${fx(bh * 0.45)}" fill="${E4.paneCore}"/>`
+    // the cone it drops on the wall behind it
+    s += `<path d="M ${fx(lx - bw * 0.8)} ${fx(ly)} L ${fx(lx + bw * 0.8)} ${fx(ly)} L ${fx(lx + bw * 2.6)} ${fx(YB)} L ${fx(lx - bw * 2.6)} ${fx(YB)} Z" fill="${E4.lamp}" opacity="${fxOp(0.16 * sc)}"/>`
   }
-  // the great hanging lantern, over the passage's mouth
-  const lx = vx + w * 0.09
-  const ly = h * 0.2
-  s += `<ellipse cx="${fx(lx)}" cy="${fx(ly)}" rx="${fx(w * 0.2)}" ry="${fx(h * 0.34)}" fill="url(#p2glow)"/>`
-  s += `<line x1="${fx(lx)}" y1="0" x2="${fx(lx)}" y2="${fx(ly - h * 0.09)}" stroke="${E4.ink}" stroke-width="3"/>`
-  s += `<path d="M ${fx(lx - w * 0.045)} ${fx(ly - h * 0.06)} L ${fx(lx + w * 0.045)} ${fx(ly - h * 0.06)} L ${fx(lx + w * 0.032)} ${fx(ly + h * 0.13)} L ${fx(lx - w * 0.032)} ${fx(ly + h * 0.13)} Z" fill="${E4.paneCore}" stroke="${E4.ink}" stroke-width="3.5"/>`
-  s += `<line x1="${fx(lx)}" y1="${fx(ly - h * 0.06)}" x2="${fx(lx)}" y2="${fx(ly + h * 0.13)}" stroke="${E4.ink}" stroke-width="2.4"/>`
-  // vignette: the jambs the reader looks past, so the eye is pulled down the axis
-  s += `<rect width="${w}" height="${h}" fill="url(#p2vig)"/>`
+
+  // --- THE KEY BOARD, hung on the left wall where the near lantern hits it -----
+  // keyGlyph(S) is S UNITS TALL, so the scale is ~0.1, not ~2. Round one used
+  // `lerp(0.0055,0.0022)*h`, i.e. scale 2.3 on a 120-unit glyph: a single
+  // 275px key covered a third of the passage and read as an olive blob.
+  const far = rec(0.72)
+  s += `<path d="M ${fx(AX - MHW * 0.98)} ${fx(lerp(YT, YB, 0.3))} L ${fx(AX - far.hw * 0.9)} ${fx(lerp(far.yt, far.yb, 0.26))} L ${fx(AX - far.hw * 0.9)} ${fx(lerp(far.yt, far.yb, 0.72))} L ${fx(AX - MHW * 0.98)} ${fx(lerp(YT, YB, 0.82))} Z" fill="${E4.timberLit}" opacity="0.2"/>`
+  for (let row = 0; row < 3; row++) {
+    for (let col = 0; col < 5; col++) {
+      const t = 0.2 + col * 0.13
+      const { hw, yt, yb } = rec(t)
+      const x = AX - hw * 0.88
+      const y = lerp(yt, yb, 0.36 + row * 0.11)
+      const sc = lerp(0.1, 0.05, t)
+      s += `<g transform="translate(${fx(x)},${fx(y)}) scale(${fx(sc)},${fx(sc * ANISO)})">${keyGlyph(120, E4.brass, E4.brassLit)}</g>`
+    }
+  }
+  // a barrel and a stool against the right wall, near the mouth
+  for (let i = 0; i < 2; i++) {
+    const t = 0.14 + i * 0.2
+    const { hw, yb } = rec(t)
+    const x = AX + hw * 0.78
+    const rad = lerp(h * 0.1, h * 0.06, t) * (1 - i * 0.2)
+    s += `<ellipse cx="${fx(x)}" cy="${fx(yb - rad * 0.8)}" rx="${fx(rad * 0.44)}" ry="${fx(rad)}" fill="${E4.timber}"/>`
+    s += `<ellipse cx="${fx(x - rad * 0.14)}" cy="${fx(yb - rad * 0.8)}" rx="${fx(rad * 0.16)}" ry="${fx(rad * 0.78)}" fill="${E4.timberLit}" opacity="0.5"/>`
+  }
+  // seeded motes in the lamplight, the one thing that says "air"
+  for (let i = 0; i < 26; i++) {
+    const t = r()
+    const { hw, yt, yb } = rec(t)
+    s += `<circle cx="${fx(AX + rr(r, -hw * 0.9, hw * 0.9))}" cy="${fx(lerp(yt, yb, rr(r, 0.15, 0.95)))}" r="${fx(rr(r, 1.2, 3.2))}" fill="${E4.lampHot}" opacity="${fxOp(rr(r, 0.1, 0.32))}"/>`
+  }
+  // the mouth's own shade: the jamb the reader looks past, so the eye is pulled
+  // down the axis and the arrival rank keeps a dark ground to silhouette against
+  s += `<rect x="${fx(AX - MHW)}" y="${fx(YT)}" width="${fx(MHW * 2)}" height="${fx(h - YT)}" fill="url(#p2vig)"/>`
+  s += `</g>`
+
   const defs =
+    `<clipPath id="p2clip"><rect x="${fx(AX - MHW)}" y="${fx(YT)}" width="${fx(MHW * 2)}" height="${fx(h - YT)}"/></clipPath>` +
     e4Glow('p2glow', E4.lamp, 0.9) +
-    `<radialGradient id="p2vig" cx="0.455" cy="0.48" r="0.72">` +
+    e4Glow('p2glowHot', E4.lampHot, 0.95) +
+    `<linearGradient id="p2ceil" x1="0" y1="${fx(YT)}" x2="0" y2="${fx(FT)}" gradientUnits="userSpaceOnUse">` +
+    `<stop offset="0" stop-color="${E4.ink}"/><stop offset="1" stop-color="#3a2716"/></linearGradient>` +
+    `<linearGradient id="p2wallL" x1="${fx(AX - MHW)}" y1="0" x2="${fx(AX - FHW)}" y2="0" gradientUnits="userSpaceOnUse">` +
+    `<stop offset="0" stop-color="#150d07"/><stop offset="0.55" stop-color="#3d2914"/>` +
+    `<stop offset="1" stop-color="#7a5330"/></linearGradient>` +
+    `<linearGradient id="p2wallR" x1="${fx(AX + MHW)}" y1="0" x2="${fx(AX + FHW)}" y2="0" gradientUnits="userSpaceOnUse">` +
+    `<stop offset="0" stop-color="#150d07"/><stop offset="0.55" stop-color="#432d17"/>` +
+    `<stop offset="1" stop-color="#8a5f36"/></linearGradient>` +
+    `<linearGradient id="p2floor" x1="0" y1="${fx(YB)}" x2="0" y2="${fx(FB)}" gradientUnits="userSpaceOnUse">` +
+    `<stop offset="0" stop-color="#1c130b"/><stop offset="0.55" stop-color="#4a3319"/>` +
+    `<stop offset="1" stop-color="#8a6132"/></linearGradient>` +
+    `<radialGradient id="p2door" cx="0.5" cy="0.62" r="0.72">` +
+    `<stop offset="0" stop-color="#fffaf0"/><stop offset="0.45" stop-color="${E4.pane}"/>` +
+    `<stop offset="1" stop-color="${E4.paneEdge}"/></radialGradient>` +
+    `<radialGradient id="p2vig" cx="0.5" cy="${fxOp((VY - YT) / (h - YT))}" r="0.62">` +
     `<stop offset="0" stop-color="${E4.ink}" stop-opacity="0"/>` +
-    `<stop offset="0.62" stop-color="${E4.ink}" stop-opacity="0.12"/>` +
-    `<stop offset="1" stop-color="${E4.ink}" stop-opacity="0.6"/></radialGradient>`
+    `<stop offset="0.55" stop-color="${E4.ink}" stop-opacity="0.14"/>` +
+    `<stop offset="1" stop-color="${E4.ink}" stop-opacity="0.72"/></radialGradient>`
   return svgPiece(w, h, s, defs)
 }
 

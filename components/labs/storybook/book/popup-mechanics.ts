@@ -1783,6 +1783,128 @@ export function stageTurnT(easedT: number, stage?: TurnStage): number {
   return Math.min(1, Math.max(0, (easedT - stage.t0) / (stage.t1 - stage.t0)))
 }
 
+// ---------------------------------------------------------------------------
+// E4 M2 — THE LANDING SETTLE (the thump).
+//
+// A staged piece used to reach the end of its window on a plain eased stop, so
+// six separated erection events all GLIDED to a halt and the page turn read as
+// six slow arrivals. A real popup does not glide: the paper runs out of travel,
+// overshoots by a hair on its own springiness, and settles back. That last
+// hair is the whole difference between a piece arriving and a piece LANDING.
+//
+// Three properties this shape has to keep, in order of how badly they break:
+//
+//  1. THE ENDPOINTS ARE UNTOUCHED. `settleShape` is exactly 0 at u <= tail and
+//     at u >= 1, so stageTurnT(0) = 0 and stageTurnT(1) = 1 still hold BIT-
+//     exactly (float `+ 0 * anything` is the identity here — the bump is added,
+//     never multiplied in). Fold-flat at book-closed and the rest pose at
+//     book-open are both asserted by e4s2-reach.mjs and both still measure zero.
+//  2. IT ONLY EVER RUNS ON AN OPENING PIECE. The bump pushes progress PAST 1,
+//     i.e. past the plane the sheet lands on. On an INCOMING spread that means
+//     the spread opens a hair beyond flat and springs back — the thump. On an
+//     OUTGOING one the same push would drive the sheet past the CLOSED plane
+//     and through the page, so an exit turn stays strictly monotone. That is
+//     the fold-flat property, which is the one physical law this lane protects.
+//  3. YOU CANNOT OVERSHOOT A LANDING YOU HAVE NOT REACHED. The prescription
+//     asked for a bump ADDED to the staged ramp, with progress passing past 1.
+//     Those two cannot both hold: staged progress is u, the bump vanishes at
+//     u = 1, so u + bump(u) > 1 needs bump(u) > 1 - u somewhere — for a 1.2 deg
+//     peak on a 173 deg sweep that is a gain of 0.007 against a deficit of 0.28
+//     at the tail's start, forty times too small (e4-settle.mjs gates the
+//     inequality). The base travel is therefore COMPRESSED into [0, tail] and
+//     the tail belongs to the settle alone: the piece reaches its landing at
+//     u = tail still moving, carries a hair past it, and eases back onto it by
+//     u = 1. Support, endpoints and the exit-turn rule are all as prescribed;
+//     only the base ramp's slope changed, and it changed because it had to.
+//  4. THE LOBE IS VELOCITY-MATCHED. Its slope where it meets the base ramp is
+//     the ramp's own, so the overshoot is a CONTINUATION of the arrival rather
+//     than a second motion glued to a stop. Quadratic out to the peak, then a
+//     smoothstep back down to exactly zero — C1 across the whole window.
+// ---------------------------------------------------------------------------
+
+/** Where in the staged window the base travel ends and the settle begins. */
+const SETTLE_TAIL = 0.72
+
+/**
+ * Peak overshoot of the landing settle, in DEGREES of the flying sheet's own
+ * angle (converted to progress units against whatever sweep the turn has, so
+ * every staged piece overshoots by the same ANGLE rather than the same
+ * fraction of its own window).
+ *
+ * SWEPT AND MEASURED — scripts/storybook/bench/e4-settle.mjs, PX block:
+ * worst-vertex screen px between the overshoot peak and the pose the piece
+ * settles to, projected through the pinned reading camera (captures could not
+ * carry this measurement; see that bench's note on the 1px load-to-load
+ * camera jitter).
+ *
+ *   peak deg   spire   hall   wing-l   guest
+ *      0.5      1.35   1.97     2.83    0.68
+ *      1.2      3.24   4.72     6.79    1.64
+ *      1.5      4.05   5.90     8.48    2.04
+ *      2.0      5.41   7.86    11.30    2.73
+ *
+ * 1.5 is the smallest that clears ~4px on the spire tip — the longest lever and
+ * the last piece to land, so the piece with the least margin. `ch1-wing-r` and
+ * the balcony deck measure 0.00px at EVERY amplitude: their own solvers
+ * saturate at the landing (the deck's flap progress is `clamp(own.h / h, 0, 1)`
+ * and that clamp is load-bearing for the ordinary case), so no settle can reach
+ * them from the sheet angle.
+ */
+export const SETTLE_PEAK_DEG = 1.5
+
+/**
+ * Staged progress with the landing settle: the base ramp compressed into
+ * [0, SETTLE_TAIL], then one velocity-matched lobe of peak `gain` (in progress
+ * units) that carries past 1 and returns to exactly 1.
+ *
+ * Exact at both ends by early return, so `stageTurnT(0) = 0` and
+ * `stageTurnT(1) = 1` survive bit-for-bit however the lobe is tuned. NaN-safe.
+ */
+export function stageSettleProgress(u: number, gain: number): number {
+  if (!(u > 0)) return 0
+  if (u >= 1) return 1
+  if (!(gain > 0)) return u
+  if (u <= SETTLE_TAIL) return u / SETTLE_TAIL
+  const x = (u - SETTLE_TAIL) / (1 - SETTLE_TAIL)
+  // The ramp covers 1 in SETTLE_TAIL, so in tail-x units it arrives at slope
+  // (1 - tail)/tail. The lobe leaves at the same slope: no kink at the landing.
+  const slope = (1 - SETTLE_TAIL) / SETTLE_TAIL
+  // Peak at half the triangle under that slope. Capped at half the tail so an
+  // absurd gain degrades into a slower lobe rather than a discontinuity.
+  const xp = Math.min(0.5, (2 * gain) / slope)
+  if (x <= xp) return 1 + slope * x - (slope / (2 * xp)) * x * x
+  const y = (x - xp) / (1 - xp)
+  return 1 + gain * (1 - y * y * (3 - 2 * y))
+}
+
+/**
+ * The staged sheet angle WITH the landing settle, for a piece that is opening.
+ *
+ * This exists because `sheetAngleTilted` clamps its progress to [0, 1] — the
+ * clamp that guarantees the rest pose — so handing it 1.007 returns exactly the
+ * landing angle and the settle would be a silent no-op. VERIFIED: the clamp is
+ * the only obstacle; the interpolation itself is a plain lerp on the sweep and
+ * extends past `to` perfectly smoothly, with no fold-back and no second branch.
+ * So rather than loosen that clamp for every caller in the book, the same lerp
+ * on the same sweep is run locally here with the upper bound lifted. Endpoints,
+ * sweep and easing are all still `sheetAngleTilted`'s, bit for bit.
+ */
+export function sheetAngleSettled(
+  dir: TurnDir,
+  stagedT: number,
+  committedSpread: number,
+  peakDeg = SETTLE_PEAK_DEG
+): number {
+  const { from, to } = sheetSweepTilted(dir, committedSpread)
+  const span = to - from
+  if (span === 0) return from
+  // A peak in degrees becomes a peak in progress units by dividing by the
+  // sweep's own size — sign-free, because `span` carries the direction and the
+  // lobe only ever pushes further along it, never back toward flat.
+  const gain = ((peakDeg * Math.PI) / 180) / Math.abs(span)
+  return from + span * stageSettleProgress(stagedT, gain)
+}
+
 /**
  * Tilted replacement for `spreadPageAngles`, role derived internally from
  * the frame-loop pair (one clock). Static planes wear their OWN spread's
@@ -1818,7 +1940,17 @@ export function spreadPageAnglesTilted(
   // both endpoints of the window map to the sweep's own endpoints, so a staged
   // piece leaves the rest pose it left before and lands on the plane it landed
   // on before — it only spends a different part of the turn getting there.
-  const theta = sheetAngleTilted(dir, stageTurnT(easedT, stage), committedSpread)
+  //
+  // E4 M2: a STAGED piece that is OPENING also gets the landing settle, so its
+  // erection event ends in a thump instead of a glide. Both conditions matter —
+  // an unstaged piece has no landing to thump on (it is still moving at t=1),
+  // and an outgoing one must stay monotone into the shut page (see the settle's
+  // header). Everything else on this path is untouched.
+  const stagedT = stageTurnT(easedT, stage)
+  const settling = !!stage && stage.t1 > stage.t0 && role === 'incoming'
+  const theta = settling
+    ? sheetAngleSettled(dir, stagedT, committedSpread)
+    : sheetAngleTilted(dir, stagedT, committedSpread)
   if (dir === 'next') {
     // Sheet lifts off the right stack, lands as the incoming left page.
     return role === 'outgoing'
