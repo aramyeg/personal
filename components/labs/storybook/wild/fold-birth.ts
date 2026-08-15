@@ -150,6 +150,34 @@ export function stageSettleProgress(u: number, gain: number = SETTLE_GAIN): numb
   return 1 + gain * (1 - y * y * (3 - 2 * y))
 }
 
+// ---------------------------------------------------------------------------------------------
+// THE SINK — how a folded-flat inn stays invisible
+// ---------------------------------------------------------------------------------------------
+
+/**
+ * A flat piece lies exactly ON the page, and the page is exactly where the reader is looking.
+ * The old clip-rise hid the sleeping building by parking the whole mass a metre under the paper;
+ * the fold has no such parking, and the diorama tree is never visibility-gated (a light-count
+ * change re-links every program in the scene), so a page-rooted piece that is still flat would
+ * render as a smeared silhouette printed on the paper — including on spreads the reader is not
+ * even on.
+ *
+ * So a flat page-rooted piece sits `sink` BELOW the page surface, where RISE_CLIP swallows it
+ * whole, and that offset is retired inside the first ~10 degrees of its swing. The reader's read
+ * of those ten degrees is the best part: the piece's top edge peeling up out of the paper.
+ * Children inherit it through their parent's map, which is exactly right — a floor plate folded
+ * against a sunken wall is sunken too.
+ */
+export const SINK_END = 0.18
+
+/** How far under the page a flat page-rooted piece parks. RISE_CLIP takes it from there. */
+export const PAGE_SINK = 0.04
+
+/** 1 while a piece is flat, 0 once it has cleared the page. sin(psi) is the argument. */
+export function sinkFactor(sinPsi: number): number {
+  return clamp01(1 - sinPsi / SINK_END)
+}
+
 /**
  * THE THUMP, as a pure shape in [0, 1]: zero everywhere until the piece reaches its landing at
  * SETTLE_TAIL, then one compression toward the hinge and a much smaller rebound, back to exactly
@@ -197,6 +225,14 @@ export type FoldChunk = {
   readonly creaseFalloff: number
   /** Landing-thump amplitude along -rise, world units. */
   readonly thump: number
+  /** How far under the page this piece hides while flat. Page-rooted pieces only — a child
+   *  inherits its parent's, which is what a floor plate folded against a sunken wall does. */
+  readonly sink: number
+  /** Where the crease shadow is measured from, if not the hinge itself (the roof's is the
+   *  RIDGE: its two slopes spread apart from a closed book-fold, and the ridge is the spine
+   *  of that fold even though the piece hinges at eave height). */
+  readonly creaseOrigin?: Vec3
+  readonly creaseAxis?: Vec3
   /** Conservative rest-space AABB, for the bench's flat/containment gates. */
   readonly extent: { readonly min: Vec3; readonly max: Vec3 }
 }
@@ -246,6 +282,7 @@ export const FOLD_CHUNKS: readonly FoldChunk[] = [
     creaseGain: 0.55,
     creaseFalloff: 0.075,
     thump: 0.008,
+    sink: PAGE_SINK,
     extent: {
       min: [HALL.min[0] - 0.03, -0.03, HALL.min[2] - 0.03],
       max: [HALL.max[0] + 0.03, HALL.max[1] + 0.02, STEP.max[2] + 0.03],
@@ -264,6 +301,7 @@ export const FOLD_CHUNKS: readonly FoldChunk[] = [
     creaseGain: 0.55,
     creaseFalloff: 0.09,
     thump: 0.009,
+    sink: PAGE_SINK,
     extent: {
       min: [TOWER.min[0] - 0.04, -0.03, TOWER.min[2] - 0.03],
       max: [TOWER.max[0] + 0.04, TOWER.cap.apexY + 0.02, TOWER.max[2] + 0.03],
@@ -280,6 +318,7 @@ export const FOLD_CHUNKS: readonly FoldChunk[] = [
     creaseGain: 0.6,
     creaseFalloff: 0.06,
     thump: 0.007,
+    sink: 0,
     extent: {
       min: [JETTY.min[0] - 0.04, JETTY.min[1] - 0.06, JETTY.min[2] - 0.04],
       max: [JETTY.max[0] + 0.04, JETTY.max[1] + 0.03, JETTY.max[2] + 0.04],
@@ -296,6 +335,7 @@ export const FOLD_CHUNKS: readonly FoldChunk[] = [
     creaseGain: 0.45,
     creaseFalloff: 0.05,
     thump: 0.006,
+    sink: PAGE_SINK,
     extent: {
       min: [BARRELS[0].center[0] - 0.08, -0.03, WELL.center[2] - WELL.radius - 0.14],
       max: [WELL.center[0] + WELL.radius + 0.04, WELL.archY + 0.03, WELL.center[2] + WELL.radius + 0.04],
@@ -309,9 +349,14 @@ export const FOLD_CHUNKS: readonly FoldChunk[] = [
     rise: UP,
     fall: FORE,
     kappa: 1,
+    // The piece hinges at eave height but its CREASE is the ridge — the slopes spread apart from
+    // a closed book-fold, so the shadow belongs in a band under the ridge on both sides.
+    creaseOrigin: [0, ROOF.ridgeY, ROOF.ridgeZ],
+    creaseAxis: UP,
     creaseGain: 0.65,
     creaseFalloff: 0.055,
     thump: 0.0075,
+    sink: 0,
     extent: {
       min: [ROOF.minX - 0.03, ROOF.eaveY - 0.05, ROOF.backEaveZ - 0.04],
       max: [ROOF.maxX + 0.03, ROOF.ridgeY + 0.03, ROOF.frontEaveZ + 0.04],
@@ -328,6 +373,7 @@ export const FOLD_CHUNKS: readonly FoldChunk[] = [
     creaseGain: 0.6,
     creaseFalloff: 0.04,
     thump: 0.005,
+    sink: 0,
     extent: {
       min: [DORMER_MIN_X - 0.05, DORMER_SILL_Y - 0.04, -0.26],
       max: [DORMER_MAX_X + 0.05, DORMER_APEX_Y + 0.03, DORMER_FRONT_Z + 0.04],
@@ -346,6 +392,7 @@ export const FOLD_CHUNKS: readonly FoldChunk[] = [
     creaseGain: 0.6,
     creaseFalloff: 0.05,
     thump: 0.005,
+    sink: 0,
     extent: {
       min: [CHIMNEY.min[0] - 0.04, CHIMNEY.foldBase - 0.01, CHIMNEY.min[2] - 0.04],
       max: [CHIMNEY.max[0] + 0.04, CHIMNEY.cap.topY + 0.03, CHIMNEY.max[2] + 0.04],
@@ -362,6 +409,7 @@ export const FOLD_CHUNKS: readonly FoldChunk[] = [
     creaseGain: 0.35,
     creaseFalloff: 0.04,
     thump: 0.005,
+    sink: 0,
     extent: {
       min: [SIGN.bracketRoot[0] - 0.03, SIGN.pivot[1] - SIGN.height - 0.08, SIGN.pivot[2] - 0.05],
       max: [SIGN.pivot[0] + SIGN.halfW + 0.03, SIGN.bracketRoot[1] + 0.04, SIGN.pivot[2] + 0.05],
@@ -378,6 +426,7 @@ export const FOLD_CHUNKS: readonly FoldChunk[] = [
     creaseGain: 0.35,
     creaseFalloff: 0.03,
     thump: 0.004,
+    sink: 0,
     extent: {
       min: [LANTERN.pos[0] - 0.05, LANTERN.pos[1] - 0.06, HALL.max[2] - 0.02],
       max: [LANTERN.pos[0] + 0.05, LANTERN.pos[1] + 0.09, LANTERN.pos[2] + 0.05],
@@ -450,9 +499,11 @@ export type FoldPose = {
   readonly crease: number
   /** This piece's raw window progress, before the settle. Landing cues fire off this. */
   readonly u: number
+  /** How far under the page this piece is currently parked (0 once it has cleared it). */
+  readonly sink: number
 }
 
-function localMatrix(c: FoldChunk, psi: number, thump: number): Mat4 {
+function localMatrix(c: FoldChunk, psi: number, thump: number, sink: number): Mat4 {
   const R = c.rise
   const F = c.fall
   const A = cross3(R, F)
@@ -475,6 +526,9 @@ function localMatrix(c: FoldChunk, psi: number, thump: number): Mat4 {
   for (let i = 0; i < 3; i += 1) {
     t.push(O[i] - (L[i][0] * O[0] + L[i][1] * O[1] + L[i][2] * O[2]) - thump * R[i])
   }
+  // The sink is world-DOWN, not along the piece's own rise: it exists to put the piece under the
+  // page's clipping plane, and the plane is horizontal.
+  t[1] -= sink
   return [
     L[0][0], L[1][0], L[2][0], 0,
     L[0][1], L[1][1], L[2][1], 0,
@@ -510,7 +564,8 @@ export function solveFoldBirth(open: number): FoldPose[] {
     const u = stageU(open, FOLD_EVENTS[c.event])
     const q = stageSettleProgress(u)
     const psi = (q * Math.PI) / 2
-    const own = localMatrix(c, psi, c.thump * thumpShape(u))
+    const sink = c.sink * sinkFactor(Math.sin(psi))
+    const own = localMatrix(c, psi, c.thump * thumpShape(u), sink)
     const ownQ = localQuat(c, psi)
     const parent = c.parent ? byName.get(c.parent) : undefined
     const pose: FoldPose = {
@@ -520,6 +575,7 @@ export function solveFoldBirth(open: number): FoldPose[] {
       quat: parent ? mulQuat(parent.quat, ownQ) : ownQ,
       crease: c.creaseGain * (1 - Math.sin(psi)),
       u,
+      sink: sink + (parent?.sink ?? 0),
     }
     byName.set(c.name, pose)
     out.push(pose)

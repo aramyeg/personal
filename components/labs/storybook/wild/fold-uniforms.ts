@@ -49,8 +49,10 @@ for (let i = 0; i < FOLD_SLOT_COUNT; i += 1) {
 // Slot 0 stays the identity for the life of the page.
 for (const c of FOLD_CHUNKS) {
   const s = foldSlot(c.name)
-  creases[s].set(c.origin[0], c.origin[1], c.origin[2], 0)
-  hinges[s].set(c.rise[0], c.rise[1], c.rise[2], 1 / c.creaseFalloff)
+  const o = c.creaseOrigin ?? c.origin
+  const a = c.creaseAxis ?? c.rise
+  creases[s].set(o[0], o[1], o[2], 0)
+  hinges[s].set(a[0], a[1], a[2], 1 / c.creaseFalloff)
 }
 
 export const FOLD_UNIFORMS = {
