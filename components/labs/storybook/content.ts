@@ -341,7 +341,11 @@ const CH1_LAYERS: readonly SceneLayer[] = [
   // upright in the lit archway (face-on 0.83, fully readable), and the pull
   // BOWS them out toward the reader over the step — the low-face-on poses now
   // exist only in motion, where they read as motion. Travel window unchanged.
-  { id: 'ch1-rank', kind: 'midground', role: 'figure', mech: 'stripflap', side: 'right', anchor: 0.22, anchorZ: 0.2, slot: 0.3, slotZ: 0.2, hingeX: 0.24, hingeZ: 0.18, hingeDeg: 20, width: 0.36, height: 0.38, restDeg: 90, travelDeg: [44, 90] },
+  // ...and the travel floor is raised 44 -> 60 for the same reason: a bow
+  // BELOW ~55 degrees re-enters the anamorphic band at this camera, so the
+  // deepest bow the pull allows is the deepest one that still reads as
+  // figures. LOOKS FIRST over the E3 travel-px floor, recorded taste call.
+  { id: 'ch1-rank', kind: 'midground', role: 'figure', mech: 'stripflap', side: 'right', anchor: 0.22, anchorZ: 0.2, slot: 0.3, slotZ: 0.2, hingeX: 0.24, hingeZ: 0.18, hingeDeg: 20, width: 0.36, height: 0.38, restDeg: 90, travelDeg: [60, 90] },
   // ---------------------------------------------------------------------
   // THE COURTYARD FLOOR — a page-flat venetian rack (Birmingham 92/93) filling
   // the left page outboard of the hall wall. Page-flat is this family's natural
