@@ -187,6 +187,40 @@ const TONES: Record<CutTone, ToneSpec> = {
   },
   brass: { color: '#c9963f', roughness: 0.35, metalness: 0.8 },
   foliage: { color: '#48603c', roughness: 0.95, metalness: 0 },
+  iron: { color: '#191b21', roughness: 0.45, metalness: 0.25 },
+  // THE DESTINATION, and the one tone whose ALBEDO is deliberately near-black.
+  // The warm key light stands 0.18 in front of the backwall: irradiance there
+  // is ~280, so any normal albedo clips all three channels and the end of the
+  // tunnel renders as flat white. Starving the diffuse term and carrying the
+  // whole value in `emissive` is what keeps it a WARM glow instead — measured,
+  // not stylistic. Panes further from that light (kitchen fire, lanterns, the
+  // yard's lit door) are emissive-only anyway, so they lose nothing.
+  hearth: {
+    color: '#060200',
+    roughness: 1,
+    metalness: 0,
+    emissive: '#ff8a20',
+    // 1.9, not 3.0: above ~2.2 the emissive alone clips all three channels and
+    // every warm pane in the diorama renders the same pale cream. The five
+    // stacked scrims already cost the deep ranks ~40% toward blue, so the
+    // emissive has to be saturated rather than merely bright.
+    emissiveIntensity: 1.9,
+  },
+  night: { color: '#0e1526', roughness: 1, metalness: 0 },
+  // A true zero albedo, and the only tone in the table that has one. The
+  // kitchen light sits 0.15 from the trap's far wall — irradiance ~180 — so
+  // even `silhouette` (#1a1614) renders there as a mid warm grey and the cook
+  // stops being a cut-out. Nothing multiplied by black survives a strong light.
+  ink: { color: '#000000', roughness: 1, metalness: 0 },
+  // Moon and stars ride at rank 5, the deepest haze, so the intensity is
+  // pre-paid: 2.8 * (1 - 0.66*0.6) = ~1.7 by the time it is graded.
+  moon: {
+    color: '#e9f1ff',
+    roughness: 0.5,
+    metalness: 0,
+    emissive: '#cfe0ff',
+    emissiveIntensity: 2.8,
+  },
 }
 
 /**
