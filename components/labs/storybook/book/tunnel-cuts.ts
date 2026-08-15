@@ -357,6 +357,18 @@ function prosceniumPieces(): CutPiece[] {
     brace(0.28, 0.312, 0.464, 0.385, 0.026), // and the braces above them
     brace(0.762, 0.312, 0.578, 0.385, -0.026),
   ]
+  // Glazing bars: a mullion + transom across every window opening, so the
+  // panes read as leaded inn glazing instead of orange stickers. The dormer
+  // (0.068 tall) takes only the mullion — a transom there would leave panes
+  // under the 0.012 detail floor.
+  for (const [x0, y0, x1, y1] of FACADE_WINDOWS) {
+    const cx = (x0 + x1) / 2
+    timber.push(rect(cx - 0.007, y0, cx + 0.007, y1))
+    if (y1 - y0 > 0.1) {
+      const cy = (y0 + y1) / 2
+      timber.push(rect(x0, cy - 0.007, x1, cy + 0.007))
+    }
+  }
 
   const roof = poly([
     [-0.82, 0.878],
