@@ -227,8 +227,12 @@ export const KEY_TOY = {
   shaftLength: 0.11,
   /** Detents the turn passes through, as fractions of the full sweep. */
   detents: [0, 0.34, 0.68, 1],
-  /** Radius within which a pointer grabs the key. */
-  grabRadius: 0.17,
+  /** Radius within which a pointer grabs the key. The accept gate is this plus bowRadius, and
+   *  it must cover the key's own reach — the bow's far rim lies shaftLength + 2*bowRadius =
+   *  0.254 from the escutcheon, and the leaned camera grazes the page so shallowly that a
+   *  finger-width of screen maps to several centimetres of paving. 0.17 rejected presses ON
+   *  the visible handle. */
+  grabRadius: 0.25,
 }
 
 // ---------------------------------------------------------------------------------------------

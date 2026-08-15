@@ -140,6 +140,12 @@ export function TheKey() {
     cellRef.current = detentCell(v)
   }, [])
 
+  /** Dev-only telemetry, off unless `?wilddebug=1` — the capture harness reads the turn. */
+  const debugRef = useRef(false)
+  useEffect(() => {
+    debugRef.current = new URLSearchParams(window.location.search).get('wilddebug') === '1'
+  }, [])
+
   const materials = useMemo(() => {
     // METALNESS IS A TRAP HERE. A true metal with no environment map has nothing to reflect,
     // so at metalness 0.9 the whole toy rendered jet black on near-black cobbles and simply
@@ -230,6 +236,14 @@ export function TheKey() {
     const p = root.parent.worldToLocal(tmp.copy(e.point))
     const dx = p.x - KEY_TOY.center[0]
     const dz = p.z - KEY_TOY.center[2]
+    if (debugRef.current) {
+      ;(window as unknown as { __wildDown?: unknown }).__wildDown = {
+        point: e.point.toArray(),
+        local: [p.x, p.y, p.z],
+        dist: Math.hypot(dx, dz),
+        gate: KEY_TOY.grabRadius + KEY_TOY.bowRadius,
+      }
+    }
     // The grab disc is deliberately wider than the hit floor so a drag that swings the bow out
     // past the escutcheon keeps producing intersections; the GRAB itself is gated tight.
     if (Math.hypot(dx, dz) > KEY_TOY.grabRadius + KEY_TOY.bowRadius) return
@@ -318,6 +332,15 @@ export function TheKey() {
 
     turnRef.current = turn
     ctx.wake.current = turn
+
+    if (debugRef.current) {
+      ;(window as unknown as { __wildKey?: unknown }).__wildKey = {
+        turn,
+        target: targetRef.current,
+        dragging: !!dragRef.current,
+        armed: armedRef.current,
+      }
+    }
 
     // THE BECKON. Anticipation first (a small counter-rock), then the sweep back, under an
     // envelope so it starts and ends at rest. Retired the instant the key is touched.
