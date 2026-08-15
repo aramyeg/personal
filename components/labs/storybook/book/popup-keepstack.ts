@@ -102,11 +102,27 @@ export type KeepStorySpec = {
    *  (popup-oanave.ts). Aperture in this engine is ALPHA IN THE PAINTED ART,
    *  not punched geometry: this field cuts nothing, it records for the painter
    *  and for the covenant test WHERE the hole in this story's facade plate is.
-   *  `halfW` across the plate crease, `apexH` up the plate from its base edge,
-   *  both in world units and both inside the plate's own width/2 x height box.
+   *
+   *  THIS DECLARATION IS THE SINGLE OWNER OF THE HOLE'S POSITION. It drifted
+   *  once — the painter cut at world x -0.05 while content, its comments and
+   *  the bench all said +0.26, so the figure meant to rise INSIDE the arch rose
+   *  next to it and nobody noticed for three rounds. Consumers must now DERIVE
+   *  from these three numbers, never restate them:
+   *    - `scripts/storybook/bench/e4s2-reach.mjs` reads them for its arch gates
+   *      AND re-measures the baked alpha centroid of the generated plate
+   *      against `centerX`, so art/declaration drift fails the bench;
+   *    - `scripts/storybook/generate-art.mjs` cannot import TS, so it keeps a
+   *      mirrored `APERTURE` constant that names this field as the owner.
+   *
+   *  `centerX` is the hole's centre in WORLD x on the assembled plate: the
+   *  plate spans x -width/2 .. +width/2 across art u 0..1, so
+   *  `u = 0.5 + centerX / plate.width`. `halfW` is across the plate crease and
+   *  `apexH` up the plate from its base edge (art v measured from the BOTTOM,
+   *  so `v = apexH / plate.height`) — all three in world units, all three
+   *  inside the plate's own width/2 x height box.
    *  The box's front CAP stays solid behind the plate at PLATE_LIFT, so the
    *  hole shows real paper at a real depth offset rather than the background. */
-  aperture?: { halfW: number; apexH: number }
+  aperture?: { centerX: number; halfW: number; apexH: number }
 }
 
 /** The jutting gold dispatch balcony — a deck riding the ground story's flat

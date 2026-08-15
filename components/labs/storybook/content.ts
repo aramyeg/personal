@@ -227,21 +227,55 @@ const CH1_LAYERS: readonly SceneLayer[] = [
       // THE HALL — the wall that breaks the page. Its facade plate is the
       // DIE-CUT CARRIAGE ARCH: aperture in this engine is alpha in the painted
       // art, not punched geometry, so the hole is baked by generate-art.mjs and
-      // the `aperture` field records what the painter must cut. THE ARCH IS
-      // CENTRED AT x = +0.26 (world), not on the spine: it has to sit where the
-      // arrival rank can physically stand, and a rank centred on the gutter
-      // would have to straddle both pages. Left masonry 0.10 to the gutter,
-      // right masonry 0.10 to the facade edge.
+      // the `aperture` field records what the painter must cut. THIS FIELD IS
+      // THE SINGLE OWNER of where the hole is (popup-keepstack.ts KeepStorySpec
+      // documents the covenant): the bench derives its arch gates from it AND
+      // re-measures the baked alpha centroid against `centerX`, and the painter
+      // keeps a mirrored constant that names this line as the owner.
+      //
+      // THE ARCH IS CENTRED AT x = +0.145 (world) — plate u 0.6394, since the
+      // plate spans x -0.52..0.52 across u 0..1. Arch and rank now share ONE
+      // number, and it is squeezed from three sides:
+      //  * it cannot sit on the spine (where the paint used to cut it, x -0.05)
+      //    because the arrival rank that has to stand IN it is a right-page
+      //    piece; a rank centred on the gutter would straddle both pages.
+      //  * it cannot sit at the rank's old x +0.26 either: the balcony deck
+      //    spans only x -0.30..0.30, so an arch at 0.26 +- 0.15 would run out
+      //    from under the gallery that is supposed to cantilever over it. That
+      //    caps centerX + halfW at 0.30.
+      //  * AND IT CANNOT GO BELOW 0.139. The rank's hinge chord is
+      //    (width/2)*cos(hingeDeg) = 0.16*cos30 = 0.1386 to each side of
+      //    hingeX, and at book-closed that chord lies IN the right page, where
+      //    x >= 0 is the fold-flat law. Any common centre under 0.1386 hangs
+      //    the closed die over the gutter — measured -0.029 at the 0.11 this
+      //    round was first cut at, which failed F and W in e4s2-reach.mjs.
+      // 0.145 is 0.006 clear of that floor and 0.005 clear of the deck edge:
+      // mouth x -0.005..0.295, the left jamb landing on the spine crease.
+      // Widening halfW to 0.16 (the old declared value) would push the mouth
+      // past the deck; 0.15 keeps 0.011 of jamb clearance around the die, which
+      // is what a 0.32 die inside a 0.30 mouth can afford.
       // THE TRAP (generate-art.mjs:7865): a gate you can see through is only
       // worth having when there is something behind it. The cap stays SOLID at
       // PLATE_LIFT behind the plate and must be painted as a warm lamplit
       // passage receding into the inn — and the arrival rank rises INSIDE the
       // hole so real moving geometry occupies it.
+      //   apexH 0.25 IS A CEILING SET BY THE BALCONY, not by the figure. The
+      // first instinct was to cut the crown at the rank's 0.30 standing height
+      // so the family passes cleanly under it. Baked and captured, that hole
+      // rendered as a rectangular garage door: the deck cantilevers over the
+      // arch and the reading camera looks DOWN, so it hides the wall above
+      // roughly y 0.25 and took the pointed head, the voussoir ring and the
+      // keystone with it. The crown stays in the band the reader can see; the
+      // family is 0.05 taller than it and 0.14 fore of the plate, so at full
+      // pull the heads cross the ring and read as stepping THROUGH the arch —
+      // and at the rest angle (36deg) they sit at y 0.176, well inside.
+      // Mouth: 0.30 wide x 0.25 tall over a 0.32-wide die whose skewed chord
+      // measures 0.277 across.
       {
         key: 'hall', a: 0.52, height: 0.36, z0: -0.23, z1: 0.23,
         roof: 'flat', capFront: true, capBack: true,
         plate: { width: 1.04, height: 0.36 },
-        aperture: { halfW: 0.16, apexH: 0.3 },
+        aperture: { centerX: 0.145, halfW: 0.15, apexH: 0.25 },
         stage: { t0: 0.1, t1: 0.32 },
       },
       // THE GUEST FLOOR — the star. Heavy dark timber over warm cream plaster,
@@ -321,10 +355,22 @@ const CH1_LAYERS: readonly SceneLayer[] = [
   // PAYOFF ONE, phase 0.00-0.55 — THE ARRIVAL RANK. The innkeeper with a
   // lantern, spouse with the enchanted ledger, waving child, dog: one linked
   // die-cut chain stood up by a hidden strip under the floor (law L5). It
-  // stands INSIDE THE CARRIAGE ARCH — standing x 0.121..0.399 against the
-  // aperture's 0.10..0.42, 0.30 tall under a 0.30 keystone — so the die-cut
+  // stands INSIDE THE CARRIAGE ARCH — standing x 0.006..0.284 against the
+  // aperture's -0.005..0.295, 0.30 tall under a 0.30 keystone — so the die-cut
   // hole has real moving geometry in it, and the gallery deck at y 0.36 hangs
   // directly over the family's heads.
+  //   THE x MOVED, and the whole x triple moved with it. Rounds 1-3 declared
+  // this rank at hingeX 0.26 to match an arch the comments said was at +0.26
+  // while the PAINT cut it at -0.05, so the family rose beside the hole instead
+  // of inside it. Arch and rank now meet at the one owned number,
+  // `aperture.centerX` = 0.145: hingeX 0.145, and anchor/slot shifted by the
+  // same -0.115 so the strip geometry is congruent, not re-tuned. 0.145 is also
+  // the FLOOR the fold-flat law leaves: at hingeX 0.1386 the closed die's own
+  // hinge chord touches the gutter (see the aperture note above).
+  // Every z, the -30 skew and the [36,90] travel are BIT-IDENTICAL — the
+  // z-clearance and visibility findings below are x-independent, and the R
+  // gates re-measure at the new x (travel is unchanged: the skew, not the
+  // station, is what the camera reads).
   //   hingeZ 0.37, not the 0.30 the first pass tried: the hall's FRONT CAP
   // bulges its crease fore to z1 + a*cos(beta/2) as the book leaves full open,
   // which at beta 165deg puts the cap at z 0.298 — a standing rank hinged at
@@ -354,7 +400,7 @@ const CH1_LAYERS: readonly SceneLayer[] = [
   // `driveFrom` is the delayed double action: this piece has no channel of its
   // own, it reads the dissolve's and remaps it through [0, 0.55], so the reader
   // pulling the brass tab raises the family first and flips the floor second.
-  { id: 'ch1-arrival-rank', kind: 'midground', role: 'figure', mech: 'stripflap', side: 'right', anchor: 0.22, anchorZ: 0.37, slot: 0.3, slotZ: 0.37, hingeX: 0.26, hingeZ: 0.37, hingeDeg: -30, width: 0.32, height: 0.3, restDeg: 36, travelDeg: [36, 90], driveFrom: { channel: 'ch1-arrival-floor', phase: [0, 0.55] } },
+  { id: 'ch1-arrival-rank', kind: 'midground', role: 'figure', mech: 'stripflap', side: 'right', anchor: 0.105, anchorZ: 0.37, slot: 0.185, slotZ: 0.37, hingeX: 0.145, hingeZ: 0.37, hingeDeg: -30, width: 0.32, height: 0.3, restDeg: 36, travelDeg: [36, 90], driveFrom: { channel: 'ch1-arrival-floor', phase: [0, 0.55] } },
   // PAYOFF TWO, phase 0.40-1.00 — THE COURTYARD. A page-flat venetian rack the
   // reader flips A->B: cold slate cobbles, empty, to lamplight pools, cast
   // shadows, wheel-tracks and a trail of brass keys leading to the arch. The

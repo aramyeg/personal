@@ -182,9 +182,12 @@ export function keepSlots(layer: SceneLayer & KeepStackGeom): Slot[] {
         // die-cut arch is, so the one surface the reader is meant to see through
         // the hole showed its two darkest margins (measured: the arch read as
         // near-black murk at rest). With the split the `-side` painting is drawn
-        // ONCE across the whole cap and its vanishing point (u 0.455) lands
-        // inside the aperture (plate u 0.311..0.599), as innPassage's own header
-        // note always assumed. Only the backbone (asset null) still tiles full.
+        // ONCE across the whole cap, so cap u IS plate u and the passage's
+        // vanishing axis lands inside the aperture by construction: both are
+        // derived from the SAME declared `aperture.centerX` (currently x +0.11,
+        // u 0.606, mouth u 0.452..0.760), which is the field the bench's D gate
+        // re-measures against the baked pixels. Only the backbone (asset null)
+        // still tiles full.
         uvs:
           asset !== null
             ? new Float32Array([u0, 0, u1, 0, u1, 1, u0, 1])

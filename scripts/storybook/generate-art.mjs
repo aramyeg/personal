@@ -16950,18 +16950,40 @@ function innGuestFacade(w, h, seed) {
 }
 
 // ---- `ch1-inn-hall-front` — THE DIE-CUT CARRIAGE ARCH ------------------------
-// The hall's facade plate (1.04 x 0.26 world = 4.0), covering its front cap
-// edge to edge. The arch is a TRUE ALPHA HOLE (mask), half-width 0.15 world and
-// apex 0.18 world, centred at u 0.455 — a little left of the spine, so the
-// opening is off-axis and the wall keeps an unequal shoulder either side.
+// The hall's facade plate, covering its front cap edge to edge. The arch is a
+// TRUE ALPHA HOLE (mask), and its three numbers ARE NOT THIS FILE'S TO CHOOSE.
+//
+// THE OWNER IS `components/labs/storybook/content.ts`, the `aperture` field on
+// ch1-inn's `hall` story (typed and documented in book/popup-keepstack.ts as
+// KeepStorySpec.aperture). This script cannot import TypeScript, so the values
+// are MIRRORED below — and because a mirror is a promise nobody keeps, the
+// bench `scripts/storybook/bench/e4s2-reach.mjs` re-measures the alpha centroid
+// of this baked plate out of the sprite atlas and fails if it has drifted from
+// the declaration by more than 0.02 world.
+//
+// It failed exactly that way for three rounds: content said the hole was at
+// world x +0.26, and this painter cut it at u 0.455 = x -0.0468. The figure
+// that is supposed to rise INSIDE the arch rose beside it, and every comment in
+// the codebase agreed with every other comment and not with the picture.
+//
 // Everything warm on this plate is light LEAKING OUT of that hole.
 function innHallFacade(w, h, seed) {
   const r = mulberry32(seed)
-  const PW = 1.04 // the plate's world width — the px/world scale for the arch
-  const ax = w * 0.455
-  const ahw = w * (0.15 / PW)
-  const aApex = h * (1 - 0.18 / 0.26)
-  const aSpring = h * 0.63
+  // ---- MIRROR OF content.ts (ch1-inn / hall). DO NOT EDIT HERE ALONE. --------
+  const PW = 1.04 // hall.plate.width  — the plate spans world x -PW/2..+PW/2
+  const PH = 0.36 // hall.plate.height — art v 0 is the plate TOP, 1 its base
+  const APERTURE = { centerX: 0.145, halfW: 0.15, apexH: 0.25 }
+  // ---------------------------------------------------------------------------
+  /** world x -> art u across the plate. */
+  const U = (x) => 0.5 + x / PW
+  const ax = w * U(APERTURE.centerX)
+  const ahw = w * (APERTURE.halfW / PW)
+  const aApex = h * (1 - APERTURE.apexH / PH)
+  // The springline: where the straight jambs stop and the pointed head starts.
+  // Held at 45% of the MOUTH WIDTH below the crown, so the arch keeps the same
+  // carriage-arch proportion whatever width the declaration asks for (a fixed
+  // v like the old 0.63 turns into a spike the moment apexH changes).
+  const aSpring = h * (1 - (APERTURE.apexH - APERTURE.halfW * 0.9) / PH)
   const x0 = ax - ahw
   const x1 = ax + ahw
   const arch =
@@ -16991,9 +17013,16 @@ function innHallFacade(w, h, seed) {
     }
   }
   // --- heavy posts: FEWER and BIGGER than the guest storey's, so the two ------
-  //     facades read as different buildings stacked, not one wallpaper
+  //     facades read as different buildings stacked, not one wallpaper.
+  //     RE-LAID for the arch's move to x +0.145: the hole used to sit at u
+  //     0.311..0.599 and the timbering was parted around THAT. It now sits at
+  //     u 0.495..0.784, so the old right-hand group at 0.7 stood inside the
+  //     mouth and the whole left page below u 0.49 was bare plaster. Same
+  //     0.085 rhythm and the same seven posts, re-dealt five/two across the
+  //     new shoulders — the wide one is the left page now. The two right posts
+  //     are pushed out past the right bracket lantern at u 0.829.
   const post = Math.max(6, w * 0.011)
-  for (const u of [0.03, 0.115, 0.2, 0.7, 0.79, 0.88, 0.97]) {
+  for (const u of [0.03, 0.115, 0.2, 0.285, 0.37, 0.895, 0.97]) {
     s += `<rect x="${fx(w * u - post / 2)}" y="${fx(h * 0.1)}" width="${fx(post)}" height="${fx(PLINTH - h * 0.1)}" fill="${E4.timber}"/>`
     s += `<rect x="${fx(w * u + post * 0.32)}" y="${fx(h * 0.1)}" width="${fx(post * 0.18)}" height="${fx(PLINTH - h * 0.1)}" fill="${E4.timberLit}" opacity="0.5"/>`
   }
@@ -17007,7 +17036,10 @@ function innHallFacade(w, h, seed) {
   //     darker wall, ended up with MORE local contrast than the eleven windows
   //     that are supposed to own the spread. They are now smaller, deep amber,
   //     and carry no white core at all.
-  for (const [u, dim] of [[0.065, 0.75], [0.15, 0.82], [0.745, 0.72], [0.925, 0.85]]) {
+  //     ROUND 3: re-stationed with the posts. 0.745 fell inside the new mouth
+  //     (a lit window painted across a hole is just a hole), so three now sit
+  //     in the wide left bays and one in the single right bay. Still four.
+  for (const [u, dim] of [[0.0725, 0.75], [0.1575, 0.82], [0.3275, 0.72], [0.9325, 0.85]]) {
     s += e4Window(w * u - w * 0.014, h * 0.3, w * 0.028, h * 0.24, 'h2glowDim', { dim })
   }
 
@@ -17061,8 +17093,14 @@ function innHallFacade(w, h, seed) {
     s += `<ellipse cx="${fx(bx)}" cy="${fx(by + h * 0.085)}" rx="${fx(w * 0.0068)}" ry="${fx(h * 0.055)}" fill="${E4.paneCore}"/>`
   }
 
-  // --- the hanging inn sign, out on the right shoulder ------------------------
-  const sx = w * 0.83
+  // --- the hanging inn sign, out on the LEFT shoulder -------------------------
+  // It hung at u 0.83 when the right shoulder was the wide one. With the arch
+  // at x +0.11 the right shoulder is 0.24 of the plate and already carries the
+  // right bracket lantern at u 0.805 — the sign's own bracket arm reached into
+  // that lantern's halo. The left page is the open wall now, so the sign swings
+  // over there, near the gutter and above the WELCOME mat, where it also gives
+  // the vacated zone something to hang.
+  const sx = w * 0.24
   s += `<path d="M ${fx(sx - w * 0.055)} ${fx(h * 0.11)} L ${fx(sx + w * 0.012)} ${fx(h * 0.11)} L ${fx(sx + w * 0.012)} ${fx(h * 0.2)}" fill="none" stroke="${E4.ink}" stroke-width="4"/>`
   s += `<rect x="${fx(sx - w * 0.042)} " y="${fx(h * 0.2)}" width="${fx(w * 0.108)}" height="${fx(h * 0.36)}" fill="${E4.timber}" stroke="${E4.ink}" stroke-width="2.5"/>`
   s += `<rect x="${fx(sx - w * 0.035)}" y="${fx(h * 0.215)}" width="${fx(w * 0.094)}" height="${fx(h * 0.33)}" fill="${E4.stoneDim}"/>`
@@ -17093,14 +17131,22 @@ function innHallFacade(w, h, seed) {
 // behind the die-cut arch. Job two is the one that matters, and it comes with a
 // window this painting must be COMPOSED FOR, derived rather than eyeballed:
 //
-//   the plate's arch is alpha at plate u 0.455 +- 0.15/1.04 and plate v 0..0.18/0.26
-//   the cap carries this image across the same 1.04 x 0.26 world rect
-//   => only  u 0.311..0.599  x  y 0.308h..1.0h  is EVER seen through the hole.
+//   the arch is alpha at plate u = 0.5 + centerX/1.04 +- halfW/1.04 and at plate
+//     v (from the plate TOP) = 1 - apexH/0.36 .. 1
+//   the suppressed cap carries THIS image across the same 1.04 x 0.36 world rect
+//     with the same u-split (popup-keepstack-merged.tsx), so plate u IS cap u
+//   => with the shipped declaration (centerX 0.145, halfW 0.15, apexH 0.25) only
+//        u 0.495..0.784   x   y 0.306h..1.0h    is EVER seen through the hole.
 //
-// That is 295 x 288 px of a 1024 x 416 image — a near-square keyhole holding 29%
-// of the width. Round one ignored it: the passage was drawn at full-image scale,
-// so the far doorway alone (half-width 0.155w) over-filled the keyhole and the
-// arch read as one flat blob. Everything is now composed INSIDE the window, and
+// That is 295 x 289 px of a 1024 x 416 image — a near-square keyhole holding 29%
+// of the width, and IT MOVED IN ROUND 4: the window used to be u 0.311..0.599,
+// because the arch was cut at u 0.455 while content.ts declared it at world x
+// +0.26. Arch and figure now meet at centerX +0.145 and this painting is
+// re-aimed on AX below; every station in it is expressed against AX / YT / MHW,
+// so the composition follows the declaration instead of being re-eyeballed.
+// Round one ignored the window entirely: the passage was drawn at full-image
+// scale, so the far doorway alone (half-width 0.155w) over-filled the keyhole and
+// the arch read as one flat blob. Everything is composed INSIDE the window, and
 // everything outside it is dim boarded wall (what the two flank slivers show).
 //
 // The px grid is ANISOTROPIC on the cap: 1024px/1.04 world across vs 416px/0.36
@@ -17118,9 +17164,17 @@ function innPassage(w, h, seed) {
   /** px-per-world is 1.174x denser vertically: round things are drawn tall. */
   const ANISO = 1.174
   const ry = (rx) => rx * ANISO
-  const AX = w * 0.455 // the aperture's centre — the passage's vanishing axis
-  const MHW = w * 0.168 // mouth half-width, a hair wider than the hole (0.144w)
-  const YT = h * 0.2 // mouth head, a hair above the arch apex (0.308h)
+  // ---- MIRROR OF content.ts (ch1-inn / hall). DO NOT EDIT HERE ALONE. --------
+  // Same three numbers innHallFacade mirrors, same owner, same drift gate.
+  const PW = 1.04
+  const PH = 0.36
+  const APERTURE = { centerX: 0.145, halfW: 0.15, apexH: 0.25 }
+  // ---------------------------------------------------------------------------
+  const AX = w * (0.5 + APERTURE.centerX / PW) // the hole's axis = the vanishing axis
+  /** mouth half-width, ~14% wider than the hole so its jambs hide behind the plate */
+  const MHW = w * (APERTURE.halfW / PW) * 1.14
+  /** mouth head, a hair above the arch crown (which is at 1 - apexH/PH of h) */
+  const YT = h * (1 - APERTURE.apexH / PH) * 0.62
   const YB = h
   const VY = h * 0.655 // the vanishing height: floor visible, ceiling closing in
   const S = 0.3 // the far wall's share of the mouth

@@ -25,6 +25,10 @@
  *   C7 asymmetry             paired supports differ >= 15% in height or stages
  *   A  apex                  assembled inn crown, target 0.95..1.00, ceiling 1.2
  *   R  arrival rank travel   worst-vertex screen travel >= 12% of frame height
+ *   D  die-cut drift        the BAKED alpha hole in the generated hall plate,
+ *      measured out of the sprite atlas, agrees with the `aperture` declared in
+ *      content.ts. The one gate here that reads pixels — and the reason the
+ *      arch can never again be painted somewhere the content does not say.
  *
  * Run:  node scripts/storybook/bench/e4s2-reach.mjs      (from the worktree root)
  */
@@ -487,18 +491,143 @@ console.log('\n=== R  ARRIVAL RANK — what the reader can see move ===')
   gate('R', 'travel is monotone (no dead-zone doubling back)', worst / pathLen >= 0.9, `endpoint/path ratio ${(worst / pathLen).toFixed(3)} (1.0 = perfectly monotone)`)
   gate('R', 'hinge skew kept near 30deg', Math.abs(Math.abs(RANK.hingeDeg ?? 0) - 30) <= 4, `hingeDeg ${RANK.hingeDeg}`)
   gate('R', 'travel lower stop above the 32deg inversion crossing', (RANK.travelDeg?.[0] ?? 0) > 32, `travelDeg [${RANK.travelDeg}]  restDeg ${RANK.restDeg}`)
-  // does it stand INSIDE the arch?
+  // does it stand INSIDE the arch? DERIVED from the declaration — this gate
+  // used to restate the centre as a literal 0.26 while the paint cut at -0.05,
+  // which is exactly how the drift survived three rounds.
   const arch = INN.stories[0].aperture
-  const ARCH_CX = 0.26 // painter contract — see content.ts
   const up = cornersAt(hi)
   const xs = up.map((p) => p[0])
   const ys = up.map((p) => p[1])
   gate(
     'R',
     'standing rank sits inside the arch mouth',
-    Math.min(...xs) >= ARCH_CX - arch.halfW - 1e-9 && Math.max(...xs) <= ARCH_CX + arch.halfW + 1e-9,
-    `rank x ${n(Math.min(...xs), 3)}..${n(Math.max(...xs), 3)} vs arch ${n(ARCH_CX - arch.halfW, 3)}..${n(ARCH_CX + arch.halfW, 3)}; rank top y ${n(Math.max(...ys), 3)} vs keystone ${arch.apexH}`
+    Math.min(...xs) >= arch.centerX - arch.halfW - 1e-9 && Math.max(...xs) <= arch.centerX + arch.halfW + 1e-9,
+    `rank x ${n(Math.min(...xs), 3)}..${n(Math.max(...xs), 3)} vs arch ${n(arch.centerX - arch.halfW, 3)}..${n(arch.centerX + arch.halfW, 3)} (centerX ${arch.centerX})`
   )
+  // HOW TALL THE CROWN MAY BE — and why this is a floor, not a ceiling.
+  //
+  // The obvious rule ("the crown must clear the standing figure") is wrong on
+  // this spread, and finding out cost a bake. The balcony deck rides the hall
+  // lid at y 0.36 and cantilevers +z OVER the arch — that is C4's whole point —
+  // and the reading camera looks DOWN from y 1.85, so the deck's silhouette
+  // lies across the top of the wall behind it. Cut the crown at the rank's
+  // 0.30 standing height and the pointed head, the voussoir ring and the
+  // keystone are ALL behind the deck: the hole renders as a rectangular garage
+  // door (captured, align-*-arch.png round 1). The crown has to stay DOWN in
+  // the band the deck leaves, and the figure is simply allowed to be taller
+  // than it — the die stands 0.14 fore of the plate, so heads crossing the
+  // crown read as stepping THROUGH the arch, which is the event we want.
+  //
+  // The occluded band was calibrated against renders, not derived: a screen-
+  // space deck-quad test built here put the ceiling at 0.21, while the SHIPPED
+  // 0.247 crown is plainly visible in settle-passage-rest.png. The bench frame
+  // is not the renderer's frame (the book group carries its own hinge lift and
+  // stack pose), so that model is not trustworthy enough to gate on. What is
+  // gated is the floor: a mouth shorter than three-quarters of the figure is a
+  // letterbox, not a doorway.
+  gate(
+    'R',
+    'arch crown >= 75% of the standing figure (a doorway, not a letterbox)',
+    arch.apexH >= 0.75 * RANK.height - 1e-9,
+    `apexH ${arch.apexH} vs rank height ${RANK.height} (floor ${(0.75 * RANK.height).toFixed(3)})`
+  )
+  console.log(
+    `      info  the rank stands ${n(Math.max(...ys) - arch.apexH, 3)} PROUD of the crown at full pull, and 0.14 fore of it. At the reader's REST angle (${RANK.restDeg}deg) the heads are down at y ${n(RANK.height * Math.sin(rad(RANK.restDeg)), 3)}, well inside the mouth — the dwell pose is clean and only the fully pulled pose crosses the ring.`
+  )
+  console.log(
+    `      info  EYE-TEST, NOT GATED: the balcony deck hides the wall above roughly y 0.25 at the reading camera. Raising apexH past that buys a crown nobody sees. Re-shoot align-rest-arch.png before believing any increase.`
+  )
+}
+console.log(rows.splice(0).join('\n'))
+
+// ====================================== D — THE ART/DECLARATION DRIFT GATE
+// The three numbers above are only a contract if something re-measures the
+// BAKED PIXELS against them. This loads the generated hall plate out of the
+// sprite atlas the renderer actually samples, finds the centroid of its alpha
+// hole, converts plate u back to world x, and compares it to `centerX`.
+//
+// WHY IT EXISTS: rounds 1-3 declared the arch at x +0.26, commented it at
+// +0.26, gated it at +0.26 — and the painter cut it at -0.05. Everything
+// agreed with everything except the picture. Never again.
+console.log('\n=== D  DIE-CUT DRIFT (baked alpha vs the declaration) ===')
+{
+  const PLATE_ART = 'ch1-inn-hall-front' // KeepStack FACE_ART: `<id>-<key>-front`
+  const TOL = 0.02
+  const arch = INN.stories[0].aperture
+  const plate = INN.stories[0].plate
+  try {
+    const sharp = require_(path.join(ROOT, 'node_modules/sharp'))
+    const fs = await import('node:fs')
+    const atlas = JSON.parse(
+      fs.readFileSync(path.join(ROOT, 'public/labs/storybook/art/atlas.json'), 'utf8')
+    )
+    const sprite = atlas.sprites[PLATE_ART]
+    if (!sprite) throw new Error(`no sprite '${PLATE_ART}' in atlas.json`)
+    const page = atlas.pages[sprite.atlas]
+    // atlas.json rects are TEXTURE uv, v measured from the page BOTTOM
+    // (art-atlas.ts: three uploads with the default flipY) — so the pixel row
+    // of the sprite's TOP edge is (1 - v1) * page, not v0 * page. Reading it as
+    // v-down lands on a neighbouring sprite and measures the wrong art.
+    const [u0, v0, u1, v1] = sprite.rect
+    const left = Math.round(u0 * page)
+    const top = Math.round((1 - v1) * page)
+    const width = Math.round((u1 - u0) * page)
+    const height = Math.round((v1 - v0) * page)
+    const img = sharp(path.join(ROOT, `public/labs/storybook/art/${sprite.atlas}.webp`))
+    const { data } = await img
+      .extract({ left, top, width, height })
+      .ensureAlpha()
+      .raw()
+      .toBuffer({ resolveWithObject: true })
+    // Alpha-0 pixels ARE the hole (material.transparent + alphaTest 0.1, so the
+    // renderer's own cut is a <=25/255 threshold; use the same one).
+    let sum = 0
+    let cnt = 0
+    let uMin = 1
+    let uMax = 0
+    let vTop = 1
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        if (data[(y * width + x) * 4 + 3] > 25) continue
+        const u = (x + 0.5) / width
+        sum += u
+        cnt += 1
+        if (u < uMin) uMin = u
+        if (u > uMax) uMax = u
+        const v = (y + 0.5) / height
+        if (v < vTop) vTop = v
+      }
+    }
+    const share = cnt / (width * height)
+    gate('D', 'the plate actually carries an alpha hole', cnt > 0 && share > 0.005, `${cnt} cut px = ${(share * 100).toFixed(2)}% of the ${width}x${height} sprite`)
+    if (cnt > 0) {
+      const uc = sum / cnt
+      const cx = (uc - 0.5) * plate.width
+      const halfW = ((uMax - uMin) / 2) * plate.width
+      // art v runs DOWN from the plate top; apexH runs UP from its base edge
+      const apexH = (1 - vTop) * plate.height
+      gate(
+        'D',
+        `baked hole centroid matches aperture.centerX +-${TOL}`,
+        Math.abs(cx - arch.centerX) <= TOL,
+        `baked u ${uc.toFixed(4)} -> world x ${n(cx, 4)} vs declared ${n(arch.centerX, 4)} (drift ${n(cx - arch.centerX, 4)})`
+      )
+      gate(
+        'D',
+        `baked hole half-width matches aperture.halfW +-${TOL}`,
+        Math.abs(halfW - arch.halfW) <= TOL,
+        `baked ${n(halfW, 4)} vs declared ${n(arch.halfW, 4)} (mouth x ${n((uMin - 0.5) * plate.width, 3)}..${n((uMax - 0.5) * plate.width, 3)})`
+      )
+      gate(
+        'D',
+        `baked crown height matches aperture.apexH +-${TOL}`,
+        Math.abs(apexH - arch.apexH) <= TOL,
+        `baked ${n(apexH, 4)} vs declared ${n(arch.apexH, 4)}`
+      )
+    }
+  } catch (err) {
+    gate('D', 'baked hole measurable', false, `could not measure ${PLATE_ART}: ${err.message}`)
+  }
 }
 console.log(rows.splice(0).join('\n'))
 
