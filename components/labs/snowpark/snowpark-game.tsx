@@ -420,7 +420,7 @@ function Recap({ rider, onReplay }: { rider: RiderState; onReplay: () => void })
         <div className="mt-12 flex gap-4">
           <PillButton onClick={onReplay}>run it back</PillButton>
           <Link
-            href="/labs"
+            href="/"
             className="rounded-full border px-5 py-2 font-mono text-sm lowercase transition-colors"
             style={{ borderColor: palette.ink, color: palette.ink }}
           >
@@ -453,7 +453,7 @@ function SkillsSheet({
         <div className="mt-12 flex gap-4">
           <PillButton onClick={onStart}>{startLabel}</PillButton>
           <Link
-            href="/labs"
+            href="/"
             className="rounded-full border px-5 py-2 font-mono text-sm lowercase transition-colors"
             style={{ borderColor: palette.ink, color: palette.ink }}
           >

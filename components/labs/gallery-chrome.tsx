@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation'
 
 /**
  * Shared lab shell: a quiet, style-neutral way back to the gallery.
- * Fixed "← Gallery" button top-left + Esc key → /labs.
+ * Fixed "← Gallery" button top-left + Esc key → /.
  */
 export function GalleryChrome({ children }: { children: ReactNode }) {
   const router = useRouter()
@@ -14,7 +14,7 @@ export function GalleryChrome({ children }: { children: ReactNode }) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.defaultPrevented) return
-      if (e.key === 'Escape') router.push('/labs')
+      if (e.key === 'Escape') router.push('/')
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
@@ -23,7 +23,7 @@ export function GalleryChrome({ children }: { children: ReactNode }) {
   return (
     <>
       <Link
-        href="/labs"
+        href="/"
         className="fixed top-4 left-4 z-50 rounded-full bg-black/40 px-3 py-1.5 text-xs font-mono uppercase tracking-widest text-white/80 backdrop-blur-sm transition-colors hover:bg-black/60 hover:text-white"
       >
         ← Gallery
