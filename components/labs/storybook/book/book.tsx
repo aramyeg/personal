@@ -45,7 +45,12 @@ import { CoverDecals } from './cover-decals'
 import { useSpreadPrints } from './use-page-print'
 import { plyLift } from './lift-ladder'
 import { useGuardedDispose } from './material-pool'
-import { drainProgramLinks, drainProgramLinksWhenIdle, runWhenRested } from './warm-programs'
+import {
+  createSceneWarm,
+  drainProgramLinks,
+  drainProgramLinksWhenIdle,
+  type SceneWarm,
+} from './warm-programs'
 
 export const BOOK = {
   coverW: 1.22,
@@ -148,6 +153,9 @@ const SHEET_BACK_SHADE = new THREE.Color('#b9ad99')
 // the color converges to white — completes the pixel-identical hand-off.
 const SHEET_BACK_ROUGH_FLAT = 0.9
 const SHEET_BACK_ROUGH_AIR = 0.97
+// Ahead of use-turn-driver.ts's DRIVER_PRIORITY (-1), so a warm slice runs
+// before anything poses the scene and long before the frame's real render.
+const WARM_PRIORITY = -3
 
 export function makeCanvasTexture(source: HTMLCanvasElement): THREE.CanvasTexture {
   const texture = new THREE.CanvasTexture(source)
@@ -266,10 +274,11 @@ export function Book() {
   // Boot sentinel counters (see the markBooted block in the useFrame below).
   const bootFrames = useRef(0)
   const bootElapsedMs = useRef(0)
-  // False until the load-time shader warm pass has run (see the compile/drain
-  // effect below): the first pass is synchronous behind the loader veil, every
-  // later one waits for an idle slice with no turn in flight.
-  const warmedOnce = useRef(false)
+  // The sliced scene warm for the current spread window (warm-programs.ts).
+  // Driven from the frame loop below, NOT from an effect: its canvas-variant
+  // pass really does paint the canvas, and only a later render in the same rAF
+  // keeps the reader from seeing it.
+  const warmRef = useRef<SceneWarm | null>(null)
 
   const leatherMaterial = useMemo(
     () => new THREE.MeshStandardMaterial({ map: leather, roughness: 0.55 }),
@@ -613,23 +622,19 @@ export function Book() {
   // used to run synchronously in the commit effect — a cluster of ~150ms
   // frames landing on the page's landing thump.
   useEffect(() => {
-    const DELAY_MS = 350
-    const isBusy = () => useStorybookStore.getState().turning !== null
-    const cancels: (() => void)[] = []
-    const pass = () => {
-      gl.compile(scene, camera)
-      cancels.push(drainProgramLinksWhenIdle(gl, isBusy))
-    }
-    if (warmedOnce.current) {
-      cancels.push(runWhenRested(pass, isBusy))
-    } else {
-      warmedOnce.current = true
-      pass()
-    }
-    const settle = setTimeout(() => cancels.push(runWhenRested(pass, isBusy)), DELAY_MS)
+    const warm = createSceneWarm(gl, scene, camera)
+    warmRef.current = warm
+    // The drain is now only a safety net — a real warm render calls
+    // getUniforms itself, so it absorbs its own link waits. It still catches
+    // programs born outside the warm (a late texture changing a cache key).
+    const cancelDrain = drainProgramLinksWhenIdle(
+      gl,
+      () => useStorybookStore.getState().turning !== null
+    )
     return () => {
-      clearTimeout(settle)
-      for (const cancel of cancels) cancel()
+      cancelDrain()
+      warm.dispose()
+      if (warmRef.current === warm) warmRef.current = null
     }
   }, [gl, scene, camera, popupSpreadIndices])
 
@@ -650,6 +655,17 @@ export function Book() {
     }, 900)
     return () => window.clearInterval(id)
   }, [gl])
+
+  // ONE WARM SLICE PER FRAME, ahead of everything (priority -3, before even the
+  // turn driver). The slice's canvas pass paints the canvas for real, so the
+  // frame's own render — r3f's at the end of the loop, or the grade composer's
+  // at priority 1 — has to come after it and overwrite it. Rest-gated inside
+  // `step`, so a slice can never land in a turn.
+  useFrame(() => {
+    const warm = warmRef.current
+    if (warm === null) return
+    if (!warm.step(() => useStorybookStore.getState().turning !== null)) warmRef.current = null
+  }, WARM_PRIORITY)
 
   useFrame((_, delta) => {
     // Boot detection, on the same clock as everything else the eye sees:

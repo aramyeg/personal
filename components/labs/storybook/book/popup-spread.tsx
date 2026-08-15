@@ -852,4 +852,28 @@ function PopupSpreadInner({ layers, accents, spreadIndex, role, frame, committed
  * `spreadIndex`/`role` are primitives that change only on a real turn — so
  * the default shallow compare is exactly the right gate.
  */
-export const PopupSpread = memo(PopupSpreadInner)
+export const PopupSpread = memo(PopupSpreadInner, (prev, next) => {
+  if (
+    prev.layers !== next.layers ||
+    prev.accents !== next.accents ||
+    prev.spreadIndex !== next.spreadIndex ||
+    prev.frame !== next.frame ||
+    prev.committedSpread !== next.committedSpread
+  ) {
+    return false
+  }
+  // `role` changes on EVERY spread at both ends of every turn
+  // ('current'->'outgoing', 'hidden'->'incoming', ...), and a default shallow
+  // compare therefore re-rendered all three mounted spreads' whole layer trees
+  // four times per turn — measured as ~590ms of React work on the frame the
+  // reader clicks (4x throttle). Almost none of it was needed: below the
+  // diorama branch the only thing this component does with `role` is
+  // `visible={role !== 'hidden'}`, and every POSE consumer re-derives its own
+  // role per frame from `committedSpread` (liveSpreadRole). So a spread only
+  // has to re-render when its SHOWN-ness actually flips.
+  // Spread 2 is the exception, mirroring the hardcoded branch above: the
+  // diorama consumes the full role string to decide whether the grade owns
+  // presentation, so it still sees every transition.
+  if (next.spreadIndex === 2) return prev.role === next.role
+  return (prev.role === 'hidden') === (next.role === 'hidden')
+})

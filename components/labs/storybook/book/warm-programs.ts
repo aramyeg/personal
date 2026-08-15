@@ -51,7 +51,7 @@
  * instead of removing it.
  */
 
-import type * as THREE from 'three'
+import * as THREE from 'three'
 
 /** Programs whose link has already been absorbed. Weak so a program three
  *  releases (its material's cache key changed) can still be collected. */
@@ -183,5 +183,197 @@ export function drainProgramLinksWhenIdle(
   return () => {
     cancelled = true
     cancelSlice()
+  }
+}
+
+// ---------------------------------------------------------------------------
+// WARM BY RENDERING (E5, round 3). `gl.compile()` is gone from the book's warm
+// path, because it cannot get the cache key right for this scene.
+//
+// A material's program is keyed by `WebGLPrograms.getParameters` — and four of
+// those fields are properties of the RENDER, not of the material:
+//
+//   outputColorSpace   (WebGLPrograms.js:212) SRGB when drawing to the canvas,
+//                      working space when drawing into ANY render target
+//   numClippingPlanes  (:354) set by clipping.setState() DURING a render, so
+//                      compile() bakes whatever the previous frame left behind
+//   shadowMapType      (:360) and shadowMapEnabled
+//   toneMapping        (:362) forced to None inside a render target
+//
+// `compile()` sets none of them. It walks the graph and asks for programs with
+// stale state, so every program it built was an orphan and the real draw
+// compiled a second one — measured: 84 program births during four turns, 77 of
+// them shaders never emitted at load.
+//
+// The outputColorSpace field also explains why arriving at chapter 1 was the
+// worst turn in the book by a wide margin. The grade's EffectComposer mounts
+// with that spread, and from then on the WHOLE scene draws into a render
+// target instead of the canvas — so every material the reader can see flips
+// its key at once and recompiles mid-turn.
+//
+// A real render sets all four correctly, because it is the thing that defines
+// them. So the warm pass renders the scene FOR REAL, twice: once to the canvas
+// (the SRGB variant every non-chapter-1 spread uses) and once into a tiny
+// render target (the working-space variant the composer path uses). Hidden
+// pieces are unhidden for the duration, which is what gets a spread's pop-ups —
+// and, through the shadow pass, their customDepthMaterials — compiled before
+// the turn that reveals them.
+//
+// It MUST be driven from inside the frame loop (book.tsx subscribes at a very
+// negative priority): the canvas-variant pass genuinely paints the canvas, and
+// only a later render in the SAME rAF — r3f's own, or the composer's at
+// priority 1 — guarantees the reader never sees it.
+// ---------------------------------------------------------------------------
+
+/** The off-screen variant only has to EXIST; nothing samples it. 8px keeps the
+ *  fragment cost of a whole extra scene pass at nothing. */
+const WARM_TARGET_PX = 8
+
+/** Hidden roots per slice. A warm pass is two full scene renders, and every one
+ *  of those re-derives each material's cache key in JS (`getParameters` +
+ *  `getProgramCacheKey`) — measured at 370-460ms per window change when the
+ *  warm ran one root per frame for a hundred frames. Batching amortises the
+ *  fixed per-render cost; the variable cost is the new programs in the batch.
+ *
+ *  There is a second, sharper reason to batch hard. The canvas-variant pass
+ *  flips `outputColorSpace` away from whatever the live path is using, and
+ *  three's `setProgram` then re-derives EVERY material's cache key on the next
+ *  real render (`materialProperties.outputColorSpace !== colorSpace`). While
+ *  the warm is running it therefore taxes each frame; the fix is to be running
+ *  for as few frames as possible, not to nibble. */
+const ROOTS_PER_SLICE = 40
+
+/**
+ * Roots already warmed, and whether the visible set has been warmed, FOR THE
+ * SESSION — not per spread window.
+ *
+ * Without this the warm restarted on every window change, i.e. on every turn
+ * commit, re-rendering the whole scene twice per frame for a hundred frames to
+ * re-warm pieces that were already warm. That churn was the entire remaining
+ * landing-cluster cost once the real compiles were gone. A piece's program does
+ * not go cold, so warming it twice buys nothing.
+ */
+const warmedRoots = new WeakSet<THREE.Object3D>()
+let visibleSetWarmed = false
+
+/** Topmost hidden objects, minus any branch containing a light. Unhiding a
+ *  light would change the scene's light count, which is itself part of every
+ *  program's key — the warm would then compile a set of programs no real frame
+ *  ever asks for, which is the exact failure this whole module exists to undo. */
+function hiddenWarmRoots(scene: THREE.Object3D): THREE.Object3D[] {
+  const lightBranch = new Set<THREE.Object3D>()
+  scene.traverse((object) => {
+    if ((object as THREE.Light).isLight !== true) return
+    for (let node: THREE.Object3D | null = object; node; node = node.parent) lightBranch.add(node)
+  })
+  const roots: THREE.Object3D[] = []
+  // Descend THROUGH hidden nodes, not just to them. A hidden spread group has
+  // hidden cutout groups inside it, each flipped independently by its own
+  // frame callback — unhiding only the outermost one leaves every piece still
+  // invisible and therefore still uncompiled, which is the shape of bug this
+  // pass exists to kill. `unhideChain` below re-shows a node's hidden
+  // ancestors with it so a nested pick actually renders.
+  const walk = (object: THREE.Object3D): void => {
+    if (object.visible === false) {
+      // `lightBranch` holds every light AND every ancestor of one, so it is
+      // only ever a veto on UNHIDING — never on traversal. (Testing it before
+      // the visible check aborted at the scene root, which is an ancestor of
+      // every light: the load warm then collected nothing at all.)
+      if (lightBranch.has(object)) return
+      if (!warmedRoots.has(object)) roots.push(object)
+    }
+    for (const child of object.children) walk(child)
+  }
+  walk(scene)
+  return roots
+}
+
+/** Every hidden node that must be shown for `roots` to actually draw: the roots
+ *  themselves plus their hidden ancestors, de-duplicated. */
+function unhideChain(roots: readonly THREE.Object3D[]): THREE.Object3D[] {
+  const chain = new Set<THREE.Object3D>()
+  for (const root of roots) {
+    for (let node: THREE.Object3D | null = root; node; node = node.parent) {
+      if (node.visible === false) chain.add(node)
+    }
+  }
+  return [...chain]
+}
+
+export type SceneWarm = {
+  /** Run one slice. Returns true while there is more to do. */
+  step: (isBusy: () => boolean) => boolean
+  dispose: () => void
+}
+
+/**
+ * A sliced scene warm. Slice 0 covers everything already on screen (its
+ * off-screen variant is the expensive one — that is the composer flip, paid
+ * once, at load, behind the veil). Every later slice unhides ONE hidden root,
+ * so its cost is bounded by that one piece's materials.
+ */
+export function createSceneWarm(
+  gl: THREE.WebGLRenderer,
+  scene: THREE.Scene,
+  camera: THREE.Camera
+): SceneWarm {
+  const target = new THREE.WebGLRenderTarget(WARM_TARGET_PX, WARM_TARGET_PX)
+  let queue: THREE.Object3D[] | null = null
+  let done = false
+
+  const pass = (picks: readonly THREE.Object3D[]): void => {
+    const roots = unhideChain(picks)
+    for (const root of roots) root.visible = true
+    const previous = gl.getRenderTarget()
+    try {
+      // Canvas variant (outputColorSpace = SRGB). Overwritten later this frame.
+      gl.setRenderTarget(null)
+      gl.render(scene, camera)
+      // Render-target variant (working space) — the composer path's key.
+      gl.setRenderTarget(target)
+      gl.render(scene, camera)
+    } catch {
+      // A failed warm is only a lost head start; never take the frame loop down.
+    } finally {
+      gl.setRenderTarget(previous)
+      for (const root of roots) root.visible = false
+    }
+  }
+
+  return {
+    step: (isBusy) => {
+      if (done) return false
+      // Never warm into a live turn: each new program costs a blocking
+      // round trip, and that is precisely the frame we are protecting.
+      if (isBusy()) return true
+      if (queue === null) {
+        // The visible set's off-screen variant — the composer flip, paid once.
+        if (!visibleSetWarmed) {
+          visibleSetWarmed = true
+          pass([])
+        }
+        queue = hiddenWarmRoots(scene)
+        return true
+      }
+      const batch: THREE.Object3D[] = []
+      while (batch.length < ROOTS_PER_SLICE) {
+        const root = queue.shift()
+        if (root === undefined) break
+        warmedRoots.add(root)
+        // A root can be detached or re-shown between planning and its slice.
+        if (root.parent !== null && root.visible === false) batch.push(root)
+      }
+      if (batch.length === 0) {
+        done = true
+        target.dispose()
+        return false
+      }
+      pass(batch)
+      return true
+    },
+    dispose: () => {
+      done = true
+      target.dispose()
+    },
   }
 }
