@@ -17,6 +17,9 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': path.resolve(dirname, './'),
+      // Outside Next's build (which sets the `react-server` export condition),
+      // `server-only` unconditionally throws. Point tests at its no-op export.
+      'server-only': path.resolve(dirname, 'node_modules/server-only/empty.js'),
     },
   },
   test: {

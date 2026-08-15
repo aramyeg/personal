@@ -30,20 +30,22 @@ export type LabEntry = {
 export const labs: LabEntry[] = [
   {
     slug: 'main',
-    title: 'Terracotta',
+    title: 'Classic Claude',
     date: '2026-07-08',
     thesis:
-      'The daily driver — warm terracotta and cream, pixel avatar, Bricolage Grotesque. The control every experiment is measured against.',
+      'Standard AI with a twist — warm terracotta and cream, pixel avatar, Bricolage Grotesque. The control every experiment is measured against.',
     status: 'live',
-    href: '/',
+    href: '/classic-claude',
   },
   {
-    slug: 'ps1',
-    title: 'PS1 / Y2K',
-    date: '2026-07-08',
+    slug: 'memory-card',
+    title: 'Memory Card',
+    date: '2026-07-10',
     thesis:
-      'PS1-era software rendering — flat shading, ordered dithering, vertex snap at 384px — on a Y2K grid world. Projects become memory-card saves.',
-    status: 'live',
+      'The PS1 memory-card manager rebuilt as a character-select screen — pick a save from the spec-sheet index and the figure re-dresses into that slot’s fit as the room re-lights in its accent. No pixelation, all nostalgia.',
+    status: 'attic',
+    retrospective:
+      'Two builds, one lesson. v1: conventional sections around a spinning card fan — "generic sloppy layout." v2: a split-hero character select — six outfits painted straight onto the body the way PS1 games did it, a real boot moment, ink and grain. The screen learned to read designed; the characters never did — "the models look really bad… the geometry is weak." You can script a render pipeline; you can’t script a character artist. Retired here, still playable, as evidence.',
   },
   {
     slug: 'snowpark',
@@ -69,6 +71,14 @@ export const labs: LabEntry[] = [
     date: '2026-07-10',
     thesis:
       'The portfolio as a fantasy pop-up book — six kingdoms, one hero, paper dragons; every page turn a small theatre.',
+    status: 'live',
+  },
+  {
+    slug: 'curator',
+    title: 'Curator',
+    date: '2026-07-10',
+    thesis:
+      'The portfolio as enterprise SaaS — a navy-and-white operations console where the museum itself is the managed asset. Every ritual played straight; the pagination paginates six rows.',
     status: 'live',
   },
 ]
