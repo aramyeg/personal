@@ -17500,9 +17500,62 @@ function innSpireSail(w, h, seed, k) {
 // not the same building at two scales, they are two buildings.
 //
 // VALUE (contract §4, ladder L2): both wings sit a full step under the guest
-// facade and desaturated — E4.wing/wingLit against the facade's plaster — and
+// facade and desaturated — WG.wing/wingLit against the facade's plaster — and
 // their windows are painted `dim`, so nothing out here competes with the eleven
 // lit panes that are supposed to own the frame.
+
+/**
+ * THE WINGS' OWN PIGMENT — the shared L2 tones pulled ~10% toward the inn's
+ * warm cream (E4R2-1: the first bake read cooler and greyer than the facade it
+ * stands beside).
+ *
+ * WHY THE WARM IS CHROMA AND NOT A LERP TOWARD THE PLASTER. Measured, E4.wing
+ * and E4.plaster are already the SAME pigment at two values — hue 39.0 vs 40.3
+ * deg, HSV saturation 0.296 vs 0.291. Mixing the wing 10% toward the plaster
+ * therefore moves nothing but luminance (122 -> 130), which is not "warmer", it
+ * is "lighter", and 130 is exactly the L3 hall's luma — the ladder would
+ * collapse into itself for no colour at all.
+ *
+ * So the warm comes from the LAMP: E4.lamp mixed into each tone, then luminance
+ * renormalised to +4% so the step survives by construction — the wall field
+ * lands at luma ~128, still under the L3 hall's 130 and still a full step under
+ * the facade's 200. Timber, the roof and every glow are deliberately NOT in this
+ * table: the brief's warm is for the plaster and the plinth stone, and pushing
+ * the darks with them would just re-flatten the contrast the value step buys.
+ *
+ * THE MIX IS 0.15 AND THE BRIEF SAID 10%, because the two are measured in
+ * different places. At t = 0.10 the pigment moved as asked but the SHIPPED
+ * PIXELS did not: sampled on the rest capture, the wing walls went R-B 40.3 ->
+ * 43.0, a 6.7% warm shift, because a wing wall on screen is plaster diluted by
+ * timber, by the outboard ink fall and by its own shadow. t = 0.15 lands the
+ * delivered shift at 8.5% (R-B 40.3 -> 43.7 left, 33.6 -> 36.5 right) for 1.8%
+ * of luminance, which is the number the ruling was actually about. Sampled on
+ * the same capture the facade does not move at all, and the wings' chroma still
+ * stops well short of it: 0.358 against 0.45.
+ */
+function wgWarm(hex, t = 0.15, lift = 0.04) {
+  const ch = (c, i) => parseInt(c.slice(1 + i * 2, 3 + i * 2), 16)
+  const lum = (v) => 0.2126 * v[0] + 0.7152 * v[1] + 0.0722 * v[2]
+  const src = [0, 1, 2].map((i) => ch(hex, i))
+  const to = [0, 1, 2].map((i) => ch(E4.lamp, i))
+  const mixed = src.map((c, i) => c + (to[i] - c) * t)
+  const k = (lum(src) * (1 + lift)) / (lum(mixed) || 1)
+  return (
+    '#' +
+    mixed
+      .map((c) => Math.round(Math.min(255, Math.max(0, c * k))).toString(16).padStart(2, '0'))
+      .join('')
+  )
+}
+const WG = {
+  wing: wgWarm(E4.wing), // #8f7e5e
+  wingLit: wgWarm(E4.wingLit), // #a99574
+  wingDim: wgWarm(E4.wingDim), // #61533e
+  stone: wgWarm(E4.stone), // #917b57
+  stoneLit: wgWarm(E4.stoneLit), // #cbb080
+  stoneDim: wgWarm(E4.stoneDim), // #615037
+}
+
 function innYardWing({ w, h, seed, storeys, spans, variant }) {
   const X = (u) => u * w
   const Y = (v) => (1 - v) * h
@@ -17550,7 +17603,7 @@ function innYardWing({ w, h, seed, storeys, spans, variant }) {
 
   const cut = `wg${variant}`
   let s = `<g clip-path="url(#${cut})">`
-  s += `<rect width="${w}" height="${h}" fill="${E4.wingDim}"/>`
+  s += `<rect width="${w}" height="${h}" fill="${WG.wingDim}"/>`
 
   // --- THE WALLS: dark timber framing over muted plaster, storey by storey. ---
   for (let k = 0; k < nS - 1; k++) {
@@ -17559,7 +17612,7 @@ function innYardWing({ w, h, seed, storeys, spans, variant }) {
     const yB = Y(v0)
     const bw = X(uOut(v0) - uIn(v0))
     // plaster panel + the lamp wash off the inn, which lives inboard (u -> 0)
-    s += `<rect x="0" y="${fx(yT)}" width="${w}" height="${fx(yB - yT)}" fill="${E4.wing}"/>`
+    s += `<rect x="0" y="${fx(yT)}" width="${w}" height="${fx(yB - yT)}" fill="${WG.wing}"/>`
     s += `<rect x="0" y="${fx(yT)}" width="${w}" height="${fx(yB - yT)}" fill="url(#wgWash)"/>`
     // the posts: a key-dark stud every bay, a mid rail, and one raking brace per
     // bay — the half-timbering that ties these outbuildings to the inn's facade
@@ -17580,7 +17633,7 @@ function innYardWing({ w, h, seed, storeys, spans, variant }) {
     }
     // the FOLD, painted as the floor band it is: a jettied beam with a lit top
     s += `<rect x="0" y="${fx(yT)}" width="${w}" height="${fx(Math.max(4, h * 0.014))}" fill="${E4.timber}"/>`
-    s += `<rect x="0" y="${fx(yT)}" width="${w}" height="${fx(Math.max(2, h * 0.005))}" fill="${E4.wingLit}" opacity="0.7"/>`
+    s += `<rect x="0" y="${fx(yT)}" width="${w}" height="${fx(Math.max(2, h * 0.005))}" fill="${WG.wingLit}" opacity="0.7"/>`
     s += `<rect x="0" y="${fx(yT + Math.max(4, h * 0.014))}" width="${w}" height="${fx(Math.max(3, h * 0.01))}" fill="${E4.ink}" opacity="0.42"/>`
     // openings — DIM, so the guest facade keeps the frame
     if (gable && k === 0) {
@@ -17626,11 +17679,11 @@ function innYardWing({ w, h, seed, storeys, spans, variant }) {
     }
     // the eaves board and its cast onto the wall below — the shadow is what makes
     // a painted roof read as a plane standing off the facade
-    s += `<rect x="0" y="${fx(yB - Math.max(4, h * 0.012))}" width="${w}" height="${fx(Math.max(4, h * 0.012))}" fill="${E4.wingLit}" opacity="0.75"/>`
+    s += `<rect x="0" y="${fx(yB - Math.max(4, h * 0.012))}" width="${w}" height="${fx(Math.max(4, h * 0.012))}" fill="${WG.wingLit}" opacity="0.75"/>`
     s += `<rect x="0" y="${fx(yB)}" width="${w}" height="${fx(Math.max(5, h * 0.018))}" fill="${E4.ink}" opacity="0.55"/>`
     if (gable) {
       // the ridge line and a hay-loft door under it, the stable's own tell
-      s += `<rect x="${fx(X(uAt(0.99, 0.36)))}" y="${fx(Y(0.995))}" width="${fx(X(uAt(0.99, 0.54) - uAt(0.99, 0.36)))}" height="${fx(Math.max(3, h * 0.01))}" fill="${E4.wingLit}" opacity="0.8"/>`
+      s += `<rect x="${fx(X(uAt(0.99, 0.36)))}" y="${fx(Y(0.995))}" width="${fx(X(uAt(0.99, 0.54) - uAt(0.99, 0.36)))}" height="${fx(Math.max(3, h * 0.01))}" fill="${WG.wingLit}" opacity="0.8"/>`
       const lx = X(uAt(0.82, 0.3))
       const lw = X(uAt(0.82, 0.44) - uAt(0.82, 0.3))
       s += `<rect x="${fx(lx)}" y="${fx(Y(0.86))}" width="${fx(lw)}" height="${fx(Y(0.76) - Y(0.86))}" fill="${E4.ink}"/>`
@@ -17639,10 +17692,10 @@ function innYardWing({ w, h, seed, storeys, spans, variant }) {
     } else {
       // the cowl's own lead, so the cut vent is never raw shingle
       s += `<rect x="${fx(X(uAt(0.976, 0.2)))}" y="${fx(Y(0.978))}" width="${fx(X(uAt(0.976, 0.5) - uAt(0.976, 0.2)))}" height="${fx(Y(0.9) - Y(0.978))}" fill="${E4.roofDim}"/>`
-      s += `<rect x="${fx(X(uAt(0.976, 0.2)))}" y="${fx(Y(0.978))}" width="${fx(X(uAt(0.976, 0.5) - uAt(0.976, 0.2)))}" height="${fx(Math.max(3, h * 0.008))}" fill="${E4.wingLit}" opacity="0.85"/>`
+      s += `<rect x="${fx(X(uAt(0.976, 0.2)))}" y="${fx(Y(0.978))}" width="${fx(X(uAt(0.976, 0.5) - uAt(0.976, 0.2)))}" height="${fx(Math.max(3, h * 0.008))}" fill="${WG.wingLit}" opacity="0.85"/>`
       // steam off the copper, the one thing that says BREWHOUSE from across the yard
       for (const [su, sv, sr] of [[0.3, 0.9, 0.055], [0.36, 0.95, 0.04]]) {
-        s += `<ellipse cx="${fx(X(uAt(sv, su)))}" cy="${fx(Y(sv))}" rx="${fx(w * sr)}" ry="${fx(h * sr * 0.6)}" fill="${E4.wingLit}" opacity="0.16"/>`
+        s += `<ellipse cx="${fx(X(uAt(sv, su)))}" cy="${fx(Y(sv))}" rx="${fx(w * sr)}" ry="${fx(h * sr * 0.6)}" fill="${WG.wingLit}" opacity="0.16"/>`
       }
     }
   }
@@ -17651,13 +17704,13 @@ function innYardWing({ w, h, seed, storeys, spans, variant }) {
   {
     const yB = Y(0)
     const yT = Y(0.1)
-    s += `<rect x="0" y="${fx(yT)}" width="${w}" height="${fx(yB - yT)}" fill="${E4.stoneDim}"/>`
+    s += `<rect x="0" y="${fx(yT)}" width="${w}" height="${fx(yB - yT)}" fill="${WG.stoneDim}"/>`
     for (let i = 0; i < 26; i++) {
       const x = rr(r, 0, w)
       const y = rr(r, yT + 4, yB - 4)
-      s += `<ellipse cx="${fx(x)}" cy="${fx(y)}" rx="${fx(rr(r, w * 0.018, w * 0.04))}" ry="${fx(rr(r, h * 0.008, h * 0.016))}" fill="${rEdge() > 0.5 ? E4.stone : E4.stoneDim}" stroke="${E4.ink}" stroke-width="1.3" stroke-opacity="0.45"/>`
+      s += `<ellipse cx="${fx(x)}" cy="${fx(y)}" rx="${fx(rr(r, w * 0.018, w * 0.04))}" ry="${fx(rr(r, h * 0.008, h * 0.016))}" fill="${rEdge() > 0.5 ? WG.stone : WG.stoneDim}" stroke="${E4.ink}" stroke-width="1.3" stroke-opacity="0.45"/>`
     }
-    s += `<rect x="0" y="${fx(yT)}" width="${w}" height="${fx(Math.max(3, h * 0.008))}" fill="${E4.stoneLit}" opacity="0.55"/>`
+    s += `<rect x="0" y="${fx(yT)}" width="${w}" height="${fx(Math.max(3, h * 0.008))}" fill="${WG.stoneLit}" opacity="0.55"/>`
   }
 
   // --- THE YARD'S OWN CLUTTER: the two wings must not be the same building. ---
@@ -17678,7 +17731,7 @@ function innYardWing({ w, h, seed, storeys, spans, variant }) {
       s += `<rect x="${fx(bx)}" y="${fx(Y(0.1) - bh)}" width="${fx(bw2)}" height="${fx(bh)}" rx="${fx(bw2 * 0.28)}" fill="${E4.timberLit}"/>`
       s += `<rect x="${fx(bx)}" y="${fx(Y(0.1) - bh * 0.72)}" width="${fx(bw2)}" height="${fx(bh * 0.1)}" fill="${E4.ink}" opacity="0.5"/>`
       s += `<rect x="${fx(bx)}" y="${fx(Y(0.1) - bh * 0.3)}" width="${fx(bw2)}" height="${fx(bh * 0.1)}" fill="${E4.ink}" opacity="0.5"/>`
-      s += `<ellipse cx="${fx(bx + bw2 / 2)}" cy="${fx(Y(0.1) - bh)}" rx="${fx(bw2 * 0.5)}" ry="${fx(bh * 0.12)}" fill="${E4.wingLit}"/>`
+      s += `<ellipse cx="${fx(bx + bw2 / 2)}" cy="${fx(Y(0.1) - bh)}" rx="${fx(bw2 * 0.5)}" ry="${fx(bh * 0.12)}" fill="${WG.wingLit}"/>`
     }
     const sx = X(uAt(0.14, 0.74))
     for (let rr2 = 0; rr2 < 3; rr2++) {
@@ -18059,6 +18112,110 @@ async function bakePieceTexture(piece, outDir) {
   return { id: piece.id, W, H, bytes: webp.length }
 }
 
+// ---- `ch1-arrival-floor-tab` — THE COURTYARD'S BRASS PULL ---------------------
+//
+// THE ASPECT, DERIVED (this is the thing that made the piece get skipped once).
+// A dissolve tab is NOT a fixed quad, which is why no single canvas aspect can
+// be read off content.ts the way the wings' can. `dissolveTabQuad`
+// (popup-dissolve.ts:310) builds it from four page-frame points:
+//
+//   d from PAGE_W - DISSOLVE_TAB_LIP  to  PAGE_W + s,   s = tabTip(beta) + tabOut(tau)
+//   z spanning tabW, centred on (z0 + z1) / 2
+//
+// with DISSOLVE_TAB_LIP 0.02 and, for `ch1-arrival-floor`, tabW 0.24, tabTip
+// 0.06, stroke 0.14. The uvs are the identity quad (popup-dissolve-layer.tsx:245
+// `[0,0, 1,0, 1,1, 0,1]`) laid on the corner order (root z-, root z+, tip z+,
+// tip z-) — so image u runs across the tab's WIDTH (the fixed 0.24) and image v
+// runs along the PULL, over a length that GROWS with the flip:
+//
+//   tau    0    45    90   135   180   deg
+//   len  0.080 0.115 0.150 0.185 0.220  world   (0.02 lip + 0.06 tongue + draw)
+//   u:v  3.000 2.087 1.600 1.297 1.091
+//
+// The print is therefore stretched along v by 2.75x between rest and full pull
+// NO MATTER WHAT CANVAS SHIPS, and the s5 tongue's 512x220 is not a mistake — it
+// is that family's own compromise (its rest aspect is 3.25).
+//
+// SO THE MOTIF IS BUILT TO NOT CARE. Canvas 512x200 (2.56) sits between the rest
+// read and the mid-pull one, erring wide because the reading camera lays the tab
+// down near-grazing and foreshortens v again on top of the geometry. Every mark
+// on it is either TRANSVERSE (root shadow, stitch line, rolled tip lip, brushed
+// streaks — bands that only get taller under stretch, which is what a band does)
+// or RECTILINEAR/LOZENGE (the plate, the key's shaft, collar, bit and its diamond
+// bow). There is not one circle on the piece: a stretched ring reads as a broken
+// ring, a stretched diamond reads as a diamond.
+function innBrassTab(w, h, seed) {
+  const r = mulberry32(seed)
+  const pfx = `bt${Math.abs(seed) % 100000}`
+  const m = Math.min(w, h)
+  // aged brass, three steps; the lamp gold is the emblem's own colour so the
+  // tab belongs to the same hour as the eleven lit panes behind it
+  const B = { deep: '#5c4415', mid: '#9c7c2b', lit: E4.brass, hi: E4.brassLit, gold: E4.lamp }
+  const defs =
+    `<linearGradient id="${pfx}g" x1="0" y1="1" x2="0" y2="0">` +
+    `<stop offset="0" stop-color="${B.deep}"/>` +
+    `<stop offset="0.46" stop-color="${B.mid}"/>` +
+    `<stop offset="1" stop-color="${B.lit}"/></linearGradient>`
+  // root (image bottom) in the page's shadow, tip (image top) catching the lamp
+  let s = `<rect width="${w}" height="${h}" fill="url(#${pfx}g)"/>`
+
+  // brushed metal: lines ALONG the tab width, so the pull stretches their
+  // spacing and never their shape
+  for (let i = 0; i < 26; i++) {
+    const y = rr(r, h * 0.06, h * 0.94)
+    s += `<line x1="0" y1="${fx(y)}" x2="${w}" y2="${fx(y)}" stroke="${r() > 0.5 ? B.hi : E4.ink}" stroke-width="${fx(rr(r, 0.9, 2.2))}" opacity="${fxOp(0.06 + 0.1 * r())}"/>`
+  }
+  // verdigris bloom in the corners — aged, not new
+  for (const [cx, cy] of [[w * 0.07, h * 0.2], [w * 0.93, h * 0.78]]) {
+    s += `<ellipse cx="${fx(cx)}" cy="${fx(cy)}" rx="${fx(w * 0.12)}" ry="${fx(h * 0.22)}" fill="#6c7a4c" opacity="0.16"/>`
+  }
+
+  // ---- the ROOT (image bottom, v=0): the cut the brass comes through --------
+  s += `<rect x="0" y="${fx(h * 0.9)}" width="${w}" height="${fx(h * 0.1)}" fill="${E4.ink}" opacity="0.62"/>`
+  s += `<rect x="0" y="${fx(h * 0.868)}" width="${w}" height="${fx(h * 0.036)}" fill="${E4.ink}" opacity="0.34"/>`
+  for (let i = 0; i < 7; i++) {
+    const x = w * (0.11 + i * 0.128)
+    s += `<line x1="${fx(x)}" y1="${fx(h * 0.952)}" x2="${fx(x + w * 0.05)}" y2="${fx(h * 0.952)}" stroke="${B.hi}" stroke-width="${fx(m * 0.018)}" opacity="0.55"/>`
+  }
+  // ---- the TIP (image top, v=1): a rolled grip lip ---------------------------
+  s += `<rect x="0" y="0" width="${w}" height="${fx(h * 0.07)}" fill="${B.hi}" opacity="0.85"/>`
+  s += `<rect x="0" y="${fx(h * 0.07)}" width="${w}" height="${fx(h * 0.032)}" fill="${B.deep}" opacity="0.7"/>`
+
+  // ---- the struck PLATE, and the KEY laid across it --------------------------
+  const px = w * 0.09
+  const py = h * 0.2
+  const pw = w * 0.82
+  const ph = h * 0.6
+  s += `<rect x="${fx(px)}" y="${fx(py)}" width="${fx(pw)}" height="${fx(ph)}" rx="${fx(m * 0.06)}" fill="${B.mid}" stroke="${E4.ink}" stroke-width="${fx(m * 0.022)}" stroke-opacity="0.8"/>`
+  s += `<rect x="${fx(px + m * 0.05)}" y="${fx(py + m * 0.05)}" width="${fx(pw - m * 0.1)}" height="${fx(ph - m * 0.1)}" rx="${fx(m * 0.04)}" fill="none" stroke="${B.hi}" stroke-width="${fx(m * 0.012)}" opacity="0.5"/>`
+  // the plate's own top bevel — one lit edge is what makes it sit PROUD
+  s += `<rect x="${fx(px + m * 0.03)}" y="${fx(py + m * 0.02)}" width="${fx(pw - m * 0.06)}" height="${fx(m * 0.02)}" fill="${B.hi}" opacity="0.6"/>`
+
+  // The key: bow (a lozenge ring) at the u-low end, a shaft along u, a collar,
+  // and two square bit teeth hanging toward the root.
+  const ky = h * 0.5
+  const ink = `stroke="${E4.ink}" stroke-width="${fx(m * 0.016)}" stroke-opacity="0.85"`
+  const bx = w * 0.235
+  const bhx = w * 0.075
+  const bhy = h * 0.19
+  const lozenge = (ex, ey) =>
+    `M ${fx(bx)} ${fx(ky - ey)} L ${fx(bx + ex)} ${fx(ky)} L ${fx(bx)} ${fx(ky + ey)} L ${fx(bx - ex)} ${fx(ky)} Z`
+  s += `<path d="${lozenge(bhx, bhy)} ${lozenge(bhx * 0.46, bhy * 0.46)}" fill-rule="evenodd" fill="${B.gold}" ${ink}/>`
+  // shaft
+  const sh = h * 0.088
+  s += `<rect x="${fx(bx + bhx * 0.55)}" y="${fx(ky - sh / 2)}" width="${fx(w * 0.53)}" height="${fx(sh)}" fill="${B.gold}" ${ink}/>`
+  // collar
+  s += `<rect x="${fx(w * 0.615)}" y="${fx(ky - h * 0.15)}" width="${fx(w * 0.035)}" height="${fx(h * 0.3)}" fill="${B.gold}" ${ink}/>`
+  // the bit: two teeth toward the root, so the key reads even when the shaft
+  // thickens under a full pull
+  for (const [f, d] of [[0.7, 0.19], [0.775, 0.13]]) {
+    s += `<rect x="${fx(w * f)}" y="${fx(ky + sh * 0.3)}" width="${fx(w * 0.042)}" height="${fx(h * d)}" fill="${B.gold}" ${ink}/>`
+  }
+  // one tip-ward specular along the shaft — the key is metal in lamplight
+  s += `<rect x="${fx(bx + bhx * 0.55)}" y="${fx(ky - sh / 2 + m * 0.014)}" width="${fx(w * 0.53)}" height="${fx(m * 0.018)}" fill="${E4.paneCore}" opacity="0.4"/>`
+  return svgPiece(w, h, s, defs)
+}
+
 // The texture-only piece bakes. `w`/`h` are pixel dims chosen at each piece's
 // true mesh aspect (content.ts width/height), long edge <= 1024 (<= 512 for
 // slivers, G5). Seeds are distinct per piece for grain determinism.
@@ -18291,6 +18448,10 @@ const PIECES = [
   { id: 'ch1-arrival-rank', seed: 20432, w: 512, h: 480, grain: 10, paint() { return innArrivalRank(this.w, this.h, this.seed) } },
   { id: 'ch1-arrival-floor-dunes', seed: 20433, w: 1024, h: 542, grain: 12, quality: 88, paint() { return innCourtyardCold(this.w, this.h, this.seed) } },
   { id: 'ch1-arrival-floor-gold', seed: 20434, w: 1024, h: 542, grain: 12, quality: 88, paint() { return innCourtyardWarm(this.w, this.h, this.seed) } },
+  // the pull tab (`<id>-tab`, popup-dissolve-layer.tsx:232 — the id the layer
+  // asks for, else it falls back to the shared kraft grip). 512x200 = 2.56, the
+  // compromise the growing tab quad forces; see innBrassTab's header.
+  { id: 'ch1-arrival-floor-tab', seed: 20435, w: 512, h: 200, grain: 8, paint() { return innBrassTab(this.w, this.h, this.seed) } },
   // the T-FLOOR flagship: the s2 spread print (same uv contract as page-4)
   { id: 'page-2', seed: 20270, w: 1024, h: 683, grain: 10, paint() { return innCourtyardSpread(this.w, this.h, this.seed) } },
   { id: 'ch1-stable-side', seed: 20210, w: 512, h: 512, grain: 12, paint() { return boxFace(this.w, this.h, this.seed, 'side', 'barn') } },
