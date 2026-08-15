@@ -230,8 +230,8 @@ export const STAGE_LIFE = {
       period: 9.4,
       /** Blink: seconds per cycle, and the fraction of it the mote is actually alight. */
       blink: 2.6,
-      duty: 0.34,
-      size: 0.0075,
+      duty: 0.46,
+      size: 0.011,
       color: '#d6f0a0',
       /** Wake band over which the colony arrives. */
       wake: [0.22, 0.55] as const,
