@@ -61,6 +61,13 @@ const skipsRim = (id) => id.startsWith('cover-') || id.startsWith('page-')
 // of those ids: prepare-art runs BEFORE generate-art, but a delivery landing
 // under one of those names would put a second file in play for the same id and
 // the next person to reorder the two scripts would silently lose the bake.)
+//
+// E4 PAINTED — the one sanctioned exception, and it is now MECHANISED rather
+// than trusted to prose. An id may live in BOTH art-src/ and generate-art's
+// PIECES if and only if it is listed in that file's `HAND_PAINTED` set, in
+// which case the procedural bake yields and this script's output is what ships.
+// Any other overlap now throws in generate-art's `assertNoSilentOverwrite()`
+// instead of quietly clobbering the delivery.
 const PAD_TO_ASPECT = {}
 
 // CROP-TO-ASPECT (per id, target width/height): centered cover-crop applied

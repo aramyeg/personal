@@ -30,7 +30,7 @@
  * source of truth for the art module — main() is guarded so importing is safe.
  */
 
-import { writeFile, mkdir, readdir } from 'node:fs/promises'
+import { writeFile, mkdir, readdir, stat } from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import sharp from 'sharp'
@@ -40,6 +40,61 @@ import { S6_STALL_CARTOUCHE } from './s6-cartouche-orientation.mjs'
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url))
 const REPO_ROOT = path.join(SCRIPT_DIR, '..', '..')
 const ART_DIR = path.join(REPO_ROOT, 'public', 'labs', 'storybook', 'art')
+const ART_SRC_DIR = path.join(REPO_ROOT, 'public', 'labs', 'storybook', 'art-src')
+
+// ============================================================================
+// HAND-PAINTED IDS (E4 PAINTED lane) — the procedural painter YIELDS to these.
+//
+// The pipeline is two scripts in a fixed order:
+//     node scripts/storybook/prepare-art.mjs   # art-src/<id>.png -> art/<id>.webp
+//     node scripts/storybook/generate-art.mjs  # PIECES -> art/<id>.webp, then atlases
+// so anything generate-art bakes LANDS ON TOP of what prepare-art just wrote.
+// Before this set existed the only defence was the rule "never let the same id
+// live in both art-src/ and PIECES" (prepare-art.mjs) — which meant a hand-
+// painted delivery for an id the painter already owns was silently destroyed.
+//
+// An id listed here is HAND-AUTHORED: `bakePieceTexture` skips it and leaves
+// whatever is on disk (i.e. prepare-art's output) untouched, while everything
+// downstream — `writeAtlases` (which packs the loose `<id>.webp` off disk) and
+// `writeManifests` (which rebuilds manifest.json from the directory listing) —
+// treats it exactly like any other art id. Adding or removing an id is a
+// one-line change here; the id does NOT have to exist in PIECES at all (a
+// listing for a piece the painter never had is a harmless no-op), so the scene
+// owner can move an id between hand-painted and procedural without touching
+// any other file.
+//
+// Delivery contract for an id in this set:
+//   1. drop `public/labs/storybook/art-src/<id>.png` (the id IS the filename)
+//   2. run prepare-art, then generate-art
+// `main()` asserts the inverse — an art-src PNG whose id is in PIECES but NOT
+// listed here fails the run loudly rather than being overwritten in silence.
+//
+// REVERTING is NOT symmetric, and this bites: deleting `art-src/<id>.png` does
+// not bring the procedural piece back, because the bake still yields to the
+// webp already sitting in art/. To go back to procedural, either drop the id
+// from this set, or `git checkout -- public/labs/storybook/art/<id>.webp` and
+// re-run generate-art so the atlas that packs it is rebuilt too.
+//
+// Rim note: prepare-art adds the 6px cream die-cut rim to every id EXCEPT
+// `cover-*` and `page-*`, so the ch1 cutouts below get the rim and `page-2`
+// (a full-bleed page face) does not. That is the intended split.
+const HAND_PAINTED = new Set([
+  'page-2',
+  'ch1-inn-hall-front',
+  'ch1-inn-guest-front',
+  'ch1-inn-balcony',
+  'ch1-inn-spire-m0',
+  'ch1-inn-spire-m1',
+  'ch1-inn-spire-m2',
+  'ch1-inn-raven',
+  'ch1-wing-l',
+  'ch1-wing-r',
+  'ch1-rank',
+  'ch1-yard-dunes',
+  'ch1-yard-gold',
+  'ch1-yard-tab',
+])
+// ============================================================================
 
 // mulberry32 — the exact PRNG the runtime placeholder path already uses
 // (procedural/placeholder-art.ts), so an art module authored here drops into
@@ -16626,6 +16681,25 @@ function chainLink(w, h, seed, mirrored) {
 }
 
 async function bakePieceTexture(piece, outDir) {
+  // HAND-PAINTED YIELD (see the HAND_PAINTED note at the top of this file): the
+  // delivery on disk wins over the painter. Reported with its real on-disk dims
+  // so the run log still accounts for the id, and so a MISSING delivery is
+  // impossible to miss.
+  if (HAND_PAINTED.has(piece.id)) {
+    const onDisk = path.join(outDir, `${piece.id}.webp`)
+    try {
+      const [meta, st] = await Promise.all([sharp(onDisk).metadata(), stat(onDisk)])
+      return { id: piece.id, W: meta.width, H: meta.height, bytes: st.size, handPainted: true }
+    } catch {
+      // No delivery yet. Bake the procedural piece so the atlas packer and the
+      // scene still have SOMETHING to read, but say so loudly — the next
+      // prepare-art run replaces it the moment the PNG lands in art-src/.
+      process.stderr.write(
+        `generate-art: WARNING ${piece.id} is HAND_PAINTED but public/labs/storybook/art/${piece.id}.webp ` +
+          `is missing — baking the procedural placeholder. Drop art-src/${piece.id}.png and re-run prepare-art.\n`
+      )
+    }
+  }
   const svg = piece.paint()
   const flat = await sharp(Buffer.from(svg)).png().toBuffer()
   const meta = await sharp(flat).metadata()
@@ -17480,8 +17554,39 @@ async function writeManifests(dir) {
   return { artIds, outlineIds }
 }
 
+/**
+ * The two-script contract, enforced instead of documented (prepare-art.mjs
+ * carries the prose version). generate-art runs SECOND, so any id it bakes
+ * overwrites prepare-art's output for the same id. That collision is legal for
+ * exactly one reason — the id is declared HAND_PAINTED, and the bake yields.
+ * Any other overlap is a delivery about to be destroyed in silence, so it stops
+ * the run.
+ */
+async function assertNoSilentOverwrite() {
+  let srcIds = []
+  try {
+    const entries = await readdir(ART_SRC_DIR, { withFileTypes: true })
+    srcIds = entries
+      .filter((e) => e.isFile() && e.name.toLowerCase().endsWith('.png'))
+      .map((e) => e.name.replace(/\.png$/i, ''))
+  } catch (err) {
+    if (err.code !== 'ENOENT') throw err
+    return
+  }
+  const pieceIds = new Set(PIECES.map((p) => p.id))
+  const clashes = srcIds.filter((id) => pieceIds.has(id) && !HAND_PAINTED.has(id)).sort()
+  if (clashes.length > 0) {
+    throw new Error(
+      `art-src delivery would be overwritten by the procedural painter: ${clashes.join(', ')}.\n` +
+        `Add each id to HAND_PAINTED (top of generate-art.mjs) to make the delivery win, ` +
+        `or delete art-src/<id>.png to keep the procedural bake.`
+    )
+  }
+}
+
 async function main() {
   await mkdir(ART_DIR, { recursive: true })
+  await assertNoSilentOverwrite()
   const info = []
   for (const slot of [...SLOTS, ...RING_SLOTS, ...S6_SOUK_SLOTS]) info.push(await bakeSlot(slot, ART_DIR))
   for (const wing of VISTA_WINGS) info.push(await bakeVistaWing(wing, ART_DIR))
@@ -17495,7 +17600,8 @@ async function main() {
     process.stdout.write(`${r.id.padEnd(24)} ${r.W}x${r.H}  a=${r.aspect}  ${r.points}pts  ${(r.bytes / 1024).toFixed(1)}kb\n`)
   }
   for (const r of pieceInfo) {
-    process.stdout.write(`${r.id.padEnd(24)} ${r.W}x${r.H}  ${(r.bytes / 1024).toFixed(1)}kb\n`)
+    const tag = r.handPainted ? '  [hand-painted, kept]' : ''
+    process.stdout.write(`${r.id.padEnd(24)} ${r.W}x${r.H}  ${(r.bytes / 1024).toFixed(1)}kb${tag}\n`)
   }
   for (const a of atlasInfo) {
     const P = ATLASES.find((x) => x.id === a.id)?.page ?? ATLAS_PAGE
@@ -17531,6 +17637,7 @@ export {
   bake,
   bakeSlot,
   PIECES,
+  HAND_PAINTED,
   bakePieceTexture,
   NAVE_C,
   NAVE_RANKS,
