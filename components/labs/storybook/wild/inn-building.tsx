@@ -352,14 +352,19 @@ function buildHall(bucket: Bucket): void {
   const coreX1 = x1 - REVEAL_D
   const coreZ1 = z1 - REVEAL_D
 
-  // Core: everything behind the facade skins, bored through by the arch.
+  // Core: everything behind the facade skins, bored through by the arch. The bore's floor sits
+  // a hair ABOVE the wall outline's bottom: earcut drops (or garbles) a hole that crosses its
+  // own outline, and an arch reaching below the wall base is exactly that — the whole opening
+  // silently vanished and the "arch" was solid coursed stone. The 8mm curb this leaves is a
+  // threshold under the gate, and the step slab in front hides it anyway.
+  const ARCH_FLOOR = y0 + 0.002
   const core = rectShape(x0, y0 - 0.006, coreX1, y1)
-  core.holes.push(archPath())
+  core.holes.push(archPath(0, ARCH_FLOOR))
   push(bucket, 'stone', uvProject(spanZ(core, z0, coreZ1), TILE.stone))
 
   // Front skin, holed by the arch and the taproom windows.
   const frontWall: Wall = { axis: 'z', plane: z1, slots: slotsOn('z', z1) }
-  facadeSkin(bucket, frontWall, rectShape(x0, y0 - 0.006, x1, y1), [archPath()], 'stone', TILE.stone)
+  facadeSkin(bucket, frontWall, rectShape(x0, y0 - 0.006, x1, y1), [archPath(0, ARCH_FLOOR)], 'stone', TILE.stone)
 
   // Right return, holed by the kitchen windows. Authored in (z, y).
   const rightWall: Wall = { axis: 'x', plane: x1, slots: slotsOn('x', x1) }
@@ -374,9 +379,11 @@ function buildArch(bucket: Bucket): void {
   const zBack = ARCH.backZ
   const hw = ARCH.halfW
 
-  // Moulded surround, standing proud of the facade.
+  // Moulded surround, standing proud of the facade. Its inner hole keeps clear of the outline's
+  // bottom edge for the same earcut reason as the wall bores — the sliver it closes across the
+  // base reads as the gate's threshold stone.
   const surround = archShape(0.026, -0.02)
-  surround.holes.push(archPath())
+  surround.holes.push(archPath(0, 0.002))
   push(bucket, 'stone', uvProject(spanZ(surround, zFront, zFront + ARCH.reveal), TILE.stone))
   // Keystone at the crown, springer blocks at the haunches.
   push(
@@ -410,12 +417,16 @@ function buildArch(bucket: Bucket): void {
   push(bucket, 'stone', uvProject(box(ARCH.cx - hw, 0, zBack, ARCH.cx + hw, 0.009, zFront + 0.01), TILE.stone))
 
   // Rear wall of the passage, filling the arch profile, with a door standing part open.
+  // Deliberately NOT stone: through the bore the rear wall is most of what the reader sees,
+  // and in the passage lamp's blaze a stone rear reads as the front wall continuing — the
+  // arch stops being a hole. Dark joinery panelling gives the bore its depth, and the hundred
+  // brass keys glint against it instead of vanishing into lit masonry.
   const doorW = 0.115
   const doorH = 0.215
   const doorX = ARCH.cx + 0.014
   const rear = archShape(-0.004, -0.02)
   rear.holes.push(rectPath(doorX - doorW / 2, 0.008, doorX + doorW / 2, doorH))
-  push(bucket, 'stone', uvProject(spanZ(rear, zBack + 0.02, zBack + 0.038), TILE.stone))
+  push(bucket, 'joinery', uvProject(spanZ(rear, zBack + 0.02, zBack + 0.038), TILE.timber))
 
   // Whatever lies beyond the door is dark until the passage lamp is lit.
   push(bucket, 'interior', box(ARCH.cx - hw, 0, zBack - 0.02, ARCH.cx + hw, ARCH.apexY, zBack + 0.021))

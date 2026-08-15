@@ -486,7 +486,9 @@ export const WINDOWS: readonly WindowSlot[] = [
  * room. Four lights, not thirty.
  */
 export const ROOM_LIGHTS = [
-  { room: 'passage' as RoomId, pos: [-0.42, 0.2, -0.3] as Vec3, distance: 1.1, intensity: 1.8 },
+  // Kept on a short leash: point lights cast no shadow here (D6, one shadow map), so a wide
+  // passage light bleeds straight through the hall walls and paints the OUTSIDE of the facade.
+  { room: 'passage' as RoomId, pos: [-0.42, 0.16, -0.3] as Vec3, distance: 0.85, intensity: 1.8 },
   { room: 'taproom' as RoomId, pos: [-0.36, 0.24, -0.05] as Vec3, distance: 0.95, intensity: 1.7 },
   { room: 'gallery' as RoomId, pos: [-0.32, 0.5, 0.0] as Vec3, distance: 0.85, intensity: 1.2 },
   { room: 'stair' as RoomId, pos: [-0.84, 0.5, -0.22] as Vec3, distance: 0.8, intensity: 1.1 },

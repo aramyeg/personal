@@ -107,10 +107,11 @@ void main() {
   float graze = 1.0 - abs(dot(normalize(vNrm), normalize(-vPosV)));
   float body = mix(0.38, 1.0, pow(clamp(graze, 0.0, 1.0), 1.2));
 
-  // Along the beam: brightest at the mouth, gone by the far end. The tiny lead-in stops the
-  // very first ring of vertices from showing as a hard lip inside the arch.
+  // Along the beam: the MOUTH is kept clear — the reader must be able to see through the
+  // aperture to what the light is coming from (the passage, the hundred keys) — so the shaft
+  // swells to full body a little way out and dies by the far end.
   float along = clamp(vUv.y, 0.0, 1.0);
-  float lengthFade = pow(1.0 - along, 1.7) * smoothstep(0.0, 0.05, along);
+  float lengthFade = pow(1.0 - along, 1.7) * smoothstep(0.0, 0.30, along);
 
   // Dust in the air, scrolling out along the beam and turning slowly around it.
   float n = fbm(vec2(vUv.x * uNoiseScale, along * uNoiseScale * 0.55 - uTime * uDrift));
