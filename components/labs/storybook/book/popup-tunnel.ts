@@ -51,8 +51,11 @@ export type TunnelGeom = {
 
 export const TUNNEL_DEFAULTS = {
   gateSlide: 0.17,
-  coachZ: [-0.46, -0.02] as const,
-  coachScale: [1.0, 1.9] as const,
+  // The coach stops short of the arch mouth at a restrained scale: at the old
+  // [-0.02, 1.9] it covered the whole aperture at full pull, eclipsing the
+  // doorway glow and the innkeeper it was arriving toward.
+  coachZ: [-0.46, -0.1] as const,
+  coachScale: [1.0, 1.55] as const,
   pullStroke: 0.22,
 } as const
 

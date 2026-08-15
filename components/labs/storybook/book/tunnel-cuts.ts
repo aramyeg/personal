@@ -40,10 +40,27 @@ export type CutTone =
   | 'brass' // warm metal — lantern, ring, weathervane
   | 'foliage'
   | 'iron' // cold dark metal — the yard gates
-  | 'hearth' // the strongest warm source: the destination doorway, the kitchen fire
+  | 'hearth' // secondary warm sources: lanterns, the kitchen fire, the yard door
+  | 'citylight' // the city's windows on the backwall, and only those (rank 4)
+  /**
+   * THE DESTINATION, and nothing else. Split off from `hearth` because the
+   * doorway at the end of the tunnel must out-burn every other warm pane in the
+   * picture by a clear margin — if the lanterns and the kitchen fire can reach
+   * the same value, the eye has three places to land and the tunnel stops
+   * pointing anywhere. One tone, one piece, one hottest spot.
+   */
+  | 'beacon'
   | 'night' // deep blue-slate: the sky plate, and only that
   | 'moon' // pale cool emissive — moon and stars
   | 'ink' // zero albedo: a cut-out that stays black under a point-blank light
+  /**
+   * The runner carpet, and only that. A deep oxblood with no emissive at all:
+   * its whole job is to be the ONE large surface in the picture that reads the
+   * key light's falloff as HUE rather than as value — scarlet where the doorway
+   * spills onto it, near-black at the arch mouth. A pale floor cannot do that;
+   * it just goes brighter, which is what made the corridor a featureless wedge.
+   */
+  | 'runner'
 
 /**
  * Pieces carrying a `slideKey` are posed by the engine rather than sitting still:
@@ -375,10 +392,17 @@ function prosceniumPieces(): CutPiece[] {
   // The sign: a wrought bracket reaching out over the arch mouth with a key
   // hung off it, so the inn's name is a SILHOUETTE against the lit tunnel
   // rather than lettering nobody can read at this camera.
+  //
+  // HALVED FROM bowR 0.04 / len 0.19. At full size the bow measured 37 px
+  // across at the reading camera against 21 px for the gallery rack keys two
+  // planes DEEPER — a nearer key reading barely larger than a far one reads as
+  // one giant key, not as depth, and its shaft ran straight through the right
+  // lantern. At bowR 0.021 it is a hanging tavern sign again: legible, clear of
+  // the lantern below it, and it no longer competes with the rack for the eye.
   const sign: THREE.Shape[] = [
-    rect(-0.11, 0.712, 0.075, 0.738),
-    rect(-0.102, 0.676, -0.082, 0.712),
-    ...keyShapes(-0.092, 0.676, 0.19, 0.04),
+    rect(-0.104, 0.712, 0.075, 0.734),
+    rect(-0.098, 0.678, -0.086, 0.712),
+    ...keyShapes(-0.092, 0.678, 0.1, 0.021),
   ]
 
   return [
@@ -410,17 +434,25 @@ function lantern(cx: number, yTop: number, dir: number): { body: THREE.Shape[]; 
   }
 }
 
-/** PLANE 1 — the measured aperture's stone reveal, plus two hanging lanterns
- *  that put warm metal INSIDE the arch where the money light can catch it. */
+/** PLANE 1 — the measured aperture's stone reveal, plus ONE hanging lantern
+ *  that puts warm metal INSIDE the arch where the money light can catch it.
+ *
+ *  WHY ONE AND NOT TWO. The left lantern hung at (-0.489, 0.635): high enough
+ *  on the reveal that the arch has already curved past it, so its bracket had
+ *  no lit stone behind it and the only thing that survived at the reading
+ *  camera was the pane — a floating amber lozenge with no wall under it, which
+ *  read as a rendering fault rather than as a lamp. The right lantern hangs
+ *  where the band is still 0.12 wide, so its arm crosses visible stone and it
+ *  reads as MOUNTED. Two competing warm lozenges inside a 395 px aperture also
+ *  cost the destination its primacy; one accent is the whole budget. */
 function jambPieces(): CutPiece[] {
   const ring = voussoirArch(ARCH.cx, 0.395, 0, ARCH.springY, 0.78, 0.045, 9)
   ring.holes.push(archHole(ARCH.cx, 0.285, 0, ARCH.springY, 0.66))
-  const l = lantern(-0.489, 0.635, -1)
   const r = lantern(-0.091, 0.5, 1)
   return [
     { id: 'jamb-voussoirs', shapes: [ring], thickness: 0.016, tone: 'stone' },
-    { id: 'jamb-lanterns', shapes: [...l.body, ...r.body], thickness: 0.02, tone: 'brass' },
-    { id: 'jamb-lantern-glass', shapes: [l.pane, r.pane], thickness: 0.009, tone: 'hearth' },
+    { id: 'jamb-lanterns', shapes: r.body, thickness: 0.02, tone: 'brass' },
+    { id: 'jamb-lantern-glass', shapes: [r.pane], thickness: 0.009, tone: 'hearth' },
   ]
 }
 
@@ -472,8 +504,11 @@ function yardPieces(): CutPiece[] {
     disc(-0.025, 0.398, 0.028),
     rect(0.06, 0, 0.62, 0.17), // the yard wall running off behind the wing
   ]
-  // A doorway at the head of the stair, so the steps go somewhere.
-  piers[0].holes.push(rectHole(-0.57, 0.166, -0.49, 0.3))
+  // A doorway at the head of the stair, so the steps go somewhere. Shrunk in
+  // round 2 (0.080 x 0.134 -> 0.055 x 0.100): a second lit doorway inside the
+  // same arch competes with the destination for the same reading, and at the
+  // old size this one was the larger warm rectangle of the two.
+  piers[0].holes.push(rectHole(-0.5605, 0.166, -0.5055, 0.266))
 
   const stair = poly([
     [-0.6, 0],
@@ -507,7 +542,7 @@ function yardPieces(): CutPiece[] {
 
   return [
     { id: 'yard-piers', shapes: piers, thickness: 0.012, tone: 'timber' },
-    { id: 'yard-lit-door', shapes: [rect(-0.566, 0.17, -0.494, 0.304)], thickness: 0.008, tone: 'hearth' },
+    { id: 'yard-lit-door', shapes: [rect(-0.5645, 0.17, -0.5015, 0.27)], thickness: 0.008, tone: 'hearth' },
     { id: 'yard-stair', shapes: [stair], thickness: 0.016, tone: 'timber' },
     { id: 'yard-gate-l', shapes: [gateLeaf(-1)], thickness: 0.014, tone: 'iron', slideKey: 'gate-l' },
     { id: 'yard-gate-r', shapes: [gateLeaf(1)], thickness: 0.014, tone: 'iron', slideKey: 'gate-r' },
@@ -526,7 +561,12 @@ function galleryPieces(): CutPiece[] {
   // of the tunnel is CUT HERE, one plane nearer, and the backwall is what
   // shines through it. A wide arcade opening would only read as a white blob.
   const wall = rect(-0.78, 0, 0.2, 0.46)
-  wall.holes.push(archHole(-0.29, 0.115, 0, 0.22, 0.42))
+  // Widened 0.115 -> 0.132 in round 2. The rack of keys and the yard gate cover
+  // most of this opening at the reading camera, and at the old width the gold
+  // that survived between them was a set of slivers rather than an aperture.
+  // The rack bar still overhangs it on both sides (-0.46 .. -0.12 against
+  // -0.422 .. -0.158), which was round 1's reason for the rack's span.
+  wall.holes.push(archHole(-0.29, 0.132, 0, 0.22, 0.445))
   for (const [x, yTop] of [
     [-0.49, 0.36],
     [-0.57, 0.3],
@@ -564,28 +604,173 @@ function galleryPieces(): CutPiece[] {
     rect(0.63, 0.115, 0.69, 0.165),
   ]
 
-  // THE DOOR, STANDING AJAR — and the reason it is cut on THIS plane. The haze
-  // ramp lerps every rank-4 albedo 52% toward the blue haze, so a backwall pane
-  // cannot be dark no matter what tone it carries; multiplied by the key
-  // light's ~280 irradiance it renders blue-white whatever we ask for. The
-  // gallery's FRONT faces are turned away from that light, so they are the
-  // deepest surfaces in the diorama that can still hold a colour. The leaf
-  // glows warm here; the slit beside it shows the backwall's white-hot core,
-  // which is exactly the value the eye wants at the far end of a tunnel.
-  const glow = archShape(-0.29, 0.13, 0, 0.22, 0.437)
-  glow.holes.push(rectHole(-0.352, 0, -0.302, 0.352))
+  // THE DESTINATION, and the reason it is cut on THIS plane and nowhere else.
+  // The haze ramp lerps every rank-4 albedo 52% toward the blue haze, so a
+  // backwall pane cannot be dark no matter what tone it carries — under the key
+  // light it renders blue-white whatever we ask for. Round 1 left a slit
+  // through this plate to show that pane deliberately; measured, the slit came
+  // back #b9b1b2 (a desaturated GREY stripe on a salmon slab) and read as a
+  // torn alpha rather than as light. So the plate is now SOLID: nothing of
+  // rank 4 shows through the doorway at all, and the whole value is carried by
+  // the `beacon` tone's emissive, which no light can blow out and no haze can
+  // turn blue.
+  const glow = archShape(-0.29, 0.147, 0, 0.22, 0.462)
+
+  // Two dark cut-outs stood in front of it, and they are what make a flat gold
+  // arch read as a doorway: the leaf of the door itself, swung inward on its
+  // left hinge (near stile tall, far stile short — the only perspective cue a
+  // flat cut can carry), and one figure standing in the light to give the
+  // opening a human height. `ink`, so they stay black point-blank to the key.
+  const doorLeaf = poly([
+    [-0.422, 0],
+    [-0.362, 0.012],
+    [-0.362, 0.27],
+    [-0.422, 0.312],
+  ])
 
   return [
     { id: 'gallery-arcade', shapes: [wall], thickness: 0.012, tone: 'silhouette' },
-    { id: 'gallery-doorglow', shapes: [glow], thickness: 0.016, tone: 'hearth' },
+    { id: 'gallery-doorglow', shapes: [glow], thickness: 0.016, tone: 'beacon' },
+    // 0.282 tall in a 0.46 doorway. Sized from the OCCLUDERS, not from the
+    // doorway: the yard gate's solid top rail covers this plane from screen
+    // y 280 down, so a figure short enough to fit "politely" in the opening
+    // showed nothing but a head floating over the spikes. Everything that has
+    // to READ — crown, neck, yoke, raised arm, lantern — is packed into the
+    // gallery-local band y 0.14..0.282, which is the 57 px of him the reader
+    // can see at rest; the rest is a person standing behind a gate, which is
+    // the whole point of the gate.
+    //
+    // He stands at cx -0.188, a tenth of a unit RIGHT of the doorway's centre
+    // line, for two reasons. He is holding the door open, so he belongs at its
+    // edge and not in the middle of its light; and the coach stops centred on
+    // the corridor at x -0.29 and grows to 1.9x, which at the reading camera
+    // spans the ENTIRE aperture — there is no "beside the coach" to stand in.
+    // What is left is ABOVE it: the coach's tallest point is its driver, and
+    // measured at full pull the driver's head owns screen x 668..703. Sliding
+    // the innkeeper from -0.205 to -0.188 moves his own head to x 710..728, so
+    // the two dark discs stop touching and his crown, neck and shoulders read
+    // against gold over the coach's roofline instead of merging into it.
+    //
+    // Thickness 0.024, up from 0.020: the lantern's glazing has to be extruded
+    // BETWEEN this black and the beacon plate behind it (0.016), and 0.020 for
+    // the pane leaves 0.002 of clearance on each side. Coplanar is a z-fight.
+    {
+      id: 'gallery-doorleaf',
+      shapes: [doorLeaf, ...innkeeperShapes(-0.188)],
+      thickness: 0.024,
+      tone: 'ink',
+    },
+    { id: 'gallery-lantern-glass', shapes: [innkeeperPane()], thickness: 0.02, tone: 'hearth' },
     { id: 'gallery-keys', shapes: keys, thickness: 0.018, tone: 'brass' },
     { id: 'gallery-roof', shapes: roof, thickness: 0.014, tone: 'slate' },
   ]
 }
 
-/** PLANE 4 — where the eye lands. The warm key light stands just in front of
- *  this plate, so the doorway is not merely emissive: it is genuinely the
- *  brightest thing in the box, and the two figures in it give the glow a scale. */
+/**
+ * THE INNKEEPER, standing at the edge of the lit doorway with a lantern held
+ * out over the threshold. Returns the black contours; `innkeeperPane` returns
+ * the one warm rectangle that goes behind the lantern's die-cut.
+ *
+ * WHY IT IS NOT THE OLD `figureShapes`. That was a tapered slab with a disc on
+ * top, and at h 0.30 the disc came out 0.075 across against shoulders of 0.063
+ * — a head WIDER than the shoulders, which is the exact recipe for a lollipop.
+ * Read at the reading camera it was an ambiguous blob perched on the gate rail.
+ * Four things fix it, and all four live in the 65 px band ABOVE the gate's top
+ * rail (gallery-local y 0.14 .. 0.30) because that is the only part of a figure
+ * on this plane the reader can actually see at rest:
+ *
+ *   1. head 0.052 across against shoulders 0.110 — a 1:2 ratio, human;
+ *   2. a real NECK, so head and body are two masses and not one;
+ *   3. a yoke that overhangs the torso, so the silhouette has shoulders;
+ *   4. an arm raised out to the left with a lantern swinging off the hand.
+ *
+ * EVERY CONTOUR TOUCHES AND NONE LAP. Same tone, same station: two overlapping
+ * extrusions would z-fight. The arm leaves the yoke exactly on the yoke's left
+ * vertical edge, the hanger meets the arm exactly on x = handX, the cap meets
+ * the hanger exactly on y = capTop, and the body meets the cap on y = capBase.
+ */
+function innkeeperShapes(cx: number): THREE.Shape[] {
+  const handX = -0.288 // the lantern hangs INSIDE the doorway, clear of the
+  // swung door leaf (whose right stile is x -0.362) — welded to the door is the
+  // one thing that would stop it reading as a carried lamp. The cap's right
+  // edge IS this line, so fist and lantern touch and never lap.
+  return [
+    // coat: flared hem, narrow chest
+    poly([
+      [cx - 0.052, 0],
+      [cx + 0.052, 0],
+      [cx + 0.034, 0.112],
+      [cx + 0.032, 0.186],
+      [cx - 0.032, 0.186],
+      [cx - 0.034, 0.112],
+    ]),
+    // Shoulder yoke, overhanging the chest on both sides. HALF-WIDTH 0.044,
+    // down from 0.055: at 0.055 the right half of the yoke was as long as the
+    // left arm and the pair read as a T-pose — a scarecrow, not an innkeeper.
+    // Shoulders two head-widths across is the human number and it also leaves
+    // the LEFT arm as the only limb in the silhouette, which is what makes the
+    // gesture legible at 44 px.
+    poly([
+      [cx - 0.032, 0.186],
+      [cx + 0.032, 0.186],
+      [cx + 0.044, 0.198],
+      [cx + 0.044, 0.216],
+      [cx - 0.044, 0.216],
+      [cx - 0.044, 0.198],
+    ]),
+    rect(cx - 0.011, 0.216, cx + 0.011, 0.238), // neck, 9 px of it and load-bearing
+    // Head r 0.022 — 0.044 across against 0.088 of shoulder. The old 0.026
+    // made a head WIDER than half the shoulders, which is the whole recipe for
+    // a lollipop, and with the yoke jammed against it there was no neck to see.
+    // The crown at y 0.282 is a ceiling set by the key rack, not by taste: the
+    // bow at x -0.215 hangs from y 0.299 and cannot move (its centre is pinned
+    // to the bar), and at a crown of 0.300 a brass ring sat in contact with the
+    // top of his head and the pair read as one snowman.
+    disc(cx, 0.26, 0.022),
+    // THE ARM, and it is bent on purpose. A straight bar off the shoulder is
+    // the other half of the scarecrow read; an elbow that drops and a forearm
+    // that lifts says a man is HOLDING something up, which is the only reason
+    // the lantern is there. Shoulder -> elbow -> raised hand, one contour.
+    poly([
+      [cx - 0.044, 0.215],
+      [cx - 0.073, 0.205],
+      [handX, 0.216],
+      [handX, 0.202],
+      [cx - 0.07, 0.192],
+      [cx - 0.044, 0.201],
+    ]),
+    rect(handX - 0.012, 0.205, handX, 0.216), // the hanger in his fist
+    rect(-0.352, 0.195, handX, 0.205), // lantern cap
+    // lantern body, wider at the foot, with the glazing cut clean out of it
+    (() => {
+      const s = poly([
+        [-0.348, 0.135],
+        [-0.292, 0.135],
+        [-0.3, 0.195],
+        [-0.34, 0.195],
+      ])
+      s.holes.push(rectHole(-0.338, 0.142, -0.302, 0.189))
+      return s
+    })(),
+  ]
+}
+
+/** The glazing behind the innkeeper's lantern. Oversized past the die-cut so
+ *  no seam shows, and extruded THICKER than the beacon plate behind it and
+ *  THINNER than the black lantern in front of it (see the thickness note at the
+ *  head of the pieces section) — that ordering is the only thing that puts a
+ *  warm pane between a gold doorway and its own black frame. */
+function innkeeperPane(): THREE.Shape {
+  return rect(-0.34, 0.14, -0.3, 0.191)
+}
+
+/** PLANE 4 — no longer where the eye lands. The destination moved one plane
+ *  nearer (see `galleryPieces`), and this plate is now what shows AROUND the
+ *  inn: a far wall, the city's lit windows over the right wing, and nothing
+ *  the reader is meant to look at. Its own doorway is fully occluded by the
+ *  gallery's solid beacon plate, so the two figures that used to stand in it
+ *  are gone — they were unrenderable geometry, and their job (giving the glow a
+ *  human height) now belongs to the figure cut on the gallery plane. */
 function backwallPieces(): CutPiece[] {
   const wall = poly([
     [-0.9, 0],
@@ -600,33 +785,39 @@ function backwallPieces(): CutPiece[] {
     [-0.9, 0.45],
   ])
   wall.holes.push(archHole(-0.29, 0.132, 0, 0.115, 0.245))
+  // THE CITY, over the right wing. Rank 4 takes 52% haze on albedo and 31% on
+  // emissive, and THREE.Color lerps in linear space, so these panes carry a
+  // 0.09 linear BLUE floor that no warm emissive can cancel — measured, they
+  // came back (180, 143, 133), the salmon-pink the review flagged. The haze is
+  // the whole atmospheric-perspective mechanism and is not negotiable, so the
+  // answer is SIZE, not hue: at 0.08 square these were 31 px slabs of dusty
+  // rose, and at 0.05 they are 20 px marks that read as distant windows, where
+  // a few points of pink is exactly what distance looks like. Six of them,
+  // staggered, instead of four in a row.
+  //
+  // The two big panes that used to sit at x -0.62 and x 0.02 are gone: the
+  // gallery wall spans -0.78..0.20 and covers both completely at the reading
+  // camera. They were never renderable.
   const lit: readonly (readonly [number, number, number, number])[] = [
-    [0.27, 0.05, 0.35, 0.13],
-    [0.45, 0.05, 0.53, 0.13],
-    [0.63, 0.04, 0.71, 0.1],
-    [0.78, 0.04, 0.86, 0.1],
-    [-0.62, 0.2, -0.5, 0.33],
-    [0.02, 0.2, 0.14, 0.33],
+    [0.27, 0.055, 0.32, 0.11],
+    [0.38, 0.045, 0.43, 0.1],
+    [0.5, 0.06, 0.55, 0.115],
+    [0.61, 0.04, 0.66, 0.09],
+    [0.72, 0.055, 0.77, 0.105],
+    [0.82, 0.04, 0.87, 0.09],
   ]
   for (const [x0, y0, x1, y1] of lit) wall.holes.push(rectHole(x0, y0, x1, y1))
 
+  // The backwall's own doorway is fully occluded by the gallery's beacon plate
+  // at the reading camera; it is kept because the planes hinge past each other
+  // mid-turn, when it briefly shows.
   const doorGlass = archShape(-0.29, 0.14, -0.006, 0.115, 0.253)
-  const glass = [doorGlass, ...lit.map(([x0, y0, x1, y1]) => rect(x0 - 0.005, y0 - 0.005, x1 + 0.005, y1 + 0.005))]
-
-  const figure = (cx: number, h: number): THREE.Shape[] => [
-    poly([
-      [cx - 0.026, 0],
-      [cx + 0.026, 0],
-      [cx + 0.018, h * 0.62],
-      [cx - 0.018, h * 0.62],
-    ]),
-    disc(cx, h * 0.62 + h * 0.13, h * 0.14),
-  ]
+  const cityGlass = lit.map(([x0, y0, x1, y1]) => rect(x0 - 0.004, y0 - 0.004, x1 + 0.004, y1 + 0.004))
 
   return [
     { id: 'backwall-wall', shapes: [wall], thickness: 0.012, tone: 'slate' },
-    { id: 'backwall-glass', shapes: glass, thickness: 0.008, tone: 'hearth' },
-    { id: 'backwall-figures', shapes: [...figure(-0.34, 0.115), ...figure(-0.245, 0.1)], thickness: 0.018, tone: 'silhouette' },
+    { id: 'backwall-doorglass', shapes: [doorGlass], thickness: 0.008, tone: 'hearth' },
+    { id: 'backwall-citylights', shapes: cityGlass, thickness: 0.008, tone: 'citylight' },
   ]
 }
 
@@ -686,6 +877,59 @@ export function deckPlan(): THREE.Shape {
   const w = STAGE.well
   s.holes.push(rectHole(w.x0, w.z0, w.x1, w.z1))
   return s
+}
+
+/**
+ * PIECES THAT LIE DOWN. Everything above is authored standing on a plane; these
+ * are authored in the deck's own PLAN frame (x = world x, y = world z), exactly
+ * like `deckPlan()`, and the layer shears them onto the rake with the same
+ * matrix and then lifts each one clear of the deck along the deck's normal.
+ *
+ * `lift` is that clearance, in world units, measured to the piece's TOP face
+ * (it extrudes downward from there). Two pieces that lie on the same floor must
+ * not intersect, so the runner's band (0.004 .. 0.009) sits entirely above the
+ * joints' band (0.001 .. 0.0035).
+ */
+export type DeckOverlay = CutPiece & { readonly lift: number }
+
+/**
+ * THE RED RUNNER, and the joints that give it scale.
+ *
+ * The corridor floor was the largest untold surface in the picture: a pale
+ * stone wedge running from the arch mouth to the doorway, carrying the key
+ * light's pool as pure VALUE, which meant the brightest warm patch in the arch
+ * was blank paving seen through the gate slots rather than the destination.
+ * A deep oxblood runner solves both halves at once — it is the inn rolling the
+ * carpet out for the arriving coach, and because red has almost no green in it
+ * the same pool now reads as scarlet near the doorway falling to near-black at
+ * the mouth. Falloff becomes hue instead of glare.
+ *
+ * It tapers 0.24 wide at the mouth to 0.19 at the door: a real carpet is
+ * parallel-sided, but 20% of taper on top of the perspective sells the length
+ * of the corridor, and the reading camera cannot tell the difference. Its left
+ * edge stops at x -0.410 for a hard reason, not a soft one: the kitchen trap is
+ * cut out of the deck from x -0.42 leftward over z 0.02..0.32, and a carpet
+ * laid over a hole is a rendering fault.
+ */
+export function deckOverlays(): readonly DeckOverlay[] {
+  const runner = poly([
+    [-0.41, 0.318],
+    [-0.17, 0.318],
+    [-0.196, -0.34],
+    [-0.384, -0.34],
+  ])
+
+  // Three joints across the paving beside the runner. Cheap scale: without
+  // them the stone either side of the carpet has no unit of measure, and a
+  // corridor with no unit of measure has no length. They run the full corridor
+  // and pass UNDER the runner rather than being clipped to it — one contour
+  // each instead of six, and the reader only ever sees the ends.
+  const joints = [0.195, 0.075, -0.045].map((z) => rect(-0.415, z, -0.075, z + 0.01))
+
+  return [
+    { id: 'deck-joints', shapes: joints, thickness: 0.0025, tone: 'slate', lift: 0.0035 },
+    { id: 'deck-runner', shapes: [runner], thickness: 0.005, tone: 'runner', lift: 0.009 },
+  ]
 }
 
 /**

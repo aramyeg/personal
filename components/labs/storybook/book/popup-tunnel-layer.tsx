@@ -100,6 +100,7 @@ import { acceptsHandleHit } from './handle-hit'
 import { STEP_CAP, stepUserDriveReturn, turnFrames } from './user-drive-return'
 import {
   STAGE,
+  deckOverlays,
   deckPlan,
   deckY,
   coachPiece,
@@ -175,36 +176,126 @@ type ToneSpec = {
 const TONES: Record<CutTone, ToneSpec> = {
   timber: { color: '#4a3527', roughness: 0.85, metalness: 0 },
   plaster: { color: '#d9c9a8', roughness: 0.95, metalness: 0 },
-  stone: { color: '#8d8577', roughness: 0.9, metalness: 0 },
+  // Masonry — and, via the layer's deliberate choice below, the deck. Taken
+  // down from #8d8577 in round 2: the deck is the single largest mass in the
+  // frame and at that albedo it measured L=191 against a destination at L=123,
+  // so the brightest thing in the picture was blank paving. #7b7268 keeps
+  // enough value to carry the arch shadow and stops the floor shouting.
+  stone: { color: '#7b7268', roughness: 0.9, metalness: 0 },
   slate: { color: '#33343a', roughness: 0.8, metalness: 0 },
   silhouette: { color: '#1a1614', roughness: 1, metalness: 0 },
+  // THE INN'S WINDOWS, and the one tone in the table that has been wrong in
+  // both directions. Round 1 ran albedo #ffd9a0 with emissive 1.6, measured
+  // brighter than the destination, and sent the eye to the OUTSIDE of the
+  // building. Round 2 answered by dropping the emissive to 0.7 — which put the
+  // panes at L 166 against lit plaster at L 168, i.e. a window DARKER than the
+  // wall around it. That is not a dim window, it is an orange sticker.
+  //
+  // The fix is the `hearth` construction, not a number between the two: kill
+  // the albedo so nothing about the pane depends on how the wall is lit, and
+  // carry the whole value in emissive. These sit at rank 0 — no haze, no scrim
+  // in front — so what is authored here is what is measured: (255, 183, 94),
+  // L 192. Comfortably over the plaster it is cut into, comfortably under the
+  // destination at L 220, and saturated rather than cream.
   glass: {
-    color: '#ffd9a0',
+    color: '#241608',
     roughness: 0.4,
     metalness: 0,
-    emissive: '#ff9d45',
-    emissiveIntensity: 1.6,
+    emissive: '#ffa040',
+    emissiveIntensity: 1.05,
   },
   brass: { color: '#c9963f', roughness: 0.35, metalness: 0.8 },
   foliage: { color: '#48603c', roughness: 0.95, metalness: 0 },
   iron: { color: '#191b21', roughness: 0.45, metalness: 0.25 },
-  // THE DESTINATION, and the one tone whose ALBEDO is deliberately near-black.
-  // The warm key light stands 0.18 in front of the backwall: irradiance there
-  // is ~280, so any normal albedo clips all three channels and the end of the
-  // tunnel renders as flat white. Starving the diffuse term and carrying the
-  // whole value in `emissive` is what keeps it a WARM glow instead — measured,
-  // not stylistic. Panes further from that light (kitchen fire, lanterns, the
-  // yard's lit door) are emissive-only anyway, so they lose nothing.
+  // SECONDARY warm panes: the lantern, the yard's lit door, the kitchen fire,
+  // the city's windows. Near-black albedo on purpose — these sit close to point
+  // lights, and any normal albedo would clip all three channels and render pale
+  // cream. Carrying the value in `emissive` keeps them warm and, crucially,
+  // keeps them PREDICTABLE: an emissive pane is the same value whatever the
+  // lighting does, which is what lets the beacon below be graded against them.
+  //
+  // Dropped 1.9 -> 1.3 in round 2. At 1.9 the kitchen fire and the yard door
+  // measured within 10 L of the destination, so the arch had three equal warm
+  // patches and pointed nowhere. Dropped again 1.3 -> 1.05 in round 3 for the
+  // same reason and against a moved target: halving the scrims lifted every one
+  // of these panes about 8% while the destination was being re-graded DOWN in
+  // luminance to buy saturation, and the jamb lantern came back at L 191 against
+  // a doorway at 200. At 1.05 they land near 169 — visibly lit, visibly minor.
+  // This tone now also carries the innkeeper's own lantern (rank 3), which is
+  // the dimmest instance of it and survives only because it is die-cut into a
+  // black lantern body; a warm pane on a warm ground needs the frame.
+  //
+  // The hue moved #ff8a20 -> #ffa00c for the same reason the beacon's did, one
+  // rank deeper. This tone's worst case is the city's windows on the backwall:
+  // at rank 4 the haze adds 0.090 linear blue against an emissive green of
+  // 0.14, and the windows came back (209, 118, 100) — the salmon-pink the
+  // review flagged. Raising the source green to 0.31 linear pushes the same
+  // panes to (209, 132, 79), which is gold. Nearer panes (lantern, yard door,
+  // kitchen fire) take less haze and simply read a shade more golden.
   hearth: {
     color: '#060200',
     roughness: 1,
     metalness: 0,
-    emissive: '#ff8a20',
-    // 1.9, not 3.0: above ~2.2 the emissive alone clips all three channels and
-    // every warm pane in the diorama renders the same pale cream. The five
-    // stacked scrims already cost the deep ranks ~40% toward blue, so the
-    // emissive has to be saturated rather than merely bright.
-    emissiveIntensity: 1.9,
+    emissive: '#ffa810',
+    emissiveIntensity: 1.05,
+  },
+  // THE CITY. Round 2's note here read "it cannot be made GOLD: nothing at
+  // rank 4 can" — and that was true only because HAZE_EMISSIVE_SCALE was 0.6.
+  // At 0.30 the blue the haze forces into a rank-4 emissive halves, and these
+  // panes come back warm on their own. The source green comes back DOWN from
+  // #ffcc00 (which was only ever raised to out-vote blue that is no longer
+  // there) and the intensity comes down with it, because four scrims at half
+  // opacity now pass 85% instead of 70% and the same number would have made
+  // the far city brighter than the inn in front of it.
+  citylight: {
+    color: '#050100',
+    roughness: 1,
+    metalness: 0,
+    emissive: '#ffb42a',
+    emissiveIntensity: 0.5,
+  },
+  // THE DESTINATION. Same construction as `hearth` — zero albedo, all value in
+  // emissive — but graded to clip RED ONLY. With NoToneMapping (book-scene.tsx)
+  // a clipped channel is a hard 255, so a bright neutral emissive goes white
+  // and a saturated one goes gold.
+  //
+  // ROUND 2 LEFT THIS PANE IN A CAGE AND ROUND 3 UNLOCKED IT. Two constants
+  // were doing the caging. `HAZE_EMISSIVE_SCALE` at 0.6 floored a rank-3
+  // emissive at 0.216 * 0.287 = 0.062 linear BLUE no matter how saturated the
+  // source, so the only way to look gold was to out-vote it with green — a
+  // paler doorway by construction. And three scrims at 0.10/0.07/0.04 passed
+  // only 80% of it, so a clipped 255 arrived as 224 and the red was hard
+  // capped: the pane could not out-measure the light pool on the deck at any
+  // intensity, and round 2 had to drag the key light down instead.
+  //
+  // At haze scale 0.30 and half-opacity scrims the blue floor halves (0.031)
+  // and transmission goes to 0.90, so the source can be a real fire hue and the
+  // intensity can be raised until the doorway is simply the brightest thing in
+  // the frame. Measured at the pane, through the scrims: (255, 222, 105),
+  // At haze scale 0.30 and half-opacity scrims the blue floor halves and
+  // transmission goes to 0.90, so the source can be a real fire hue.
+  //
+  // AND THE GRADE IS NOT WHERE IT LOOKED. Two measurements moved this tone off
+  // the arithmetic round 2 was doing. (a) Blending happens in the default
+  // sRGB drawing buffer, not in linear, so three scrims turn a clipped 255 into
+  // 0.8985*255 + 0.1015*91 = 238 — red is capped at 238 and no intensity in the
+  // world raises it. (b) The pane's own near-black ALBEDO is lerped 36% toward
+  // the haze by HAZE_RAMP, which the emissive scale does not touch, and the key
+  // light standing point-blank in front of it lit that blue-grey to a measured
+  // 0.075 linear BLUE floor — more blue than the emissive was contributing.
+  //
+  // So the intensity came DOWN (4.0 -> 2.3) and the source green went UP: past
+  // the point where red clips, extra intensity buys nothing but blue, because
+  // blue is the only channel the haze feeds. Measured through the scrims:
+  // (238, 200, 111) against (238, 223, 125) at intensity 4 — same value, real
+  // gold instead of chartreuse. The remaining blue is the albedo floor, and the
+  // key light's own hue is what finally takes it out (see the light group).
+  beacon: {
+    color: '#050100',
+    roughness: 1,
+    metalness: 0,
+    emissive: '#ff9800',
+    emissiveIntensity: 2.3,
   },
   night: { color: '#0e1526', roughness: 1, metalness: 0 },
   // A true zero albedo, and the only tone in the table that has one. The
@@ -213,14 +304,26 @@ const TONES: Record<CutTone, ToneSpec> = {
   // stops being a cut-out. Nothing multiplied by black survives a strong light.
   ink: { color: '#000000', roughness: 1, metalness: 0 },
   // Moon and stars ride at rank 5, the deepest haze, so the intensity is
-  // pre-paid: 2.8 * (1 - 0.66*0.6) = ~1.7 by the time it is graded.
+  // pre-paid. Taken down from 2.8 in round 2, where the moon measured L=204 —
+  // second brightest thing in the frame, and cool, so it pulled the eye clean
+  // off the warm destination. Taken down AGAIN, 2.2 -> 1.3, purely to hold that
+  // gain: dropping the haze scale to 0.30 and halving the scrims multiplies
+  // everything at rank 5 by about 1.8 (1.33 from the grade, 1.33 from five
+  // veils now passing 78% instead of 59%), so keeping 2.2 would have handed the
+  // moon back the frame. The night plate behind it takes the same 1.8 in the
+  // other direction — less scrim lift, so a genuinely darker sky.
   moon: {
-    color: '#e9f1ff',
+    color: '#c3cee2',
     roughness: 0.5,
     metalness: 0,
     emissive: '#cfe0ff',
-    emissiveIntensity: 2.8,
+    emissiveIntensity: 0.7,
   },
+  // THE RUNNER. No emissive and a deliberately near-black green and blue: the
+  // warm key at the doorway multiplies this albedo by roughly (4.3, 3.1, 1.2)
+  // at the far end and by a tenth of that at the mouth, so red is the only
+  // channel with anywhere to go. Scarlet at the door, oxblood at the arch.
+  runner: { color: '#5e1418', roughness: 0.95, metalness: 0 },
 }
 
 /**
@@ -231,16 +334,34 @@ const TONES: Record<CutTone, ToneSpec> = {
  */
 const HAZE = new THREE.Color('#4c6a93')
 const HAZE_RAMP = [0, 0.1, 0.22, 0.36, 0.52, 0.66] as const
-/** Emissive gets the same ramp at 0.6 strength so far windows cannot out-punch
- *  near ones — an unhazed emissive is the one channel that would defeat the
- *  whole cue. */
-const HAZE_EMISSIVE_SCALE = 0.6
+/**
+ * Emissive gets the same ramp so far windows cannot out-punch near ones — an
+ * unhazed emissive is the one channel that would defeat the whole cue.
+ *
+ * 0.6 -> 0.30. At 0.6 this constant was not shading the depths, it was setting
+ * the palette: every emissive deeper than rank 2 got a blue floor it could not
+ * spend its way out of, which is why round 2 measured a salmon city, a capped
+ * doorway, and had to raise green in three separate tones to fight the same
+ * lerp. The haze should WHISPER — enough to keep a rank-4 lamp from reading as
+ * near as a rank-1 lamp, not enough to decide what colour the fire is. Albedo
+ * keeps the full HAZE_RAMP, which is where atmospheric perspective actually
+ * belongs; light sources now stay their own colour and lose mostly VALUE.
+ */
+const HAZE_EMISSIVE_SCALE = 0.3
 
 /** Mechanism 2 of 2: a translucent scrim standing in FRONT of each rank 1..5.
  *  Tint alone only desaturates; a physical veil of air also LIFTS the black
- *  level, which is what actually separates a far plane from a near one. */
+ *  level, which is what actually separates a far plane from a near one.
+ *
+ *  HALVED IN ROUND 3. Stacked, the old numbers put 20% of a flat blue-grey over
+ *  everything at rank 3 and 30% over rank 5 — that is not air, that is a lid.
+ *  It capped the destination's red at 224, greyed the night sky's blacks, and
+ *  cost every deep piece its saturation. At half strength rank 3 passes 90% and
+ *  rank 5 passes 78%, which is still a measurable 12-point spread between
+ *  consecutive ranks and still lifts the far blacks — the separation survives,
+ *  the palette comes back. */
 const SCRIM_COLOR = '#5b7ba6'
-const SCRIM_OPACITY = [0.04, 0.07, 0.1, 0.13, 0.16] as const
+const SCRIM_OPACITY = [0.02, 0.035, 0.05, 0.065, 0.08] as const
 const SCRIM_OVERSIZE = 1.15
 const SCRIM_Z = 0.03
 
@@ -359,6 +480,23 @@ export function TunnelPopupLayer({
     // is to CARRY a shadow.
     const deckMaterial = toneMaterial('stone', 0)
 
+    // --- what LIES ON the deck: the runner, and the paving joints ----------
+    // Same plan frame as the deck and therefore the same shear, then a lift
+    // along the deck's own up normal (0, cos A, sin A) so the piece rests a
+    // hair proud of the paving instead of z-fighting it. Rank 0: these are the
+    // nearest thing in the diorama and take no haze.
+    const overlays = deckOverlays().map((o) => {
+      const g = new THREE.ExtrudeGeometry(o.shapes as THREE.Shape[], {
+        depth: o.thickness,
+        bevelEnabled: false,
+      })
+      g.applyMatrix4(DECK_PLAN_TO_STAGE)
+      g.translate(0, o.lift * Math.cos(RAKE_ANGLE), o.lift * Math.sin(RAKE_ANGLE))
+      g.computeVertexNormals()
+      geometries.push(g)
+      return { id: o.id, geometry: g, material: toneMaterial(o.tone, 0) }
+    })
+
     // --- the well: far wall of the trap, top flush with the deck -----------
     const wellPosition = stageLocal(0, deckY(STAGE.well.z0) - STAGE.well.depth, STAGE.well.z0)
     const well: PieceNode[] = wellPieces().map((p) => ({
@@ -426,6 +564,7 @@ export function TunnelPopupLayer({
     return {
       deckGeometry,
       deckMaterial,
+      overlays,
       wellPosition,
       well,
       planes,
@@ -643,14 +782,55 @@ export function TunnelPopupLayer({
           shadow frustum stay put while the diorama folds. */}
       <group name="tunnel-lights">
         <ambientLight color="#7f93b8" intensity={0.35} />
-        {/* THE MONEY LIGHT: the warm glow deep in the inn. Sitting behind the
-            arch mouth, it rims the INNER edge of every die-cut — which is the
-            single cue that says "these are separate sheets of paper". */}
+        {/* THE MONEY LIGHT — and in round 2 it moved INTO the doorway it is
+            supposed to be coming out of.
+
+            It used to stand at [-0.29, 0.62, -0.34], intensity 9, distance 2.4:
+            0.18 in front of the backwall and reaching the whole box. Two things
+            went wrong, both measured. (a) Irradiance on the backwall was ~280,
+            which blew the rank-4 plate to a grey #b9b1b2 stripe seen through
+            the gallery's door slit — the destination read as a torn alpha.
+            (b) At distance 2.4 the falloff across the 0.5-unit stretch of deck
+            under the arch was almost flat, so the near floor took the same
+            ~44 irradiance as the far floor and the brightest mass in the
+            picture was blank paving at the reader's feet (deck L=191 against a
+            doorway at L=123 — the value hierarchy exactly inverted).
+
+            Now it sits AT the gallery doorway aperture (z -0.30 is the gallery
+            plane; y 0.74 is two thirds up the opening) with a 0.95 cutoff.
+            Inverse square over that short a distance is the whole point: the
+            deck immediately outside the doorway still takes a pool of light —
+            that pool is what the reader sees through the gate slots — while the
+            deck under the arch mouth, 0.54 away instead of 0.25, takes a
+            quarter of it and goes to a mid value where it belongs.
+
+            Trimmed 3.4 -> 2.8 -> 2.0 after measuring. At 3.4 that pool, seen
+            through the gate slots, out-measured the doorway itself (L 223 vs
+            212); at 2.8 it was still level with it. The doorway is pure
+            emissive AND its red is capped at 224 by the three scrims in front
+            of it, so it cannot be raised to win the comparison — this number is
+            the only knob that changes their ORDER.
+
+            The colour stays saturated on purpose: with NoToneMapping, a warm
+            light that clips clips only its red channel and the hot spot stays
+            gold instead of going white.
+
+            ROUND 3 TOOK THE BLUE OUT OF IT: #ffa94e -> #ff9c2c, which is a
+            third of the blue. This lamp stands point-blank in front of the
+            beacon plate, and HAZE_RAMP lerps that plate's near-black albedo 36%
+            toward a blue-grey haze — so whatever blue this light carries is
+            multiplied straight into the destination's own colour. Measured, it
+            was contributing more blue to the doorway than the emissive was.
+            Every warm surface in the box gains by the same change: the deck
+            pool, the voussoirs and the runner all take their key from here, and
+            round 2's complaint that the picture had lost its warmth was in
+            large part this one hex value. Intensity 2.0 -> 2.3 because the
+            runner now absorbs most of what used to bounce off pale paving. */}
         <pointLight
-          position={[-0.29, 0.62, -0.34]}
-          color="#ffb15e"
-          intensity={9}
-          distance={2.4}
+          position={[-0.29, 0.74, -0.3]}
+          color="#ff9c2c"
+          intensity={2.3}
+          distance={0.95}
           decay={2}
           ref={(l) => l?.layers.enable(TUNNEL_LAYER)}
         />
@@ -665,12 +845,22 @@ export function TunnelPopupLayer({
           castShadow
         />
         <object3D ref={targetRef} position={[0, 0.36, -0.2]} />
-        {/* The kitchen burning below the trap. */}
+        {/* The kitchen burning below the trap. Pulled 4 -> 1.4 with the key and
+            moved 0.09 further from the pit's far wall: the trap sits at the
+            arch's lower left, and at 0.166 from that wall its spill measured
+            the single brightest peak in the frame (L 215) — a fire in a cellar
+            outranking the end of the tunnel. The cook and the pots still read,
+            because a silhouette needs a lit wall behind it, not a bright one.
+
+            1.0 -> 0.82 in round 3. Its hottest pixel measured L 196 against a
+            destination re-graded to 200 — a four-point margin is not a
+            hierarchy, and the trap sits in the lower LEFT of the same arch, so
+            the two compete inside one glance. */}
         <pointLight
-          position={[-0.69, 0.16, 0.17]}
+          position={[-0.69, 0.19, 0.26]}
           color="#ff8a3c"
-          intensity={4}
-          distance={1.1}
+          intensity={0.82}
+          distance={0.7}
           decay={2}
           ref={(l) => l?.layers.enable(TUNNEL_LAYER)}
         />
@@ -686,6 +876,13 @@ export function TunnelPopupLayer({
             castShadow
             receiveShadow
           />
+
+          {/* the runner and the paving joints, lying on it. They take the
+              arch's raking shadow but cast none of their own — a 5mm carpet
+              casting a shadow map entry buys nothing but acne. */}
+          {built.overlays.map((o) => (
+            <mesh key={o.id} ref={tagMesh} geometry={o.geometry} material={o.material} receiveShadow />
+          ))}
 
           {/* down the trap */}
           <group position={built.wellPosition}>
