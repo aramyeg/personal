@@ -590,17 +590,17 @@ export function AtmosphereFx() {
       const level = passage * stage * breathe
       arch.outer.uniforms.uTime.value = f.time
       arch.inner.uniforms.uTime.value = f.time
-      arch.outer.uniforms.uOpacity.value = level * 0.26
-      arch.inner.uniforms.uOpacity.value = level * 0.32
+      arch.outer.uniforms.uOpacity.value = level * 0.2
+      arch.inner.uniforms.uOpacity.value = level * 0.2
       const group = archGroupRef.current
       if (group) group.visible = level > 0.003
       const flare = flareRef.current
       if (flare) {
         // The flare is a breath in the arch's mouth, not the light itself — the bore's own
         // edges must stay legible or the arch reads as a fireball stuck to the facade.
-        flareMat.opacity = Math.min(1, level * 0.16)
+        flareMat.opacity = Math.min(1, level * 0.05)
         flare.visible = flareMat.opacity > 0.004
-        const s = ARCH.halfW * (1.3 + 0.3 * Math.min(1, level))
+        const s = ARCH.halfW * (1.1 + 0.2 * Math.min(1, level))
         flare.scale.set(s, s * 1.05, 1)
       }
     }

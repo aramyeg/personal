@@ -108,7 +108,6 @@ function makeHaloTexture(): THREE.CanvasTexture {
 export function TheKey() {
   const ctx = useWild()
   const gl = useThree((s) => s.gl)
-  const three = useThree()
 
   const rootRef = useRef<THREE.Group>(null)
   const keyRef = useRef<THREE.Group>(null)
@@ -319,29 +318,6 @@ export function TheKey() {
 
     turnRef.current = turn
     ctx.wake.current = turn
-
-    // TEMP CAPTURE HOOK — remove before ship.
-    ;(window as unknown as { __wild?: unknown }).__wild = {
-      turn,
-      target: targetRef.current,
-      open: f.open,
-      fade,
-      armed: armedRef.current,
-      visible: root.visible,
-      world: root.getWorldPosition(new THREE.Vector3()).toArray(),
-      screen: (() => {
-        const v = root.getWorldPosition(new THREE.Vector3()).project(three.camera)
-        return [
-          Math.round((v.x * 0.5 + 0.5) * three.size.width),
-          Math.round((1 - (v.y * 0.5 + 0.5)) * three.size.height),
-        ]
-      })(),
-      kids: root.children.map((c) => {
-        const mesh = c as THREE.Mesh
-        const mat = mesh.material as THREE.MeshStandardMaterial | undefined
-        return [c.type, c.visible, mat?.opacity ?? null, mat?.transparent ?? null, (mesh.geometry as THREE.BufferGeometry | undefined)?.type ?? null]
-      }),
-    }
 
     // THE BECKON. Anticipation first (a small counter-rock), then the sweep back, under an
     // envelope so it starts and ends at rest. Retired the instant the key is touched.
