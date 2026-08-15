@@ -20,7 +20,7 @@ import * as THREE from 'three'
 import type { SceneLayer } from '../content'
 import { useGuardedDispose } from './material-pool'
 import { kraftTints } from './paper-stock'
-import { liveSpreadRole, spreadPageAnglesTilted, type DepthVistaGeom, type DepthVistaWing, type PanelQuad } from './popup-mechanics'
+import { liveSpreadRole, spreadPageAnglesTilted, type TurnStage, type DepthVistaGeom, type DepthVistaWing, type PanelQuad } from './popup-mechanics'
 import { depthVistaEnvelope, moundPatches } from './popup-depthvista'
 import { easeTurnWeighted } from './page-geometry'
 import { shadowLift } from './shadow-light'
@@ -64,7 +64,8 @@ function writeQuad(geometry: THREE.BufferGeometry, quad: PanelQuad): void {
 function usePageAngles(
   spreadIndex: number,
   frame: RefObject<TurnFrame | null>,
-  committedSpread: RefObject<number>
+  committedSpread: RefObject<number>,
+  stage?: TurnStage
 ): () => { role: ReturnType<typeof liveSpreadRole>; thetaL: number; thetaR: number; beta: number } {
   return () => {
     const f = frame.current
@@ -73,7 +74,8 @@ function usePageAngles(
       spreadIndex,
       committedSpread.current,
       f?.dir ?? null,
-      f ? easeTurnWeighted(f.t) : 0
+      f ? easeTurnWeighted(f.t) : 0,
+      stage
     )
     return { role, thetaL, thetaR, beta: thetaL - thetaR }
   }
@@ -100,7 +102,7 @@ function WingFlap({
   const faceArt = useArtTexture(`${layer.id}-${wing.key}`)
   const outline = useLayerOutline(`${layer.id}-${wing.key}`)
   const tint = useMemo(() => kraftTints(`${layer.id}-${wing.key}`), [layer.id, wing.key])
-  const readAngles = usePageAngles(spreadIndex, frame, committedSpread)
+  const readAngles = usePageAngles(spreadIndex, frame, committedSpread, layer.stage)
 
   const geometry = useMemo(
     () => (outline ? makeShapedGeometry(outline) : makeQuadGeometry(new Float32Array(FLAP_UVS))),

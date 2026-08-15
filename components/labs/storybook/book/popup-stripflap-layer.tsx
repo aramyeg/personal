@@ -266,7 +266,8 @@ export function StripFlapPopupLayer({
       spreadIndex,
       committedSpread.current,
       frame.current?.dir ?? null,
-      frame.current ? easeTurnWeighted(frame.current.t) : 0
+      frame.current ? easeTurnWeighted(frame.current.t) : 0,
+      layer.stage
     )
 
   /** The pointer's angle about the flap hinge line (law H3). The family's
@@ -352,7 +353,8 @@ export function StripFlapPopupLayer({
       spreadIndex,
       committedSpread.current,
       f?.dir ?? null,
-      f ? easeTurnWeighted(f.t) : 0
+      f ? easeTurnWeighted(f.t) : 0,
+      layer.stage
     )
     const beta = thetaL - thetaR
 

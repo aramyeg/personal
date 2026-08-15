@@ -16,7 +16,7 @@ import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import type { SceneLayer } from '../content'
 import { useGuardedDispose } from './material-pool'
-import { liveSpreadRole, spreadPageAnglesTilted, type PanelQuad } from './popup-mechanics'
+import { liveSpreadRole, spreadPageAnglesTilted, type TurnStage, type PanelQuad } from './popup-mechanics'
 import { solveSkylineRow, keepSkylineEnvelope, type KeepSkylineGeom } from './popup-skyline'
 import { kraftTints } from './paper-stock'
 import { easeTurnWeighted } from './page-geometry'
@@ -115,7 +115,8 @@ export function writeShapedQuad(geometry: THREE.BufferGeometry, quad: PanelQuad,
 function usePageAngles(
   spreadIndex: number,
   frame: RefObject<TurnFrame | null>,
-  committedSpread: RefObject<number>
+  committedSpread: RefObject<number>,
+  stage?: TurnStage
 ): () => { role: ReturnType<typeof liveSpreadRole>; thetaL: number; thetaR: number; beta: number } {
   return () => {
     const f = frame.current
@@ -124,7 +125,8 @@ function usePageAngles(
       spreadIndex,
       committedSpread.current,
       f?.dir ?? null,
-      f ? easeTurnWeighted(f.t) : 0
+      f ? easeTurnWeighted(f.t) : 0,
+      stage
     )
     return { role, thetaL, thetaR, beta: thetaL - thetaR }
   }
@@ -150,7 +152,7 @@ function SkylineRow({
   // sidecar exists — in which case we keep the original rectangle quad.
   const outline = useLayerOutline(`${layer.id}-mound${k}`)
   const tint = useMemo(() => kraftTints(`${layer.id}-mound${k}`), [layer.id, k])
-  const readAngles = usePageAngles(spreadIndex, frame, committedSpread)
+  const readAngles = usePageAngles(spreadIndex, frame, committedSpread, layer.stage)
   const row = layer.rows[k]
 
   // Rebuilt when the atlas rect resolves (it arrives a frame or two after the

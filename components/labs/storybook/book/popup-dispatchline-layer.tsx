@@ -304,7 +304,8 @@ export function DispatchLinePopupLayer({
       spreadIndex,
       committedSpread.current,
       f?.dir ?? null,
-      f ? easeTurnWeighted(f.t) : 0
+      f ? easeTurnWeighted(f.t) : 0,
+      layer.stage
     )
     return { role, thetaL, thetaR, beta: thetaL - thetaR }
   }

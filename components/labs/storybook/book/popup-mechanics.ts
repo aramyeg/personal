@@ -1761,6 +1761,21 @@ export function sheetAngleTilted(dir: TurnDir, easedT: number, committedSpread: 
   return from + (to - from) * clamp(easedT, 0, 1)
 }
 
+/** E4 staging: the sub-window of the page turn over which a piece erects.
+ *  t0/t1 are fractions of the driver's published turn progress, 0..1. */
+export type TurnStage = { t0: number; t1: number }
+
+/** Remap the page-turn fraction into a piece's own erection window.
+ *  Outside the window the piece is fully flat (before) or fully erect (after);
+ *  inside it, it runs its whole travel. t0 >= t1 is treated as unstaged.
+ *  CRITICAL: stageTurnT(0) === 0 and stageTurnT(1) === 1 for every window, so
+ *  fold-flat at book-closed and the rest pose at book-open are both preserved
+ *  exactly — staging changes WHEN a piece moves, never WHERE it ends up. */
+export function stageTurnT(easedT: number, stage?: TurnStage): number {
+  if (!stage || stage.t1 <= stage.t0) return easedT
+  return Math.min(1, Math.max(0, (easedT - stage.t0) / (stage.t1 - stage.t0)))
+}
+
 /**
  * Tilted replacement for `spreadPageAngles`, role derived internally from
  * the frame-loop pair (one clock). Static planes wear their OWN spread's
@@ -1775,7 +1790,10 @@ export function spreadPageAnglesTilted(
   spreadIndex: number,
   committedSpread: number,
   dir: TurnDir | null,
-  easedT: number
+  easedT: number,
+  /** E4 staging (optional): this piece's own erection window inside the turn.
+   *  Omitted, every line below runs on the raw eased clock exactly as before. */
+  stage?: TurnStage
 ): { thetaL: number; thetaR: number } {
   const role = liveSpreadRole(spreadIndex, committedSpread, dir)
   const rest = restAngles(spreadIndex)
@@ -1789,7 +1807,11 @@ export function spreadPageAnglesTilted(
   if (dir === null || role === 'current' || role === 'hidden') {
     return { thetaL: Math.PI - rest.aL, thetaR: rest.aR }
   }
-  const theta = sheetAngleTilted(dir, easedT, committedSpread)
+  // THE ONE STAGED LINE (E4 §1a). Only the moving sheet's angle is remapped:
+  // both endpoints of the window map to the sweep's own endpoints, so a staged
+  // piece leaves the rest pose it left before and lands on the plane it landed
+  // on before — it only spends a different part of the turn getting there.
+  const theta = sheetAngleTilted(dir, stageTurnT(easedT, stage), committedSpread)
   if (dir === 'next') {
     // Sheet lifts off the right stack, lands as the incoming left page.
     return role === 'outgoing'

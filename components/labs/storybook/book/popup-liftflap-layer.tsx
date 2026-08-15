@@ -23,7 +23,7 @@ import * as THREE from 'three'
 import type { SceneLayer } from '../content'
 import { useGuardedDispose } from './material-pool'
 import type { LiftFlapGeom, PanelQuad } from './popup-mechanics'
-import { liveSpreadRole, spreadPageAnglesTilted } from './popup-mechanics'
+import { liveSpreadRole, spreadPageAnglesTilted, type TurnStage } from './popup-mechanics'
 import {
   doorSlopFactors,
   liftFlapGrabQuad,
@@ -133,7 +133,8 @@ function useFaceMaterials(fallbackTexture: THREE.Texture, artId: string) {
 function usePageAngles(
   spreadIndex: number,
   frame: RefObject<TurnFrame | null>,
-  committedSpread: RefObject<number>
+  committedSpread: RefObject<number>,
+  stage?: TurnStage
 ): () => { role: ReturnType<typeof liveSpreadRole>; thetaL: number; thetaR: number; beta: number } {
   return () => {
     const f = frame.current
@@ -142,7 +143,8 @@ function usePageAngles(
       spreadIndex,
       committedSpread.current,
       f?.dir ?? null,
-      f ? easeTurnWeighted(f.t) : 0
+      f ? easeTurnWeighted(f.t) : 0,
+      stage
     )
     return { role, thetaL, thetaR, beta: thetaL - thetaR }
   }
@@ -172,7 +174,7 @@ export function LiftFlapPopupLayer({
   const groupRef = useRef<THREE.Group>(null)
   const doorMeshRefs = useRef<(THREE.Mesh | null)[]>([])
   const slopMeshRefs = useRef<(THREE.Mesh | null)[]>([])
-  const readAngles = usePageAngles(spreadIndex, frame, committedSpread)
+  const readAngles = usePageAngles(spreadIndex, frame, committedSpread, layer.stage)
   const thetaMax = liftFlapMax(layer)
   const doorCount = layer.doors.length
 

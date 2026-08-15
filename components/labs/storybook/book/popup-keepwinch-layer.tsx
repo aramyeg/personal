@@ -33,7 +33,7 @@ import * as THREE from 'three'
 import type { SceneLayer } from '../content'
 import { useGuardedDispose } from './material-pool'
 import type { PanelQuad } from './popup-mechanics'
-import { liveSpreadRole, spreadPageAnglesTilted } from './popup-mechanics'
+import { liveSpreadRole, spreadPageAnglesTilted, type TurnStage } from './popup-mechanics'
 import {
   KEEP_WINCH_IRIS_SHUTTERS,
   keepWinchAtPawl,
@@ -144,7 +144,8 @@ function enlargeQuad(quad: PanelQuad, kf: number): PanelQuad {
 function usePageAngles(
   spreadIndex: number,
   frame: RefObject<TurnFrame | null>,
-  committedSpread: RefObject<number>
+  committedSpread: RefObject<number>,
+  stage?: TurnStage
 ): () => { role: ReturnType<typeof liveSpreadRole>; thetaL: number; thetaR: number; beta: number; turnT: number } {
   return () => {
     const f = frame.current
@@ -156,7 +157,8 @@ function usePageAngles(
       spreadIndex,
       committedSpread.current,
       f?.dir ?? null,
-      f ? easeTurnWeighted(turnT) : 0
+      f ? easeTurnWeighted(turnT) : 0,
+      stage
     )
     return { role, thetaL, thetaR, beta: thetaL - thetaR, turnT }
   }
@@ -179,7 +181,7 @@ function WinchDisc({
   const slopRef = useRef<THREE.Mesh>(null)
   const { texture: art, rect } = useArtSprite(`${layer.id}-disc`)
   const tint = useMemo(() => kraftTints(`${layer.id}-disc`), [layer.id])
-  const readAngles = usePageAngles(spreadIndex, frame, committedSpread)
+  const readAngles = usePageAngles(spreadIndex, frame, committedSpread, layer.stage)
   const thetaMax = useMemo(() => keepWinchThetaMax(layer), [layer])
 
   // Only the DRAWN quad is remapped into the atlas region; the touch-slop quad
@@ -393,7 +395,7 @@ function WinchOutput({
   const groupRef = useRef<THREE.Group>(null)
   const { texture: art, rect } = useArtSprite(artId)
   const tint = useMemo(() => kraftTints(artId), [artId])
-  const readAngles = usePageAngles(spreadIndex, frame, committedSpread)
+  const readAngles = usePageAngles(spreadIndex, frame, committedSpread, layer.stage)
   const geometries = useMemo(
     () =>
       Array.from({ length: count }, (_, i) =>

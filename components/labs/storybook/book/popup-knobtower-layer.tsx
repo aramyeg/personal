@@ -26,7 +26,7 @@ import { useFrame, type ThreeEvent } from '@react-three/fiber'
 import * as THREE from 'three'
 import type { SceneLayer } from '../content'
 import { kraftTints } from './paper-stock'
-import { liveSpreadRole, spreadPageAnglesTilted, type KnobTowerGeom } from './popup-mechanics'
+import { liveSpreadRole, spreadPageAnglesTilted, type TurnStage, type KnobTowerGeom } from './popup-mechanics'
 import { knobTowerThetaMax, knobTowerTierLift, solveKnobTowerPose } from './popup-knobtower'
 import { ROTOR_LIFT } from './popup-rotor'
 import { shadowLift } from './shadow-light'
@@ -145,7 +145,8 @@ function enlargeQuad(
 function usePageAngles(
   spreadIndex: number,
   frame: RefObject<TurnFrame | null>,
-  committedSpread: RefObject<number>
+  committedSpread: RefObject<number>,
+  stage?: TurnStage
 ): () => { role: ReturnType<typeof liveSpreadRole>; thetaL: number; thetaR: number; beta: number } {
   return () => {
     const f = frame.current
@@ -154,7 +155,8 @@ function usePageAngles(
       spreadIndex,
       committedSpread.current,
       f?.dir ?? null,
-      f ? easeTurnWeighted(f.t) : 0
+      f ? easeTurnWeighted(f.t) : 0,
+      stage
     )
     return { role, thetaL, thetaR, beta: thetaL - thetaR }
   }
@@ -179,7 +181,7 @@ function KnobDisc({
   const slopRef = useRef<THREE.Mesh>(null)
   const art = useArtTexture(`${layer.id}-disc`)
   const tint = useMemo(() => kraftTints(`${layer.id}-disc`), [layer.id])
-  const readAngles = usePageAngles(spreadIndex, frame, committedSpread)
+  const readAngles = usePageAngles(spreadIndex, frame, committedSpread, layer.stage)
   const thetaMax = useMemo(() => knobTowerThetaMax(layer), [layer])
 
   const geometry = useMemo(() => makeQuadGeometry(new Float32Array([0, 0, 1, 0, 1, 1, 0, 1])), [])
@@ -373,7 +375,7 @@ function KnobTier({
   const shadowGroupRef = useRef<THREE.Group>(null)
   const faceArt = useArtTexture(`${layer.id}-tier${k}`)
   const tint = useMemo(() => kraftTints(`${layer.id}-tier${k}`), [layer.id, k])
-  const readAngles = usePageAngles(spreadIndex, frame, committedSpread)
+  const readAngles = usePageAngles(spreadIndex, frame, committedSpread, layer.stage)
   const tier = layer.tiers[k]
   const inFace = `tier${k}In`
   const outFace = `tier${k}Out`

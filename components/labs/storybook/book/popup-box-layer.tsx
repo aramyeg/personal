@@ -287,7 +287,8 @@ export function BoxPopupLayer({
       spreadIndex,
       committedSpread.current,
       f?.dir ?? null,
-      f ? easeTurnWeighted(f.t) : 0
+      f ? easeTurnWeighted(f.t) : 0,
+      layer.stage
     )
     const beta = thetaL - thetaR
 

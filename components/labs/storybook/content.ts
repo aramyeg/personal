@@ -1,6 +1,6 @@
 import { experiences } from '@/data'
 import type { Experience } from '@/types'
-import type { LayerGeom } from '@/components/labs/storybook/book/popup-mechanics'
+import type { LayerGeom, TurnStage } from '@/components/labs/storybook/book/popup-mechanics'
 import type { IdleTag } from '@/components/labs/storybook/book/idle-life'
 import { buildSwarmStruts } from '@/components/labs/storybook/book/popup-swarmarc'
 
@@ -87,7 +87,21 @@ export type LayerRole = 'backdrop' | 'scenery' | 'figure' | 'story'
  *     paperwork.
  *  Deeper per-spread ambient art (smoke, candle halos, twinkle) belongs to the
  *  scene lanes; this is the draught in the room, nothing more. */
-export type SceneLayer = { id: string; kind: LayerKind; role: LayerRole; idle?: IdleTag } & LayerGeom
+export type SceneLayer = {
+  id: string
+  kind: LayerKind
+  role: LayerRole
+  idle?: IdleTag
+  /** E4: this piece's erection window within the page turn (see TurnStage).
+   *  Omitted = erects across the whole turn, i.e. the pre-E4 behaviour. */
+  stage?: TurnStage
+  /** Read another layer's drive channel instead of your own, remapped through
+   *  this window — one reader input, several staggered outputs (Birmingham 101).
+   *  `channel` is the SOURCE layer's id; the source's raw value is normalised by
+   *  ITS OWN family domain (book/drive-phase.ts) before the window is applied,
+   *  because no two families store the same units. */
+  driveFrom?: { channel: string; phase: readonly [number, number] }
+} & LayerGeom
 
 export type Chapter = {
   spread: number

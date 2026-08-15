@@ -22,7 +22,7 @@ import * as THREE from 'three'
 import type { SceneLayer } from '../content'
 import { useGuardedDispose } from './material-pool'
 import type { PanelQuad } from './popup-mechanics'
-import { liveSpreadRole, spreadPageAnglesTilted, type VolvelleGeom } from './popup-mechanics'
+import { liveSpreadRole, spreadPageAnglesTilted, type TurnStage, type VolvelleGeom } from './popup-mechanics'
 import {
   solveVolvellePose,
   volvelleCrankStep,
@@ -145,7 +145,8 @@ function enlargeQuad(quad: PanelQuad, kf: number): PanelQuad {
 function usePageAngles(
   spreadIndex: number,
   frame: RefObject<TurnFrame | null>,
-  committedSpread: RefObject<number>
+  committedSpread: RefObject<number>,
+  stage?: TurnStage
 ): () => { role: ReturnType<typeof liveSpreadRole>; thetaL: number; thetaR: number; beta: number; turnT: number } {
   return () => {
     const f = frame.current
@@ -157,7 +158,8 @@ function usePageAngles(
       spreadIndex,
       committedSpread.current,
       f?.dir ?? null,
-      f ? easeTurnWeighted(turnT) : 0
+      f ? easeTurnWeighted(turnT) : 0,
+      stage
     )
     return { role, thetaL, thetaR, beta: thetaL - thetaR, turnT }
   }
@@ -205,7 +207,7 @@ export function VolvellePopupLayer({
 }) {
   const groupRef = useRef<THREE.Group>(null)
   const slopRef = useRef<THREE.Mesh>(null)
-  const readAngles = usePageAngles(spreadIndex, frame, committedSpread)
+  const readAngles = usePageAngles(spreadIndex, frame, committedSpread, layer.stage)
   const thetaMax = volvelleThetaMax()
 
   const dialGeometry = useMemo(() => makeQuadGeometry(discUvs(layer.side)), [layer.side])

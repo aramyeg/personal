@@ -128,7 +128,8 @@ export function StagedChainPopupLayer({
       spreadIndex,
       committedSpread.current,
       f?.dir ?? null,
-      f ? easeTurnWeighted(f.t) : 0
+      f ? easeTurnWeighted(f.t) : 0,
+      layer.stage
     )
     const beta = thetaL - thetaR
     const visible = role !== 'hidden' && beta > FLAT_EPSILON && texture !== null

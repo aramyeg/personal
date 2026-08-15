@@ -348,7 +348,8 @@ export function DissolvePopupLayer({
       spreadIndex,
       committedSpread.current,
       frame.current?.dir ?? null,
-      frame.current ? easeTurnWeighted(frame.current.t) : 0
+      frame.current ? easeTurnWeighted(frame.current.t) : 0,
+      layer.stage
     )
 
   /** The pointer's projection onto the live page's fore axis (page-frame u),
@@ -466,7 +467,8 @@ export function DissolvePopupLayer({
       spreadIndex,
       committedSpread.current,
       f?.dir ?? null,
-      f ? easeTurnWeighted(f.t) : 0
+      f ? easeTurnWeighted(f.t) : 0,
+      layer.stage
     )
     const beta = thetaL - thetaR
     // TURN-CULL (C-3, dissolve-class): the rack is interaction-only and

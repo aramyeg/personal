@@ -408,7 +408,8 @@ export function TabPiecePopupLayer({
       spreadIndex,
       committedSpread.current,
       frame.current?.dir ?? null,
-      frame.current ? easeTurnWeighted(frame.current.t) : 0
+      frame.current ? easeTurnWeighted(frame.current.t) : 0,
+      layer.stage
     )
 
   /** The pointer's projection onto the live page's strip axis (page-frame u),
@@ -487,7 +488,8 @@ export function TabPiecePopupLayer({
       spreadIndex,
       committedSpread.current,
       f?.dir ?? null,
-      f ? easeTurnWeighted(f.t) : 0
+      f ? easeTurnWeighted(f.t) : 0,
+      layer.stage
     )
     const beta = thetaL - thetaR
 
