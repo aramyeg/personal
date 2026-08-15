@@ -6,13 +6,10 @@ import { useSearchParams } from 'next/navigation'
 import './storybook.css'
 import './storybook-overlay.css'
 import './storybook-responsive.css'
-// E4-TUNNEL-FONT-STUB — the shared node_modules junction no longer carries these
-// three packages (pruned by an install run from the main root, which does not
-// declare them). Restore these four lines the moment they are installed again.
-// import '@fontsource-variable/grenze-gotisch'
-// import '@fontsource-variable/alegreya'
-// import '@fontsource/alegreya-sc/400.css'
-// import '@fontsource/alegreya-sc/700.css'
+import '@fontsource-variable/grenze-gotisch'
+import '@fontsource-variable/alegreya'
+import '@fontsource/alegreya-sc/400.css'
+import '@fontsource/alegreya-sc/700.css'
 import { PlainTale } from './plain-tale'
 import { resolveSbView, type SbView } from './resolve-view'
 import { useStorybookStore } from './store'
