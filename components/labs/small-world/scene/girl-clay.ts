@@ -16,6 +16,14 @@ import * as THREE from 'three'
  * We do NOT touch girl.glb on disk; every change is in-memory at load.
  */
 
+/**
+ * Name the asset chain gives the shirt's material — the shipped file's own label
+ * for the garment primitive. It is `GARMENT_MATERIAL` in
+ * scripts/small-world/detach-girl.mjs, and girl-clay.test.ts asserts the two
+ * still agree rather than trusting a copied string.
+ */
+export const GARMENT_MATERIAL = 'girl_garment'
+
 /** Keep this fraction of the texture's chroma — compresses generated vividness. */
 const GRADE_SAT = 0.72
 /** Lift toward white for pastel airiness (0..1). */
@@ -91,6 +99,23 @@ export function toonifyGirl(
   ramp: THREE.Texture,
   flatShading: boolean
 ): void {
+  // The girl is TWO meshes since T121 cut the shirt into its own primitive, and
+  // both reference the same atlas. gradeGirlTexture reads a 1024² image into a
+  // canvas and walks every pixel, so without this cache it runs twice per mount
+  // and uploads a second identical texture. Keyed on the SOURCE texture rather
+  // than the material because GLTFLoader may hand out cloned materials for
+  // primitives with different attributes while still sharing one texture.
+  const graded = new Map<THREE.Texture, THREE.Texture | null>()
+  const gradeOnce = (src: THREE.Texture): THREE.Texture | null => {
+    if (graded.has(src)) return graded.get(src) ?? null
+    const out = gradeGirlTexture(src)
+    graded.set(src, out)
+    // The source map is superseded for every mesh at once, so it is released
+    // once here rather than once per material.
+    if (out) src.dispose()
+    return out
+  }
+
   scene.traverse((obj) => {
     const mesh = obj as THREE.Mesh
     if (!mesh.isMesh) return
@@ -99,12 +124,32 @@ export function toonifyGirl(
 
     const next = src.map((m) => {
       const std = m as THREE.MeshStandardMaterial
-      const graded = std.map ? gradeGirlTexture(std.map) : null
+      const graded = std.map ? gradeOnce(std.map) : null
       const toon = new THREE.MeshToonMaterial({
         map: graded ?? std.map ?? undefined,
         color: graded || !std.map ? 0xffffff : GRADE_FALLBACK_TINT,
         gradientMap: ramp,
-        side: std.side,
+        // THE SHIRT IS THE ONE DOUBLE-SIDED SURFACE ON THE FIGURE, and it earns
+        // the exception by measurement rather than by taste. The garment is an
+        // OPEN SHEET — a shirt with a hem, two cuffs and a placket — and once the
+        // cloth sim lets its panels swing, the camera looks into the sleeves and
+        // at the inside of the open front. A single-sided material culls those
+        // faces and draws whatever is behind them, which is either the tank or
+        // NOTHING: measured across all six clips at 16 views, 45.2 px/view where
+        // the culled inner face is the nearest surface and the pixel falls
+        // through to the background, and another 45.5 px/view where it falls
+        // through to the body — up to 322 void pixels in one 384² view, with the
+        // culled face 10–20 cm in front of what gets drawn instead
+        // (scratchpad/t124/backface.mjs). That is what "torn" looks like, and it
+        // is worst exactly where a sleeve becomes a tube seen end-on
+        // (scratchpad/t124/sheets/innerzoom-JumpB-{single,double}.png).
+        //
+        // Deliberately scoped to the garment. The body is a closed shell, so a
+        // back face of it reaching the camera would be a real defect and must
+        // keep failing loudly — canonicalize-girl's "all materials OPAQUE +
+        // single-sided" self-test still holds on the ASSET, and this exception
+        // lives in the renderer beside renderOrder rather than weakening it.
+        side: m.name === GARMENT_MATERIAL ? THREE.DoubleSide : std.side,
         transparent: std.transparent,
         alphaTest: std.alphaTest,
       })
@@ -112,13 +157,27 @@ export function toonifyGirl(
       // from its three typings — cast to reach it.
       ;(toon as unknown as { flatShading: boolean }).flatShading = flatShading
       toon.name = std.name
-      // Free what we replaced. Dispose the source map only when a graded copy
-      // took over — otherwise the toon material still points at it.
-      if (graded && std.map) std.map.dispose()
+      // Free what we replaced. The source map is disposed by gradeOnce, once,
+      // when a graded copy takes over — otherwise the toon material still
+      // points at it.
       std.dispose()
       return toon
     })
 
     mesh.material = Array.isArray(mesh.material) ? next : next[0]
+
+    // The shirt draws LAST, and this is a correctness fix rather than a
+    // preference (T121b). The lining is the garment patch offset inward along a
+    // field that tapers to zero at the garment outline, so the 72 lining
+    // triangles whose three vertices all sit on that outline are bit-exact
+    // copies of the garment triangles above them — 43 cm² of two surfaces in
+    // one place. Every fragment there is a depth TIE, and three sorts opaque
+    // objects by distance, so which surface won depended on the camera: the
+    // shirt from one angle, the tank-coloured lining from another. renderOrder
+    // puts the garment after everything else, and the default LessEqual depth
+    // test lets an equal fragment overwrite, so the shirt wins every tie from
+    // every angle. Measured: 21.7 of the bind pose's 28.4 px/view of "lining in
+    // front of shirt" are these ties (scratchpad/t121b/{pokemargin,coincident}.mjs).
+    if (next.some((m) => m.name === GARMENT_MATERIAL)) mesh.renderOrder = 1
   })
 }

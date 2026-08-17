@@ -73,3 +73,12 @@ IMPROVEMENT_PLAN.md
 
 # raw Meshy character sources are never committed (shipped asset is girl.glb)
 /public/labs/small-world/girl-v2.glb
+# T117's weight-rebind output: the raw source with clean skin weights, produced
+# by scripts/small-world/rebind-girl.mjs. Same class as the source above — it is
+# 14 MB, it is re-derivable by script from a file that is itself untracked, and
+# the thing that ships is girl.glb.
+/public/labs/small-world/girl-v2-rebound.glb
+# T120's lining output: the rebound source with the body surface built under the
+# garment, produced by scripts/small-world/line-girl.mjs. Same class again.
+/public/labs/small-world/girl-v2-lined.glb
+public/labs/small-world/girl-v2-cloth.glb
