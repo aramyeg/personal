@@ -4,13 +4,14 @@ import {
   STAIR,
   HALL,
   atticDepth,
+  atticGableHeight,
   atticPlacements,
   atticPlaquePlacement,
   clampToRegions,
   floorY,
   hallLength,
 } from '@/components/labs/museum/layout'
-import type { LabEntry } from '@/lib/labs-manifest'
+import { atticLabs, type LabEntry } from '@/lib/labs-manifest'
 
 const L = hallLength(2) // hall with two paintings
 
@@ -90,9 +91,76 @@ describe('attic placements', () => {
     const ps = atticPlacements([entry('a'), entry('b')], L)
     expect(ps[0].position[0]).not.toBe(ps[1].position[0])
   })
-  it('places the plaque beside the first exhibit on the same wall', () => {
+  it('centres the row on the gable wall however many have been retired', () => {
+    for (const n of [1, 2, 3, 4]) {
+      const ps = atticPlacements(
+        Array.from({ length: n }, (_, i) => entry(`a${i}`)),
+        L
+      )
+      const xs = ps.map((p) => p.position[0])
+      expect((Math.min(...xs) + Math.max(...xs)) / 2).toBeCloseTo(0, 6)
+    }
+  })
+  // Gated against the real manifest, not a fabricated count: the wall has room
+  // for the failures shipped today, and the day one more is retired this fires.
+  //
+  // A hall frame is 2.12 x 2.72 (painting.tsx: ART_W/ART_H + 2 * FRAME_T);
+  // attic placements carry a scale, so every bound below is derived from it.
+  const FRAME_W = 2.12
+  const FRAME_H = 2.72
+  const shipped = atticPlacements(atticLabs, L)
+  const corners = (p: (typeof shipped)[number]) => {
+    const s = p.scale ?? 1
+    return {
+      halfW: (FRAME_W / 2) * s,
+      top: p.position[1] + (FRAME_H / 2) * s,
+      bottom: p.position[1] - (FRAME_H / 2) * s,
+    }
+  }
+
+  it('keeps every shipped exhibit on the gable wall, clear of the knee walls', () => {
+    for (const p of shipped) {
+      expect(Math.abs(p.position[0]) + corners(p).halfW).toBeLessThanOrEqual(ATTIC.halfWidth)
+    }
+  })
+  it('keeps every frame under the roof and off the floor', () => {
+    // The failure this gates: a frame's upper OUTER corners leaving the gable
+    // and hanging in the dark past the roof line.
+    for (const p of shipped) {
+      const { halfW, top, bottom } = corners(p)
+      for (const x of [p.position[0] - halfW, p.position[0] + halfW]) {
+        expect(top).toBeLessThanOrEqual(atticGableHeight(x))
+      }
+      expect(bottom).toBeGreaterThan(STAIR.rise)
+    }
+  })
+  it('never overlaps two shipped frames', () => {
+    for (let i = 1; i < shipped.length; i++) {
+      const gap =
+        shipped[i].position[0] -
+        corners(shipped[i]).halfW -
+        (shipped[i - 1].position[0] + corners(shipped[i - 1]).halfW)
+      expect(gap).toBeGreaterThan(0)
+    }
+  })
+  it('hangs the plaque on the left knee wall, inside it and facing the room', () => {
     const plaque = atticPlaquePlacement(L)
-    expect(plaque.rotationY).toBe(0)
-    expect(plaque.position[2]).toBeCloseTo(-(atticDepth(L) - ATTIC.hangOffset), 6)
+    expect(plaque.rotationY).toBeCloseTo(Math.PI / 2, 6) // normal points +x, into the room
+    expect(plaque.position[0]).toBeLessThan(-(ATTIC.halfWidth - 0.1)) // on the wall
+    expect(plaque.position[0]).toBeGreaterThan(-ATTIC.halfWidth) // not through it
+    // fits between the attic floor and the knee wall's top (plaque is 1.15 tall)
+    expect(plaque.position[1] - 0.575).toBeGreaterThan(STAIR.rise)
+    expect(plaque.position[1] + 0.575).toBeLessThan(STAIR.rise + ATTIC.wallHeight)
+    // and inside the attic's depth rather than in the stair shaft or the wall
+    expect(plaque.position[2]).toBeLessThan(-(L + STAIR.run))
+    expect(plaque.position[2]).toBeGreaterThan(-atticDepth(L))
+  })
+  it('keeps the plaque clear of every hung exhibit', () => {
+    // The two hang on perpendicular walls, so the separation that matters is
+    // along z: the plaque must stand well off the gable the frames cover.
+    const plaque = atticPlaquePlacement(L)
+    for (const p of atticPlacements(atticLabs, L)) {
+      expect(plaque.position[2] - p.position[2]).toBeGreaterThan(1)
+    }
   })
 })

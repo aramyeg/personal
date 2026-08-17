@@ -59,7 +59,12 @@ export default function RoomsModule() {
                 <td className={`px-4 ${pad} font-[family-name:var(--font-data)] text-[12px] tabular-nums`}>{r.date}</td>
                 <td className={`hidden px-4 ${pad} max-w-[420px] truncate text-[12px] text-[var(--c-text-soft)] md:table-cell`} title={r.thesis}>{r.thesis}</td>
                 <td className={`px-4 ${pad} text-right`}>
-                  <a href={r.href} aria-label={`Open ${r.title}`} className="text-[12px] font-medium text-[var(--c-blue)] hover:underline">Open</a>
+                  {/* A remnant is inventoried but has no room to open. */}
+                  {r.href ? (
+                    <a href={r.href} aria-label={`Open ${r.title}`} className="text-[12px] font-medium text-[var(--c-blue)] hover:underline">Open</a>
+                  ) : (
+                    <span className="text-[12px] font-medium text-[var(--c-text-soft)]" title="Decommissioned — no room to open">Decommissioned</span>
+                  )}
                 </td>
               </tr>
             ))}

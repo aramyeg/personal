@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Canvas } from '@react-three/fiber'
 import * as THREE from 'three'
-import { hallLabs, labs } from '@/lib/labs-manifest'
+import { hallLabs, labHref, labs, type LabEntry } from '@/lib/labs-manifest'
 import { hallLength, paintingPlacements, PLAYER } from './layout'
 import { Hall } from './hall'
 import { Painting, PaintingBoundary } from './painting'
@@ -16,6 +16,7 @@ import { PlayerControls, type MoveVec } from './player-controls'
 import { MobileJoystick } from './mobile-joystick'
 import { LoadSignal } from './load-signal'
 import { FocusCard } from './focus-card'
+import { SmallWorldSign } from './small-world-sign'
 import { VisitorGuide } from './visitor-guide'
 import { usePause } from './use-pause'
 
@@ -33,6 +34,7 @@ export default function MuseumGallery({
   const placements = useMemo(() => paintingPlacements(hallLabs), [])
   const targets = useRef(new Map<string, THREE.Object3D>())
   const [focused, setFocused] = useState<string | null>(null)
+  const [sign, setSign] = useState<LabEntry | null>(null)
   const focusedLab = labs.find((l) => l.slug === focused) ?? null
   const moveRef = useRef<MoveVec>({ x: 0, y: 0 })
   const [coarse, setCoarse] = useState(false)
@@ -41,16 +43,45 @@ export default function MuseumGallery({
   const navigatingRef = useRef(false)
   const { paused, open: openPause, close: closePause } = usePause(navigatingRef)
 
+  /** The remnant whose sign was just dismissed. Closing the sign leaves the
+   * visitor unlocked and still facing the frame, so the click that resumes the
+   * walk would re-open it forever; the frame re-arms once they look elsewhere. */
+  const dismissedRef = useRef<string | null>(null)
+  const onFocusChange = useCallback((slug: string | null) => {
+    setFocused(slug)
+    if (slug !== dismissedRef.current) dismissedRef.current = null
+  }, [])
+
+  const closeSign = useCallback(() => {
+    dismissedRef.current = sign?.slug ?? null
+    setSign(null)
+  }, [sign])
+
   const register = useCallback((slug: string, obj: THREE.Object3D | null) => {
     if (obj) targets.current.set(slug, obj)
     else targets.current.delete(slug)
   }, [])
 
+  /**
+   * Enter the focused frame. A remnant has no room behind it, so instead of
+   * routing (which would land on a page this build never shipped) it opens its
+   * sign. Pointer lock is released the same way a navigation would release it,
+   * and the release is flagged so the pause screen does not also open.
+   */
   const enterFocused = useCallback(() => {
     if (!focused) return
-    navigatingRef.current = true
     const lab = labs.find((l) => l.slug === focused)
-    router.push(lab?.href ?? `/labs/${focused}`)
+    if (!lab) return
+    const href = labHref(lab)
+    if (!href) {
+      if (dismissedRef.current === lab.slug) return
+      navigatingRef.current = true
+      document.exitPointerLock?.()
+      setSign(lab)
+      return
+    }
+    navigatingRef.current = true
+    router.push(href)
   }, [focused, router])
 
   return (
@@ -74,8 +105,8 @@ export default function MuseumGallery({
         </Suspense>
         <DrapedFrame labCount={hallLabs.length} />
         <AtticRoom hallLen={length} register={register} focused={focused} />
-        <FocusProbe targets={targets} onChange={setFocused} />
-        <PlayerControls length={length} moveRef={moveRef} paused={paused} />
+        <FocusProbe targets={targets} onChange={onFocusChange} />
+        <PlayerControls length={length} moveRef={moveRef} paused={paused || sign !== null} />
         {onLoadChange && <LoadSignal onChange={onLoadChange} />}
       </Canvas>
 
@@ -85,7 +116,10 @@ export default function MuseumGallery({
       <div className="pointer-events-none absolute left-1/2 top-1/2 h-1.5 w-1.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white/70" />
 
       {/* Lean-in preview of the focused painting */}
-      {focusedLab && <FocusCard lab={focusedLab} />}
+      {focusedLab && !sign && <FocusCard lab={focusedLab} />}
+
+      {/* A remnant's frame opens onto its sign, not onto a route */}
+      {sign && <SmallWorldSign lab={sign} onClose={closeSign} />}
 
       {/* Controls hint */}
       <div className="pointer-events-none absolute bottom-4 left-1/2 -translate-x-1/2 font-mono text-[11px] uppercase tracking-widest text-white/50">

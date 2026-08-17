@@ -1,7 +1,8 @@
 import { experiences } from '@/data/experience'
-import { labs, type LabEntry } from '@/lib/labs-manifest'
+import { labs, labHref } from '@/lib/labs-manifest'
 
-export type RoomRow = { slug: string; title: string; status: 'live' | 'attic'; date: string; thesis: string; href: string }
+/** `href` is null for a remnant — a room in the inventory with nothing to open. */
+export type RoomRow = { slug: string; title: string; status: 'live' | 'attic'; date: string; thesis: string; href: string | null }
 export type PersonnelRow = {
   id: string; company: string; role: string; location: string; period: string
   startDate: string; endDate: string | null; tenureMonths: number
@@ -18,12 +19,10 @@ export function tenureMonths(startDate: string, endDate: string | null, now = ne
   return (end[0] - sy) * 12 + (end[1] - sm)
 }
 
-const roomHref = (l: LabEntry) => l.href ?? `/labs/${l.slug}`
-
 export function getRoomRows(): RoomRow[] {
   return labs.map((l) => ({
     slug: l.slug, title: l.title, status: l.status === 'attic' ? 'attic' : 'live',
-    date: l.date, thesis: l.thesis, href: roomHref(l),
+    date: l.date, thesis: l.thesis, href: labHref(l),
   }))
 }
 

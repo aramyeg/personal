@@ -25,6 +25,17 @@ export type LabEntry = {
   /** The honest saga shown on the attic plaque and in the list view.
    * Required in practice for status 'attic'. */
   retrospective?: string
+  /** No room behind the frame: the experiment left the museum and only its
+   * sign remains. Nothing may link or navigate to a remnant — `labHref`
+   * returns null for it and every consumer renders the entry unlinked. */
+  remnant?: true
+}
+
+/** The route an entry opens, or null when there is nothing to open.
+ * The one place the /labs/<slug> convention is spelled out — routing a lab
+ * anywhere else risks pointing at a room this build never shipped. */
+export function labHref(lab: LabEntry): string | null {
+  return lab.remnant ? null : (lab.href ?? `/labs/${lab.slug}`)
 }
 
 export const labs: LabEntry[] = [
@@ -72,6 +83,17 @@ export const labs: LabEntry[] = [
     thesis:
       'The portfolio as enterprise SaaS — a navy-and-white operations console where the museum itself is the managed asset. Every ritual played straight; the pagination paginates six rows.',
     status: 'live',
+  },
+  {
+    slug: 'small-world',
+    title: 'Small World',
+    date: '2026-07-16',
+    thesis:
+      'A clay planet small enough to walk in an afternoon — every lap of it is a career. A cartoon girl skips through six chapters as the world resculpts itself under her feet.',
+    status: 'attic',
+    remnant: true,
+    retrospective:
+      'There was a whole world in this room once — clay, four seasons, one career walked in an afternoon. It was never really an exhibit; it was a present being wrapped. The museum kept the loading screen.',
   },
 ]
 

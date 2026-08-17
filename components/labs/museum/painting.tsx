@@ -57,7 +57,12 @@ export function Painting({
   const frameColor = focused ? '#d6b968' : GOLD
 
   return (
-    <group ref={group} position={placement.position} rotation-y={placement.rotationY}>
+    <group
+      ref={group}
+      position={placement.position}
+      rotation-y={placement.rotationY}
+      scale={placement.scale ?? 1}
+    >
       {/* Poster */}
       <mesh position={[0, 0, FRAME_D / 2]}>
         <planeGeometry args={[ART_W, ART_H]} />

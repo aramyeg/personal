@@ -1,0 +1,278 @@
+/* THE SIGN — Small World's loading plate, kept looping in the museum attic.
+   Ported from the lab's planet-loader.module.css; the palette arrives as
+   --swl-* custom properties from small-world-sign.tsx (the lab's palette.ts
+   does not exist in this build). The world/bird SVG fills are palette
+   presentation attributes so the sketch pass's line-art override wins. */
+
+/* One endless lap drives everything periodic on the plate — the bird's orbit,
+   the uncoloured wedge and the road's gap — so the loop has no seam. Registered
+   so it interpolates as a number; engines without @property simply step. */
+@property --swl-lap {
+  syntax: '<number>';
+  inherits: true;
+  initial-value: 0;
+}
+
+@keyframes swl-lap {
+  from {
+    --swl-lap: 0;
+  }
+  to {
+    --swl-lap: 1;
+  }
+}
+
+.sign {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  display: grid;
+  place-items: center;
+  overflow-y: auto;
+  background-color: var(--swl-paper);
+  animation: swl-lap 15s linear infinite;
+}
+
+/* Halftone paper grain, pushed out to the edges by a radial mask so the plate
+   itself sits on clean paper. */
+.sign::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(
+    circle,
+    color-mix(in srgb, var(--swl-ink) 9%, transparent) 1px,
+    transparent 1.3px
+  );
+  background-size: 9px 9px;
+  -webkit-mask-image: radial-gradient(120% 90% at 50% 46%, transparent 40%, #000 85%);
+  mask-image: radial-gradient(120% 90% at 50% 46%, transparent 40%, #000 85%);
+  pointer-events: none;
+}
+
+.sheet {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: clamp(1rem, 3vh, 1.6rem);
+  padding: clamp(1.5rem, 5vh, 3rem) 1.25rem;
+}
+
+.plate {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: clamp(0.6rem, 1.8vh, 1rem);
+}
+
+.title {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: clamp(2rem, 5.5vw, 3.4rem);
+  letter-spacing: 0.06em;
+  line-height: 1;
+  color: var(--swl-ink);
+  transform: rotate(-2deg);
+  text-shadow: 3px 3px 0 color-mix(in srgb, var(--swl-clay) 55%, transparent);
+}
+
+.sub {
+  font-family: var(--font-sans);
+  font-size: clamp(0.95rem, 2.2vw, 1.25rem);
+  color: color-mix(in srgb, var(--swl-ink) 72%, transparent);
+  transform: rotate(-1deg);
+}
+
+.world {
+  position: relative;
+  width: min(38vh, 66vw, 300px);
+  aspect-ratio: 1;
+}
+
+.art {
+  position: absolute;
+  inset: 0;
+}
+
+.art svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+/* sketch pass: line art only, faint — the uncoloured page. The .fill elements
+   are the colour shapes; strip their fills and give them a thin ink contour. */
+.sketch {
+  opacity: 0.3;
+}
+
+.sketch svg :global(.fill) {
+  fill-opacity: 0;
+  stroke: color-mix(in srgb, var(--swl-ink) 55%, transparent);
+  stroke-width: 0.7;
+}
+
+/* Colour pass: coloured everywhere EXCEPT a wedge just ahead of the bird. The
+   wedge is cut by rotating the gradient's origin rather than by moving its
+   stops, so it sweeps the rim without ever crossing a seam — the page is
+   always one corner short of finished, and always a different corner. */
+.color {
+  -webkit-mask: conic-gradient(
+    from calc(var(--swl-lap) * 360deg),
+    transparent 0deg var(--swl-gap),
+    #000 var(--swl-gap)
+  );
+  mask: conic-gradient(
+    from calc(var(--swl-lap) * 360deg),
+    transparent 0deg var(--swl-gap),
+    #000 var(--swl-gap)
+  );
+}
+
+.road {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+/* dotted plan of the route, drawn in full from the start */
+.roadPlan {
+  fill: none;
+  stroke: color-mix(in srgb, var(--swl-ink) 16%, transparent);
+  stroke-width: 1.1;
+  stroke-linecap: round;
+  stroke-dasharray: 0.2 2.9;
+}
+
+/* The laid road: ink casing + clay centre. One dash (the laid stretch) and one
+   gap, together exactly the rim — so sliding the offset by a whole rim per lap
+   carries the gap round once and returns the pattern to where it began. The
+   offset is solved so the gap opens at the bird's own position. */
+.roadInk,
+.roadClay {
+  fill: none;
+  stroke-linecap: round;
+  stroke-dasharray: var(--swl-road-tail) calc(var(--swl-road-len) - var(--swl-road-tail));
+  stroke-dashoffset: calc(var(--swl-road-tail) - var(--swl-lap) * var(--swl-road-len));
+}
+
+.roadInk {
+  stroke: var(--swl-ink);
+  stroke-width: 3.4;
+}
+
+.roadClay {
+  stroke: var(--swl-clay);
+  stroke-width: 1.9;
+}
+
+/* the bird rides the road's leading tip: its wrapper takes the same lap angle
+   the wedge and the dash offset are derived from, so all three stay locked */
+.birdBox {
+  position: absolute;
+  inset: 0;
+  transform: rotate(calc(var(--swl-lap) * 360deg));
+}
+
+.bird {
+  position: absolute;
+  left: 50%;
+  top: -7.5%;
+  width: 15%;
+  margin-left: -7.5%;
+  overflow: visible;
+  transform: rotate(8deg);
+}
+
+/* very subtle wing-bob glide — motion-permitting contexts only */
+@media (prefers-reduced-motion: no-preference) {
+  .bird {
+    animation: swl-bob 2.8s ease-in-out infinite;
+  }
+}
+
+@keyframes swl-bob {
+  0%,
+  100% {
+    transform: rotate(8deg) translateY(0);
+  }
+  50% {
+    transform: rotate(5deg) translateY(-3px);
+  }
+}
+
+.chip {
+  background: var(--swl-cream);
+  border: 2px solid var(--swl-ink);
+  border-radius: 3px;
+  box-shadow: 3px 3px 0 color-mix(in srgb, var(--swl-ink) 90%, transparent);
+  padding: 0.45rem 0.95rem;
+  font-family: var(--font-sans);
+  font-weight: 700;
+  font-size: clamp(0.75rem, 1.6vw, 0.9rem);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--swl-ink);
+  transform: rotate(-1deg);
+}
+
+.pct {
+  font-family: var(--font-mono);
+  font-size: 1.05em;
+  margin-left: 0.45em;
+  letter-spacing: 0.06em;
+}
+
+/* The remark: the museum's own label under the borrowed plate. */
+.remark {
+  max-width: 34rem;
+  text-align: center;
+  border-top: 1px solid color-mix(in srgb, var(--swl-ink) 20%, transparent);
+  padding-top: clamp(0.9rem, 2.5vh, 1.4rem);
+}
+
+.retrospective {
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: clamp(0.9rem, 1.8vw, 1.02rem);
+  font-style: italic;
+  line-height: 1.65;
+  color: color-mix(in srgb, var(--swl-ink) 82%, transparent);
+}
+
+.dismiss {
+  margin-top: 1.1rem;
+  border: 2px solid var(--swl-ink);
+  border-radius: 3px;
+  background: transparent;
+  box-shadow: 3px 3px 0 color-mix(in srgb, var(--swl-clay) 70%, transparent);
+  padding: 0.5rem 1.1rem;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--swl-ink);
+  cursor: pointer;
+  transition: background-color 150ms ease;
+}
+
+.dismiss:hover,
+.dismiss:focus-visible {
+  background: var(--swl-cream);
+}
+
+/* Reduced motion: the plate holds one still frame of the lap — the road stops
+   with its gap open and the page stops one wedge short, which is the joke told
+   without any movement at all. */
+@media (prefers-reduced-motion: reduce) {
+  .sign {
+    animation: none;
+  }
+
+  .bird {
+    animation: none;
+  }
+}
