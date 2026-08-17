@@ -1,4 +1,4 @@
-import type { LabEntry } from '@/lib/labs-manifest'
+import { labHref, type LabEntry } from '@/lib/labs-manifest'
 import styles from './focus-card.module.css'
 
 const STATUS_LABEL: Record<LabEntry['status'], string> = {
@@ -17,7 +17,7 @@ export function FocusCard({ lab }: { lab: LabEntry }) {
       </p>
       <h2 className={styles.title}>{lab.title}</h2>
       <p className={styles.thesis}>{lab.thesis}</p>
-      <p className={styles.action}>click to enter</p>
+      <p className={styles.action}>{labHref(lab) ? 'click to enter' : 'click to read the sign'}</p>
     </div>
   )
 }

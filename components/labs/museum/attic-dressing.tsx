@@ -44,7 +44,11 @@ function sheetMaterialProps() {
 export function CornerDrape({ placement }: { placement: PaintingPlacement }) {
   const cloth = useMemo(() => clothGeometry(1.25, 1.5, 41, 0.08), [])
   return (
-    <group position={placement.position} rotation-y={placement.rotationY}>
+    <group
+      position={placement.position}
+      rotation-y={placement.rotationY}
+      scale={placement.scale ?? 1}
+    >
       <mesh geometry={cloth} position={[-0.72, 0.9, 0.14]} rotation-z={-0.18}>
         <meshStandardMaterial {...sheetMaterialProps()} />
       </mesh>
@@ -122,7 +126,11 @@ export function AtticDressing({ hallLen }: { hallLen: number }) {
       <CoveredFrame x={-(ATTIC.halfWidth - 0.55)} z={entryZ - 1.6} lean={0.16} seed={7} />
       <CoveredFrame x={-(ATTIC.halfWidth - 0.7)} z={entryZ - 2.1} lean={0.22} seed={11} w={1.0} h={1.4} />
       <CoveredFrame x={ATTIC.halfWidth - 0.6} z={entryZ - 3.4} lean={0.14} seed={19} />
-      <CoveredStatue x={-2.6} z={-(far - 1.2)} height={1.7} seed={23} />
+      {/* Off the far wall, not against it: the exhibit row is centred and now
+          spans nearly the whole gable, so a statue standing a metre off that
+          wall is a statue standing in front of a painting. It keeps the left
+          side of the room instead, where a visitor passes it on the way in. */}
+      <CoveredStatue x={-(ATTIC.halfWidth - 0.6)} z={-(far - 3.4)} height={1.7} seed={23} />
       {/* GATE H: moved off the stair-exit lane (was entryZ - 1.4 at x 2.7 —
           you emerged from the stairs straight through it). Now against the
           entry wall left of the opening: behind you as you arrive, clear of

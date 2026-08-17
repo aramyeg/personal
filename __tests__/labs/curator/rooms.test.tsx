@@ -20,8 +20,19 @@ describe('RoomsModule', () => {
   it('links every room to its resolved href', () => {
     render(<RoomsModule />)
     const links = screen.getAllByRole('link', { name: /open/i })
-    expect(links).toHaveLength(labs.length)
+    expect(links).toHaveLength(labs.filter((l) => !l.remnant).length)
     expect(links.map((l) => l.getAttribute('href'))).toContain('/classic-claude')
+  })
+  it('inventories a remnant but offers no link — there is no room to open', () => {
+    render(<RoomsModule />)
+    for (const lab of labs.filter((l) => l.remnant)) {
+      expect(screen.getByText(lab.title)).toBeInTheDocument()
+      expect(screen.queryByRole('link', { name: `Open ${lab.title}` })).toBeNull()
+    }
+    const dead = labs.filter((l) => l.remnant).map((l) => `/labs/${l.slug}`)
+    for (const link of screen.getAllByRole('link')) {
+      expect(dead).not.toContain(link.getAttribute('href'))
+    }
   })
   it('gives every row action a distinct accessible name', () => {
     render(<RoomsModule />)

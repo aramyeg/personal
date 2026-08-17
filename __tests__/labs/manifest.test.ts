@@ -1,5 +1,7 @@
+import { existsSync } from 'node:fs'
+import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { labs, hallLabs, atticLabs } from '@/lib/labs-manifest'
+import { labs, hallLabs, atticLabs, labHref } from '@/lib/labs-manifest'
 
 describe('labs manifest attic split', () => {
   it('splits the manifest into hall and attic without losing entries', () => {
@@ -31,6 +33,30 @@ describe('labs manifest attic split', () => {
     expect(xp).toBeDefined()
     expect(xp!.title).toBe('Bliss')
     expect(xp!.status).toBe('live')
+  })
+
+  it('keeps small world as a remnant: a sign in the attic, with no room behind it', () => {
+    const sw = atticLabs.find((l) => l.slug === 'small-world')
+    expect(sw).toBeDefined()
+    expect(sw!.remnant).toBe(true)
+    expect(sw!.href).toBeUndefined()
+    expect(sw!.retrospective).toContain('The museum kept the loading screen.')
+    expect(labHref(sw!)).toBeNull()
+  })
+
+  it('resolves a route for every lab that is not a remnant', () => {
+    for (const lab of labs) {
+      expect(labHref(lab) === null).toBe(lab.remnant === true)
+    }
+  })
+
+  it('never points a lab at a route this build does not ship', () => {
+    for (const lab of labs) {
+      const href = labHref(lab)
+      if (href === null) continue
+      const route = join(process.cwd(), 'app', href, 'page.tsx')
+      expect(existsSync(route), `${lab.slug} routes to ${href}, which has no page`).toBe(true)
+    }
   })
 
   it('demotes the main site to a hall painting at /classic-claude', () => {

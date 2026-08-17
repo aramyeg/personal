@@ -13,6 +13,13 @@ describe('FocusCard', () => {
     expect(screen.getByText(/click to enter/i)).toBeInTheDocument()
   })
 
+  it('offers the sign, not the room, for an entry with no room behind it', () => {
+    const remnant = atticLabs.find((l) => l.remnant)!
+    render(<FocusCard lab={remnant} />)
+    expect(screen.getByText(/click to read the sign/i)).toBeInTheDocument()
+    expect(screen.queryByText(/click to enter/i)).toBeNull()
+  })
+
   it('labels live and attic statuses differently', () => {
     const live = hallLabs.find((l) => l.status === 'live')!
     const { unmount } = render(<FocusCard lab={live} />)

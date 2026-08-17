@@ -9,7 +9,7 @@ import { WinMyComputer } from '@/components/labs/xp/win-my-computer'
 import { experiences, projects } from '@/data'
 import { WinAddRemove, sizeOnDisk } from '@/components/labs/xp/win-add-remove'
 import { WinRecycleBin } from '@/components/labs/xp/win-recycle-bin'
-import { atticLabs } from '@/lib/labs-manifest'
+import { atticLabs, labHref } from '@/lib/labs-manifest'
 import { skills } from '@/data'
 import { WinMessenger } from '@/components/labs/xp/win-messenger'
 import { WinIE } from '@/components/labs/xp/win-ie'
@@ -73,7 +73,22 @@ describe('recycle bin', () => {
     render(<WinRecycleBin />)
     for (const lab of atticLabs) {
       expect(screen.getByText(lab.title)).toBeInTheDocument()
-      expect(screen.getByRole('link', { name: `Restore ${lab.title}` })).toHaveAttribute('href', lab.href ?? `/labs/${lab.slug}`)
+      const href = labHref(lab)
+      if (href === null) continue
+      expect(screen.getByRole('link', { name: `Restore ${lab.title}` })).toHaveAttribute('href', href)
+    }
+  })
+
+  it('lists a remnant but cannot restore it — there is nowhere to restore it to', () => {
+    render(<WinRecycleBin />)
+    for (const lab of atticLabs.filter((l) => l.remnant)) {
+      expect(screen.getByText(lab.title)).toBeInTheDocument()
+      expect(screen.getByText(lab.retrospective!)).toBeInTheDocument()
+      expect(screen.queryByRole('link', { name: `Restore ${lab.title}` })).toBeNull()
+    }
+    const dead = atticLabs.filter((l) => l.remnant).map((l) => `/labs/${l.slug}`)
+    for (const link of screen.getAllByRole('link')) {
+      expect(dead).not.toContain(link.getAttribute('href'))
     }
   })
 })

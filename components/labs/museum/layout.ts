@@ -23,6 +23,8 @@ export type PaintingPlacement = {
   thesis: string
   position: [number, number, number]
   rotationY: number
+  /** Frame scale; 1 is the hall's full size. */
+  scale?: number
 }
 
 /** One frame per manifest entry, alternating walls down the hall. */
@@ -140,27 +142,61 @@ export function clampToRegions(
   return { x, z }
 }
 
-/** Exhibits hang on the far gable wall, facing back toward the stairs. */
+/**
+ * The attic hangs SMALLER frames than the hall, and it has to.
+ *
+ * A hall frame is 2.12 x 2.72 (painting.tsx: ART_W/ART_H + 2 * FRAME_T). The
+ * gable it hangs on here is 7 wide but only 1.6 tall at the knee walls, rising
+ * to 3.4 at the ridge — so a full-size frame's upper OUTER corners leave the
+ * wall entirely and hang in the dark past the roof line, and three of them side
+ * by side reach into the knee walls as well. At this scale and pitch all three
+ * sit inside the gable's cross-section (see `atticGableHeight`), which is what
+ * the layout tests gate. Smaller frames upstairs also read correctly: these are
+ * the lesser works.
+ */
+const ATTIC_SCALE = 0.68
+const ATTIC_PITCH = 1.65
+
+/** Height of the roof cross-section above the attic floor at |x| — the gable
+ * triangle at the end wall, and the roof slope everywhere else. Anything hung
+ * above this line at that x is off the wall. */
+export function atticGableHeight(x: number): number {
+  const t = Math.min(1, Math.abs(x) / ATTIC.halfWidth)
+  return STAIR.rise + ATTIC.wallHeight + (ATTIC.ridgeHeight - ATTIC.wallHeight) * (1 - t)
+}
+
+/** Exhibits hang on the far gable wall, facing back toward the stairs, as a row
+ * CENTRED on the wall: the attic fills up over time, and a row that grew from a
+ * fixed left edge ran its third frame off into the knee wall. */
 export function atticPlacements(atticEntries: LabEntry[], hallLen: number): PaintingPlacement[] {
   const wallZ = -(atticDepth(hallLen) - ATTIC.hangOffset)
-  const hangY = STAIR.rise + 1.5
+  const hangY = STAIR.rise + 1.08
+  const firstX = -((atticEntries.length - 1) / 2) * ATTIC_PITCH
   return atticEntries.map((lab, i) => ({
     slug: lab.slug,
     title: lab.title,
     date: lab.date,
     thesis: lab.thesis,
-    position: [-1.2 + i * 2.6, hangY, wallZ],
+    position: [firstX + i * ATTIC_PITCH, hangY, wallZ],
     rotationY: 0,
+    scale: ATTIC_SCALE,
   }))
 }
 
-/** The failed-experiments plaque, right of the first exhibit on the same wall. */
+/** The failed-experiments plaque, on the left knee wall facing across the room.
+ * The far gable wall belongs to the exhibits — a centred row of three leaves no
+ * clear span there, and a plaque hung into that row simply sits behind a frame.
+ * The side wall is what a visitor cresting the stairs turns to see first. */
 export function atticPlaquePlacement(hallLen: number): {
   position: [number, number, number]
   rotationY: number
 } {
   return {
-    position: [1.6, STAIR.rise + 1.5, -(atticDepth(hallLen) - ATTIC.hangOffset)],
-    rotationY: 0,
+    position: [
+      -(ATTIC.halfWidth - 0.03),
+      STAIR.rise + ATTIC.wallHeight / 2,
+      -(hallLen + STAIR.run + ATTIC.depth * 0.45),
+    ],
+    rotationY: Math.PI / 2,
   }
 }

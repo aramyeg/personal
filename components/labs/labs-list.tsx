@@ -1,12 +1,15 @@
 import type { ReactNode } from 'react'
 import Link from 'next/link'
-import { atticLabs, hallLabs, type LabEntry } from '@/lib/labs-manifest'
+import { atticLabs, hallLabs, labHref, type LabEntry } from '@/lib/labs-manifest'
 import { siteConfig, socialLinks } from '@/lib/constants'
 import styles from './catalogue.module.css'
 
+/** A remnant has no room to open, so its card is the card without the link —
+ *  same frame, same placard, no destination. */
 function CatalogueCard({ lab, showRetrospective }: { lab: LabEntry; showRetrospective?: boolean }) {
-  return (
-    <Link href={lab.href ?? `/labs/${lab.slug}`} className={styles.card}>
+  const href = labHref(lab)
+  const card = (
+    <>
       <span className={styles.frame}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
@@ -21,12 +24,21 @@ function CatalogueCard({ lab, showRetrospective }: { lab: LabEntry; showRetrospe
         <span className={styles.placardTitle}>{lab.title}</span>
         <span className={styles.placardDate}>{lab.date}</span>
         {lab.status === 'wip' && <span className={styles.placardWip}>in progress</span>}
+        {lab.remnant && <span className={styles.placardWip}>no room — sign only</span>}
         <span className={styles.placardThesis}>{lab.thesis}</span>
       </span>
       {showRetrospective && lab.retrospective && (
         <span className={styles.retrospective}>{lab.retrospective}</span>
       )}
+    </>
+  )
+  // A remnant has no room to open: same frame, same placard, no destination.
+  return href ? (
+    <Link href={href} className={styles.card}>
+      {card}
     </Link>
+  ) : (
+    <div className={styles.card}>{card}</div>
   )
 }
 
